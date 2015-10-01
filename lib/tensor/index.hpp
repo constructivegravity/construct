@@ -5,6 +5,11 @@
 #include <sstream>
 #include <map>
 
+#include <boost/archive/binary_iarchive.hpp>
+#include <boost/archive/binary_oarchive.hpp>
+#include <boost/serialization/vector.hpp>
+#include <boost/serialization/string.hpp>
+
 #include <common/printable.hpp>
 #include <common/range.hpp>
 
@@ -44,8 +49,8 @@ namespace Albus {
 			// Copy constructor
 			Index(const Index& other) : name(other.name), Printable(other.GetPrintedText()), range(other.range) { }
 			// Move constructor (TODO)
-			//Index(Index&& other) 
-			//  : name(std::move(other.name)), Printable(other.GetPrintedText())(std::move(other.printed_text)), range(std::move(other.range)) { }
+			Index(Index&& other)
+			  : name(std::move(other.name)), Printable(std::move(other.printed_text)), range(std::move(other.range)) { }
 		public:
 			/**
 				Copy assignment operator
@@ -67,17 +72,29 @@ namespace Albus {
 				return *this;
 			}
 		public:
+			inline std::string GetName() const {
+				return name;
+			}
+
+			inline Range GetRange() const {
+				return range;
+			}
+
+			inline bool IsContravariant() const {
+				return up;
+			}
+		public:
 			/**
 				Equality operator
 			 */
-			bool operator==(const Index& other) const {
+			inline bool operator==(const Index& other) const {
 				return name == other.name && printed_text == other.printed_text;
 			}
 			
 			/**
 				Inequality operator
 			 */
-			bool operator!=(const Index& other) const {
+			inline bool operator!=(const Index& other) const {
 				return name != other.name || printed_text != other.printed_text;
 			}
 		public:
@@ -94,6 +111,16 @@ namespace Albus {
 			unsigned operator()(unsigned value) const {
 				assert(value >= range.GetFrom() && value <= range.GetTo());
 				return value;
+			}
+		private:
+			friend class boost::serialization::access;
+
+			template<class Archive>
+			void serialize(Archive& ar, const unsigned int version) {
+				ar & name;
+				ar & printed_text;
+				ar & range;
+				ar & up;
 			}
 		private:
 			std::string name;
@@ -178,6 +205,22 @@ namespace Albus {
 			Indices(Index&& index) {
 				indices.emplace_back(std::move(index));
 			}
+
+			Indices(const Indices& other)
+				: indices(other.indices) { }
+
+			Indices(Indices&& other)
+				: indices(std::move(other.indices)) { }
+		public:
+			Indices& operator=(const Indices& other) {
+				indices = other.indices;
+				return *this;
+			}
+
+			Indices& operator=(Indices&& other) {
+				indices = std::move(other.indices);
+				return *this;
+			}
 		public:
 			Indices Partial(const Range& range) const {
 				Indices result;
@@ -227,13 +270,40 @@ namespace Albus {
 		public:
 			std::vector<Index>::iterator begin() { return indices.begin(); }
 			std::vector<Index>::iterator end() { return indices.end(); }
+
+			std::vector<Index>::const_iterator begin() const { return indices.begin(); }
+			std::vector<Index>::const_iterator end() const { return indices.end(); }
 			
 			Index operator[](unsigned id) const {
 				assert(id >= 0 && id < indices.size());
 				return indices[id];
 			}
-			
+
+			Index operator[](const std::string& name) const {
+				for (auto& index : indices) {
+					if (index.GetName() == name) return index;
+				}
+				assert(false);
+			}
+
+			Index& operator[](unsigned id) {
+				assert(id >= 0 && id < indices.size());
+				return indices[id];
+			}
+
+			Index& operator[](const std::string& name) {
+				for (auto& index : indices) {
+					if (index.GetName() == name) return index;
+				}
+				assert(false && "Index not present");
+			}
+
 			size_t Size() const { return indices.size(); }
+			int IndexOf(const Index& index) const {
+				for (int i=0; i<indices.size(); i++)
+					if (indices[i] == index) return i;
+				return -1;
+			}
  		public:
 			virtual std::string ToString() const {
 				std::stringstream ss;
@@ -293,6 +363,66 @@ namespace Albus {
 					result.indices.emplace_back(Index(fullName, fullName, range));
 				}
 				return result;
+			}
+		public:
+			/**
+				\brief Returns if the given indices are a permutation of the given ones
+
+			 	In some cases it is necessary to determine if some set of indices contain the same
+			 	symbols but are permuted. This is especially essential for the contraction of indices
+			 	and generation of multiplied and added tensors.
+
+			 	\param[in] other	The other set of indices
+			 	\return is the index of a permutation of the other
+			 */
+			bool IsPermutationOf(const Indices& other) const {
+				// if the number of indices does not match then clearly not
+				if (other.indices.size() != indices.size()) return false;
+
+				// Iterate over all indices
+				for (auto& index : other.indices) {
+					if (std::find(indices.begin(), indices.end(), index) == indices.end()) return false;
+				}
+
+				// All indices were present => it is a permutation
+				return true;
+			}
+
+			static bool IsPermutationOf(const Indices& one, const Indices& other) {
+				// if the number of indices does not match then clearly not
+				if (other.indices.size() != one.indices.size()) return false;
+
+				// Iterate over all indices
+				for (auto& index : other.indices) {
+					if (std::find(one.indices.begin(), one.indices.end(), index) == one.indices.end()) return false;
+				}
+
+				// All indices were present => it is a permutation
+				return true;
+			}
+
+			static bool IsPermutationOf(const std::vector<int>& one, const std::vector<int>& other) {
+				// if the number of indices does not match then clearly not
+				if (other.size() != one.size()) return false;
+
+				// Iterate over all indices
+				for (auto& index : other) {
+					if (std::find(one.begin(), one.end(), index) == one.end()) return false;
+				}
+
+				// All indices were present => it is a permutation
+				return true;
+			}
+
+			bool ContainsIndex(const Index& index) const {
+				return std::find(indices.begin(), indices.end(), index) != indices.end();
+			}
+		private:
+			friend class boost::serialization::access;
+
+			template<class Archive>
+			void serialize(Archive& ar, const unsigned int version) {
+				ar & indices;
 			}
 		private:
 			std::vector<Index> indices;

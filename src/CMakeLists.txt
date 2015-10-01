@@ -6,3 +6,5 @@ add_subdirectory(module)
 
 add_executable(albus main.cpp)
 target_link_libraries(albus module)
+
+target_link_libraries(albus )

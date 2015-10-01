@@ -17,6 +17,10 @@ set(ALBUS_SOURCE_DIRECTORY "${ALBUS_MAIN_DIRECTORY}/src")
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "../../bin")
 
+find_package(Boost COMPONENTS system serialization REQUIRED)
+
+include_directories(${Boost_INCLUDE_DIRS})
+
 include_directories(
     ${ALBUS_LIBRARY_DIRECTORY}
 )

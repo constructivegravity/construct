@@ -1,5 +1,8 @@
 #pragma once
 
+#include <boost/archive/binary_iarchive.hpp>
+#include <boost/archive/binary_oarchive.hpp>
+
 namespace Albus {
 	namespace Common {
 		
@@ -105,6 +108,14 @@ namespace Albus {
 					result.push_back(i);
 				}
 				return result;
+			}
+		private:
+			friend class boost::serialization::access;
+
+			template<class Archive>
+			void serialize(Archive& ar, const unsigned int version) {
+				ar & from;
+				ar & to;
 			}
 		private:
 			unsigned from;
