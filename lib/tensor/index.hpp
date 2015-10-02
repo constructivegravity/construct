@@ -199,6 +199,21 @@ namespace Albus {
 		 */
 		class IndexAssignments {
 		public:
+			IndexAssignments() = default;
+
+			IndexAssignments(const IndexAssignments& other) : assignment(other.assignment) { }
+			IndexAssignments(IndexAssignments&& other) : assignment(std::move(other.assignment)) { }
+		public:
+			IndexAssignments& operator=(const IndexAssignments& other) {
+				assignment = other.assignment;
+				return *this;
+			}
+
+			IndexAssignments& operator=(IndexAssignments&& other) {
+				assignment = std::move(other.assignment);
+				return *this;
+			}
+		public:
 			unsigned& operator[](const std::string& name) {
 				return assignment[name];
 			}
@@ -352,7 +367,7 @@ namespace Albus {
 				return ss.str();
 			}
 			
-			static Indices GetSeries(unsigned N, const std::string& name, const std::string& printed, const Range& range) {
+			static Indices GetSeries(unsigned N, const std::string& name, const std::string& printed, const Range& range, unsigned offset=0) {
 				Indices result;
 				for (unsigned i=1; i<=N; i++) {
 					std::string fullName = "";
@@ -361,14 +376,14 @@ namespace Albus {
 					// Generate full name
 					{
 						std::stringstream ss;
-						ss << name << "_" << i;
+						ss << name << "_" << (i+offset);
 						fullName = ss.str();
 					}
 					
 					// Generate full printed text
 					{
 						std::stringstream ss;
-						ss << printed << "_" << i;
+						ss << printed << "_" << (i+offset);
 						fullPrinted = ss.str();
 					}
 										
@@ -377,24 +392,24 @@ namespace Albus {
 				return result;
 			}
 			
-			static Indices GetGreekSeries(unsigned N, const Range& range) {
-				assert(N <= GreekIndices.size());
+			static Indices GetGreekSeries(unsigned N, const Range& range, unsigned offset=0) {
+				assert(N+offset <= GreekIndices.size());
 				Indices result;
 				for (unsigned i=0; i<N; i++) {
-					std::string fullName = GreekIndices[i];
+					std::string fullName = GreekIndices[i+offset];
 					std::string fullPrinted = GreekSymbols.at(fullName);
 					result.indices.emplace_back(Index(fullName, fullPrinted, range));
 				}
 				return result;
 			}
 			
-			static Indices GetRomanSeries(unsigned N, const Range& range) {
-				assert(N <= 52);
+			static Indices GetRomanSeries(unsigned N, const Range& range, unsigned offset=0) {
+				assert(N+offset <= 52);
 				Indices result;
 				for (char i=0; i<N; i++) {
 					std::string fullName;
-					fullName = 'a' + i;
-					if (i >= 26) fullName = 'A' + (i-26);
+					fullName = 'a' + i+offset;
+					if (i+offset >= 26) fullName = 'A' + (i+offset-26);
 					result.indices.emplace_back(Index(fullName, fullName, range));
 				}
 				return result;
