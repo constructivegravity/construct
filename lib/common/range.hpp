@@ -46,6 +46,14 @@ namespace Albus {
 			unsigned GetFrom() const { return from; }
 			unsigned GetTo() const { return to; }
 		public:
+			bool operator==(const Range& other) const {
+				return from == other.from && to == other.to;
+			}
+
+			bool operator!=(const Range& other) const {
+				return from != other.from || to != other.to;
+			}
+		public:
 			/**
 				\class Iterator
 			
