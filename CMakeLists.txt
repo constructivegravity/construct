@@ -17,9 +17,20 @@ set(ALBUS_SOURCE_DIRECTORY "${ALBUS_MAIN_DIRECTORY}/src")
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "../../bin")
 
+# Use boost
 find_package(Boost COMPONENTS system serialization REQUIRED)
-
 include_directories(${Boost_INCLUDE_DIRS})
+
+# Documentation
+#find_package(Doxygen)
+#if(DOXYGEN_FOUND)
+#    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile @ONLY)
+#    add_custom_target(doc
+#            ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
+#            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+#            COMMENT "Generating API documentation with Doxygen" VERBATIM
+#    )
+#endif(DOXYGEN_FOUND)
 
 include_directories(
     ${ALBUS_LIBRARY_DIRECTORY}
