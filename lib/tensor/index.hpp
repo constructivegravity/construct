@@ -25,6 +25,11 @@ namespace Albus {
 			IncompleteIndexAssignmentException()
 				: Exception("Incomplete index assignment") { }
 		};
+
+		class IndexOutOfRangeException : public Exception {
+		public:
+			IndexOutOfRangeException() : Exception("The index assignment is out of range.") { }
+		};
 		
 		/**
 			\class Index
@@ -114,9 +119,13 @@ namespace Albus {
 				If the test passes, then the index is returned again.
 			
 				\param value	The index that may be applied
+
+			 	\throws IndexOutOfRangeException
 			 */
 			unsigned operator()(unsigned value) const {
-				assert(value >= range.GetFrom() && value <= range.GetTo());
+				if (!(value >= range.GetFrom() && value <= range.GetTo())) {
+					throw IndexOutOfRangeException();
+				}
 				return value;
 			}
 		private:
@@ -309,7 +318,7 @@ namespace Albus {
 				std::vector<unsigned> result;
 				
 				result = Partial(Range(1, indices.size()))(args...);
-				
+
 				result.insert(result.begin(), (indices.at(0))(t));
 				return result;
 			}
