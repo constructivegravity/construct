@@ -91,8 +91,8 @@ namespace Albus {
 				unsigned max;
 			};
 			
-			Iterator begin() const { return Iterator(from, to); }
-			Iterator end() const { return Iterator(to, to); }
+			Iterator begin() const { return Iterator(from, to+1); }
+			Iterator end() const { return Iterator(to+1, to+1); }
 		public:
 			static Range SpacetimeRange(unsigned D=3) {
 				return Range(0,D);
