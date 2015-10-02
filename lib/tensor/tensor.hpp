@@ -225,7 +225,7 @@ namespace Albus {
 
 			 	Negation of a tensor. Is equal to a multiplication by -1.
 			 */
-			ScaledTensor operator-() const;
+			inline ScaledTensor operator-() const;
 
 			/**
 				\brief Addition of two tensors
@@ -325,6 +325,10 @@ namespace Albus {
 
 				return true;
 			}
+
+			/*bool IsEqual(const Tensor& tensor) const {
+				return (*this - tensor).IsZero();
+			}*/
 		private:
 			friend class boost::serialization::access;
 
@@ -360,7 +364,7 @@ namespace Albus {
 				Constructor of an AddedTensor
 			 */
 			AddedTensor(ConstTensorPointer A, ConstTensorPointer B)
-				: Tensor(A->GetName(), "", A->GetIndices()), A(A), B(B) { }
+				: Tensor("", "", A->GetIndices()), A(A), B(B) { }
 		public:
 			/**
 				Return the LaTeX code of both tensors
@@ -421,7 +425,7 @@ namespace Albus {
 		class MultipliedTensor : public Tensor {
 		public:
 			MultipliedTensor(ConstTensorPointer A, ConstTensorPointer B)
-				: Tensor(A->GetName(), "", A->GetIndices()), A(A), B(B)
+				: Tensor("", "", A->GetIndices()), A(A), B(B)
 			{
 				// Insert the remaining indices of B
 				for (auto& index : B->GetIndices()) {
@@ -484,7 +488,7 @@ namespace Albus {
 		class ScaledTensor : public Tensor {
 		public:
 			ScaledTensor(ConstTensorPointer A, double c)
-				: Tensor(A->GetName(), "", A->GetIndices()), A(A), c(c) { }
+				: Tensor("", "", A->GetIndices()), A(A), c(c) { }
 		public:
 			virtual std::string ToString() const {
 				std::stringstream ss;
@@ -533,6 +537,10 @@ namespace Albus {
 
 		ScaledTensor operator*(double c, const Tensor& other) {
 			return other*c;
+		}
+
+		inline ScaledTensor Tensor::operator-() const {
+			return -1 * (*this);
 		}
 
 		AddedTensor Tensor::operator+(const Tensor& other) const {
