@@ -10,6 +10,7 @@
 #include <boost/serialization/vector.hpp>
 #include <boost/serialization/string.hpp>
 
+#include <common/error.hpp>
 #include <common/printable.hpp>
 #include <common/range.hpp>
 
@@ -18,6 +19,12 @@ namespace Albus {
 		
 		using Common::Printable;
 		using Common::Range;
+
+		class IncompleteIndexAssignmentException : public Exception {
+		public:
+			IncompleteIndexAssignmentException()
+				: Exception("Incomplete index assignment") { }
+		};
 		
 		/**
 			\class Index
@@ -183,6 +190,34 @@ namespace Albus {
 		static const std::vector<std::string> GreekIndices = {
 			"mu", "nu", "kappa", "lambda", "alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta", "iota", "xi", "omicron", "pi", "rho", "sigma", "tau", "upsilon", "phi", "chi", "psi", "omega",
 			"Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta", "Eta", "Theta", "Iota", "Kappa", "Lambda", "Mu", "Nu", "Xi", "Omicron", "Pi", "Rho", "Sigma", "Tau", "Upsilon", "Phi", "Chi", "Psi", "Omega",
+		};
+
+		class Indices;
+
+		/**
+			\class IndexAssignments
+		 */
+		class IndexAssignments {
+		public:
+			unsigned& operator[](const std::string& name) {
+				return assignment[name];
+			}
+		public:
+			std::vector<unsigned> operator()(const Indices&) const;
+
+			friend std::ostream& operator<<(std::ostream& os, const IndexAssignments& assignment) {
+				os << "{ ";
+				int i=0;
+				for (auto& it : assignment.assignment) {
+					os << "\"" << it.first << "\" => " << it.second;
+					if (i != assignment.assignment.size()-1) os << " , ";
+					i++;
+				}
+				os << " }";
+				return os;
+			}
+		private:
+			std::map<std::string, unsigned> assignment;
 		};
 		
 		/**
@@ -427,6 +462,25 @@ namespace Albus {
 		private:
 			std::vector<Index> indices;
 		};
+
+
+		std::vector<unsigned> IndexAssignments::operator()(const Indices& indices) const {
+			std::vector<unsigned> result;
+
+			// Check if all the indices in the tensor are present in the assignment
+			for (auto& index : indices) {
+				auto it = assignment.find(index.GetName());
+
+				if (it == assignment.end()) {
+					throw IncompleteIndexAssignmentException();
+				} else {
+					// push the assignment to the list
+					result.push_back(it->second);
+				}
+			}
+
+			return result;
+		}
 		
 	}
 }
