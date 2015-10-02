@@ -250,6 +250,81 @@ namespace Albus {
 			 	\throws CannotAddTensorsException
 			 */
 			AddedTensor operator-(const Tensor& other) const;
+		public:
+			/**
+				\brief Checks if all the ranges are equal
+
+			 	Checks if all the ranges of the indices are equal. If we for example
+			 	multiply the Levi-Civita symbol on the spatial slice with the
+			 	metric in all spacetime we have two indices that range from
+			 	0 to 3 and three from 1 to 3. In this case the function
+			 	returns false.
+			 */
+			bool AllRangesEqual() const {
+				for (auto& index : indices) {
+					if (index.GetRange() != indices[0].GetRange()) return false;
+				}
+				return true;
+			}
+
+			/**
+				\brief Returns all the possible index combinations for the tensor.
+
+			 	Returns all the possible index combinations for the tensor.
+			 	It uses a recursive inline methods that fixes the indices one by one
+			 	until all indices have a value. In this case the combination is added to the
+			 	result.
+			 */
+			std::vector<std::vector<unsigned>> GetAllIndexCombinations() const {
+				std::vector<std::vector<unsigned>> result;
+
+				// Helper method to recursively determine the index combinations
+				std::function<void(const std::vector<unsigned>&)> fn = [&](const std::vector<unsigned>& input) -> void {
+					// If all indices are fixed, add the combination to the list
+					if (input.size() == indices.Size()) {
+						result.push_back(input);
+						return;
+					}
+
+					// Get range of next unfixed index
+					auto range = indices[input.size()].GetRange();
+
+					// Iterate over the range
+					for (auto i : range) {
+						// Add the index to the list
+						std::vector<unsigned> newInput = input;
+						newInput.push_back(i);
+
+						// Recursive call to go to next index
+						fn(newInput);
+					}
+				};
+
+				// Start recursion
+				fn({});
+
+				return result;
+			}
+
+			/**
+				\brief Checks if the tensor is identical to zero
+
+			 	Checks if the tensor is identical to zero. For
+			 	this it evaluates at all the possible index combinations
+				and immediately returns false if one combination does
+			 	not yield zero.
+			 */
+			bool IsZero() const {
+				// Get all index combinations
+				auto combinations = GetAllIndexCombinations();
+
+				// Iterate over all combinations
+				for (auto& combination : combinations) {
+					if (Evaluate(combination)) return false;
+				}
+
+				return true;
+			}
 		private:
 			friend class boost::serialization::access;
 
@@ -575,6 +650,10 @@ namespace Albus {
 				return GammaTensor(Indices::GetRomanSeries(2, {1,3}, offset), 0,3);
 			}
 		public:
+			/**
+				Evaluate the tensor components. It returns 0 if evaluated
+			 	off diagonal, -1 for all indices < p and 1 else.
+			 */
 			virtual double Evaluate(const std::vector<unsigned>& vec) const {
 				if (vec.size() != 2) {
 					throw IncompleteIndexAssignmentException();
