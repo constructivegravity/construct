@@ -553,6 +553,34 @@ namespace Albus {
 		}
 
 		/**
+			\class ScalarTensor
+		 */
+		class ScalarTensor : public Tensor {
+		public:
+			ScalarTensor(const std::string& name, const std::string& printed_text, double value)
+				: Tensor(name, printed_text, Indices()), value(value) { }
+		public:
+			virtual std::string ToString() const {
+				return printed_text;
+			}
+		public:
+			double operator()() const {
+				return value;
+			}
+
+			double Evaluate(const std::vector<unsigned>& args) {
+				if (args.size() != 0) throw IncompleteIndexAssignmentException();
+				return value;
+			}
+		private:
+			double value;
+		};
+
+		inline ScalarTensor One() {
+			return ScalarTensor("1", "1", 1);
+		}
+
+		/**
 			\class EpsilonTensor
 
 		 	\brief Represents the totally antisymmetric tensor density
@@ -630,7 +658,7 @@ namespace Albus {
 			}
 
 			GammaTensor(const Indices& indices)
-				: Tensor("gamma", "\\epsilon", indices),  signature({0,3}) {
+				: Tensor("gamma", "\\gamma", indices),  signature({0,3}) {
 				assert(indices.Size() == 2);
 			}
 		public:

@@ -375,7 +375,150 @@ namespace Albus {
 	
 				return ss.str();
 			}
-			
+		public:
+			/**
+				Get a partition of n indices. Note that this is up to permutation.
+
+			 	TODO: parallelize this
+			 */
+			std::vector<std::pair<Indices, Indices>> GetAllPartitions(unsigned n) const {
+				// Check if the number of indices we wish to draw from the indices is
+				// smaller than the total number of indices.
+				assert(n <= indices.size());
+
+				std::vector< std::pair<Indices, Indices> > result;
+
+				// Use a helper method
+				std::function<void(const std::vector<unsigned>&, const std::vector<unsigned>&)> fn = [&](const std::vector<unsigned>& usedIndices, const std::vector<unsigned>& neglectedIndices) -> void {
+					// If we have enough used indices finish the partition
+					if (usedIndices.size() == n) {
+						Indices used;
+						Indices remaining;
+
+						// Add all the used indices to the used list
+						for (auto& index : usedIndices) used.Insert(indices[index]);
+
+						// Add all the so far unused indices to the remaining list
+						for (auto& index : neglectedIndices) remaining.Insert(indices[index]);
+
+						// Fill the unused indices
+						for (unsigned current = usedIndices.size() + neglectedIndices.size(); current < indices.size(); current++) {
+							remaining.Insert(indices[current]);
+						}
+
+						// Add partition
+						result.push_back({ used, remaining });
+						return;
+					}
+
+					// If all the indices were used, but no partition is found yet, cancel
+					if (usedIndices.size() + neglectedIndices.size() == indices.size()) {
+						return;
+					}
+
+					// Obtain current index
+					unsigned current = usedIndices.size() + neglectedIndices.size();
+
+					// Consider it as used index
+					{
+						std::vector<unsigned> newUsedIndices = usedIndices;
+						newUsedIndices.push_back(current);
+
+						fn(newUsedIndices, neglectedIndices);
+					}
+
+					// Consider it as neglected index
+					{
+						std::vector<unsigned> newNeglectedIndices = neglectedIndices;
+						newNeglectedIndices.push_back(current);
+
+						fn(usedIndices, newNeglectedIndices);
+					}
+				};
+
+				// Start recursion
+				fn({}, {});
+
+				return result;
+			}
+
+			/**
+				Get all the partitions of a series of indices in
+			 */
+			std::vector< std::vector<Indices> > GetAllPartitions(const std::vector<unsigned>& partitions, bool commutative=false) const {
+				// Check if the request partitions are valid
+				unsigned total = 0;
+				for (auto& i : partitions) {
+					total += i;
+				}
+				assert(total == indices.size());
+
+				std::vector< std::vector<Indices> > result;
+
+				// Helper function for permutation
+				// Based on Heap's algorithm to generate all permutations of an element
+				std::function<bool(std::vector<Indices>&, unsigned)> checkAllPermutations;
+				checkAllPermutations = [&](std::vector<Indices>& input, unsigned n) -> bool {
+					if (n == 1) {
+						return std::find(result.begin(), result.end(), input) == result.end();
+					} else {
+						for (int i=0; i<n; i++) {
+							bool res = checkAllPermutations(input, n-1);
+							if (!res) return false;
+							if (n % 2 == 1) {
+								std::swap(input[0], input[n-1]);
+							} else {
+								std::swap(input[i], input[n-1]);
+							}
+						}
+					}
+
+					return true;
+				};
+
+				// Helper function for commutativity check
+				std::function<bool(const std::vector<Indices>&)> commutativityCheck;
+				if (commutative) {
+					commutativityCheck = [&](const std::vector<Indices>& input) -> bool {
+						std::vector<Indices> temporary = input;
+						return checkAllPermutations(temporary, temporary.size());
+					};
+				} else {
+					commutativityCheck = [&](const std::vector<Indices>&) -> bool {
+						return true;
+					};
+				}
+
+				// Helper function
+				std::function< void(const std::vector<unsigned>&, const std::vector<Indices>&, const Indices&) > fn = [&](const std::vector<unsigned>& usedPartitions, const std::vector<Indices>& used, const Indices& remaining) -> void {
+					// If we have used all partitions, add partition to the result
+					if (usedPartitions.size() == partitions.size() && remaining.Size() == 0) {
+						if (commutativityCheck(used))
+							result.push_back(used);
+						return;
+					}
+
+					// Get current
+					unsigned current = partitions[usedPartitions.size()];
+
+					// Partition the remaining indices
+					auto part = remaining.GetAllPartitions(current);
+					for (auto& p : part) {
+						auto newUsedPartitions = usedPartitions;
+						newUsedPartitions.push_back(current);
+
+						auto newUsed = used;
+						newUsed.push_back(p.first);
+
+						fn(newUsedPartitions, newUsed, p.second);
+					}
+				};
+
+				fn({}, {}, *this);
+
+				return result;
+			}
+		public:
 			static Indices GetSeries(unsigned N, const std::string& name, const std::string& printed, const Range& range, unsigned offset=0) {
 				Indices result;
 				for (unsigned i=1; i<=N; i++) {
