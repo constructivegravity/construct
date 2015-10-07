@@ -114,7 +114,6 @@ namespace Albus {
                 // Indicate that the pool has been shut down.
                 stopped = true;
             }
-
         private:
             std::vector<std::thread> threadPool;
             std::queue<std::function<void()>> tasks;

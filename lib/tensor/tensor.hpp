@@ -8,6 +8,7 @@
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/archive/binary_iarchive.hpp>
 
+#include <common/task_pool.hpp>
 #include <tensor/permutation.hpp>
 
 namespace Albus {
@@ -34,6 +35,9 @@ namespace Albus {
 			CannotMultiplyTensorsException() : Exception("Cannot multiply tensors due to incompatible indices") { }
 		};
 
+		// Evaluation function
+		typedef std::function<double(const std::vector<unsigned>&)>	EvaluationFunction;
+
 		/**
 			\class Tensor
 
@@ -55,6 +59,20 @@ namespace Albus {
 		 */
 		class Tensor : public Printable {
 		public:
+			enum class TensorType {
+				ADDITION = 1,
+				MULTIPLICATION = 2,
+				SCALED = 3,
+
+				SCALAR = 101,
+				NUMERIC = 102,
+
+				EPSILON = 201,
+				GAMMA = 202,
+
+				CUSTOM = -1
+			};
+		public:
 			/**
 				Constructor of a Tensor
 
@@ -63,20 +81,24 @@ namespace Albus {
 			 	\param indices		The indices of the tensor
 			 */
 			Tensor(const std::string& name, const std::string& printable, const Indices& indices)
-				: name(name), Printable(printable), indices(indices) { }
+				: name(name), Printable(printable), indices(indices), evaluator([&](const std::vector<unsigned>&) { return 0.0; }) { }
+			Tensor(const std::string& name, const std::string& printable, const Indices& indices, const EvaluationFunction& fn)
+					: name(name), Printable(printable), indices(indices), evaluator(fn) { }
 
 			// Copy constructor
 			Tensor(const Tensor& other)
-				: name(other.name), Printable(other.printed_text), indices(other.indices) { }
+				: name(other.name), Printable(other.printed_text), indices(other.indices), evaluator(other.evaluator), type(other.type) { }
 			// Move constructor
 			Tensor(Tensor&& other)
-				: name(std::move(other.name)), Printable(std::move(other.printed_text)), indices(std::move(other.indices)) { }
+				: name(std::move(other.name)), Printable(std::move(other.printed_text)), indices(std::move(other.indices)), evaluator(std::move(other.evaluator)), type(std::move(other.type)) { }
 		public:
 			// Copy assignment
 			Tensor& operator=(const Tensor& other) {
 				name = other.name;
 				printed_text = other.printed_text;
 				indices = other.indices;
+				type = other.type;
+				evaluator = other.evaluator;
 				return *this;
 			}
 
@@ -85,6 +107,8 @@ namespace Albus {
 				name = std::move(other.name);
 				printed_text = std::move(other.printed_text);
 				indices = std::move(other.indices);
+				evaluator = std::move(other.evaluator);
+				type = std::move(other.type);
 				return *this;
 			}
 		public:
@@ -146,11 +170,13 @@ namespace Albus {
 			/**
 				Virtual method for tensor evaluation. Standard result is zero.
 
+			 	@DEPRECEATED! Replace with evaluator
+
 			 	\param indices	Vector with the index assigment, i.e unsigned ints
 			 	\returns		The tensor component at this index assignment
 			 */
-			virtual double Evaluate(const std::vector<unsigned>& indices) const {
-				return 0.0;
+			inline double Evaluate(const std::vector<unsigned>& indices) const {
+				return evaluator(indices);
 			}
 
 			/**
@@ -167,7 +193,7 @@ namespace Albus {
 			template<typename T, typename... Args>
 			double operator()(T t, Args... args) const {
 				auto indices = CheckIndices(t, args...);
-				return Evaluate(indices);
+				return evaluator(indices);
 			}
 
 			/**
@@ -180,7 +206,7 @@ namespace Albus {
 			 */
 			inline double operator()(const IndexAssignments& assignment) const {
 				auto result = assignment(indices);
-				return Evaluate(result);
+				return evaluator(result);
 			}
 
 			/**
@@ -193,8 +219,20 @@ namespace Albus {
 			 	\returns		The tensor component at this index assignment
 			 */
 			inline double operator()(const std::vector<unsigned>& indices) const {
-				return Evaluate(indices);
+				return evaluator(indices);
 			}
+        public:
+            bool IsCustomTensor() const { return type == TensorType::CUSTOM; }
+
+            bool IsAddedTensor() const { return type == TensorType::ADDITION; }
+            bool IsMultipliedTensor() const { return type == TensorType::MULTIPLICATION; }
+            bool IsScaledTensor() const { return type == TensorType::SCALED; }
+
+            bool IsScalar() const { return type == TensorType::SCALAR; }
+            bool IsNumeric() const { return type == TensorType::NUMERIC; }
+
+            bool IsEpsilonTensor() const { return type == TensorType::EPSILON; }
+            bool IsGammaTensor() const { return type == TensorType::GAMMA; }
 		public:
 			/**
 				\brief Multiplication of two tensors
@@ -276,6 +314,8 @@ namespace Albus {
 			 	result.
 			 */
 			std::vector<std::vector<unsigned>> GetAllIndexCombinations() const {
+
+				// Result
 				std::vector<std::vector<unsigned>> result;
 
 				// Helper method to recursively determine the index combinations
@@ -301,6 +341,7 @@ namespace Albus {
 				};
 
 				// Start recursion
+				std::vector<unsigned> input;
 				fn({});
 
 				return result;
@@ -340,11 +381,16 @@ namespace Albus {
 			void serialize(Archive& ar, const unsigned int version) {
 				ar & name;
 				ar & printed_text;
+                ar & type;
 				ar & indices;
 			}
 		protected:
 			std::string name;
 			Indices indices;
+
+			TensorType type;
+
+			EvaluationFunction evaluator;
 		};
 
 		// Syntactic sugar for pointers to tensors
@@ -364,7 +410,30 @@ namespace Albus {
 				Constructor of an AddedTensor
 			 */
 			AddedTensor(ConstTensorPointer A, ConstTensorPointer B)
-				: Tensor("", "", A->GetIndices()), A(A), B(B) { }
+				: Tensor("", "", A->GetIndices()), A(A), B(B) {
+
+				type = TensorType::ADDITION;
+				evaluator =
+					/**
+                    	\brief Evaluate the components of the sum
+
+                     	Evaluate the components of the sum. It first checks the
+                     	index assignment and afterwards generates an IndexAssignments
+                     	instance. that is passed to both tensors.
+
+                     	The reason for the IndexAssignments object is that we need
+                     	terms as
+                        	 T_{ab} + T_{ba}
+                     	This gives us a tensor with {ab} indices, but the assignment
+                     	has to incorporate the arrangement of the tensors.
+
+                     	\throws IncompleteIndexAssignmentException
+                 	 */
+					[&](const std::vector<unsigned>& args) {
+                        return AddedTensor::Evaluate(args, *this);
+					};
+
+			}
 		public:
 			/**
 				Return the LaTeX code of both tensors
@@ -374,36 +443,21 @@ namespace Albus {
 				ss << A->ToString() << " + " << B->ToString();
 				return ss.str();
 			}
-		public:
-			/**
-				\brief Evaluate the components of the sum
+        public:
+            static double Evaluate(const std::vector<unsigned>& args, const AddedTensor& tensor) {
+                // If number of args and indices differ return
+                if (args.size() != tensor.indices.Size()) {
+                    throw IncompleteIndexAssignmentException();
+                }
 
-			 	Evaluate the components of the sum. It first checks the
-			 	index assignment and afterwards generates an IndexAssignments
-			 	instance. that is passed to both tensors.
+                // Create index assignments
+                IndexAssignments assignment;
+                for (int i=0; i<args.size(); i++) {
+                    assignment[tensor.indices[i].GetName()] = args[i];
+                }
 
-			 	The reason for the IndexAssignments object is that we need
-			 	terms as
-			 		T_{ab} + T_{ba}
-			 	This gives us a tensor with {ab} indices, but the assignment
-			 	has to incorporate the arrangement of the tensors.
-
-			 	\throws IncompleteIndexAssignmentException
-			 */
-			virtual double Evaluate(const std::vector<unsigned>& args) const {
-				// If number of args and indices differ return
-				if (args.size() != indices.Size()) {
-					throw IncompleteIndexAssignmentException();
-				}
-
-				// Create index assignments
-				IndexAssignments assignment;
-				for (int i=0; i<args.size(); i++) {
-					assignment[indices[i].GetName()] = args[i];
-				}
-
-				return (*A)(assignment) + (*B)(assignment);
-			}
+                return (*tensor.A)(assignment) + (*tensor.B)(assignment);
+            }
 		private:
 			ConstTensorPointer A;
 			ConstTensorPointer B;
@@ -431,6 +485,23 @@ namespace Albus {
 				for (auto& index : B->GetIndices()) {
 					indices.Insert(index);
 				}
+
+				type = TensorType::MULTIPLICATION;
+				evaluator =
+					/**
+            			\brief Evaluates the tensor component
+
+             			Evaluates the tensor components. For this, we first
+             			check the index assignment, then seperate the
+             			assignments into two IndexAssignments objects for each
+             			tensor and assign them to the given tensors.
+
+             			\throws IncompleteIndexAssignmentException
+         			 */
+					[&](const std::vector<unsigned>& args) -> double {
+                        return MultipliedTensor::Evaluate(args, *this);
+					};
+
 			}
 		public:
 			virtual std::string ToString() const {
@@ -438,39 +509,29 @@ namespace Albus {
 				ss << A->ToString() << B->ToString();
 				return ss.str();
 			}
-		public:
-			/**
-				\brief Evaluates the tensor component
 
-			 	Evaluates the tensor components. For this, we first
-			 	check the index assignment, then seperate the
-			 	assignments into two IndexAssignments objects for each
-			 	tensor and assign them to the given tensors.
+            static double Evaluate(const std::vector<unsigned>& args, const MultipliedTensor& tensor) {
+                // If number of args and indices differ return
+                if (args.size() != tensor.indices.Size()) {
+                    throw IncompleteIndexAssignmentException();
+                }
 
-			 	\throws IncompleteIndexAssignmentException
-			 */
-			virtual double Evaluate(const std::vector<unsigned>& args) const {
-				// If number of args and indices differ return
-				if (args.size() != indices.Size()) {
-					throw IncompleteIndexAssignmentException();
-				}
+                // Create index assignments
+                IndexAssignments assignment1;
+                IndexAssignments assignment2;
 
-				// Create index assignments
-				IndexAssignments assignment1;
-				IndexAssignments assignment2;
+                // First N indices belong to A
+                for (int i=0; i<tensor.A->GetIndices().Size(); i++) {
+                    assignment1[tensor.indices[i].GetName()] = args[i];
+                }
 
-				// First N indices belong to A
-				for (int i=0; i<A->GetIndices().Size(); i++) {
-					assignment1[indices[i].GetName()] = args[i];
-				}
+                // Remaining indices belong to B
+                for (int i=tensor.A->GetIndices().Size(); i<args.size(); i++) {
+                    assignment2[tensor.indices[i].GetName()] = args[i];
+                }
 
-				// Remaining indices belong to B
-				for (int i=A->GetIndices().Size(); i<args.size(); i++) {
-					assignment2[indices[i].GetName()] = args[i];
-				}
-
-				return (*A)(assignment1) * (*B)(assignment2);
-			}
+                return (*tensor.A)(assignment1) * (*tensor.B)(assignment2);
+            }
 		private:
 			ConstTensorPointer A;
 			ConstTensorPointer B;
@@ -488,26 +549,30 @@ namespace Albus {
 		class ScaledTensor : public Tensor {
 		public:
 			ScaledTensor(ConstTensorPointer A, double c)
-				: Tensor("", "", A->GetIndices()), A(A), c(c) { }
+				: Tensor("", "", A->GetIndices()), A(A), c(c) {
+
+				type = TensorType::SCALED;
+				evaluator =
+					/**
+						\brief Evaluates the tensor component
+
+			 			Evaluates the tensor components. We can directly
+			 			do so by feeding the arguments to the tensor and
+			 			multiplying the evaluated result with the scale
+			 			factor c
+
+			 			\throws IncompleteIndexAssignmentException
+					 */
+					[&](const std::vector<unsigned>& args) -> double {
+						return c * A->Evaluate(args);
+					};
+
+			}
 		public:
 			virtual std::string ToString() const {
 				std::stringstream ss;
 				ss << c << "*" << A->ToString();
 				return ss.str();
-			}
-		public:
-			/**
-				\brief Evaluates the tensor component
-
-			 	Evaluates the tensor components. We can directly
-			 	do so by feeding the arguments to the tensor and
-			 	multiplying the evaluated result with the scale
-			 	factor c
-
-			 	\throws IncompleteIndexAssignmentException
-			 */
-			virtual double Evaluate(const std::vector<unsigned>& args) const {
-				return c * A->Evaluate(args);
 			}
 		private:
 			ConstTensorPointer A;
@@ -558,18 +623,25 @@ namespace Albus {
 		class ScalarTensor : public Tensor {
 		public:
 			ScalarTensor(const std::string& name, const std::string& printed_text, double value)
-				: Tensor(name, printed_text, Indices()), value(value) { }
+				: Tensor(name, printed_text, Indices()), value(value) {
+
+				type = TensorType::SCALAR;
+				evaluator =
+					[&](const std::vector<unsigned>& args) -> double {
+						return ScalarTensor::Evaluate(args, *this);
+					};
+
+			}
 		public:
 			virtual std::string ToString() const {
 				return printed_text;
 			}
+        public:
+            static double Evaluate(const std::vector<unsigned>& args, const ScalarTensor& tensor) {
+                return tensor.value;
+            }
 		public:
 			double operator()() const {
-				return value;
-			}
-
-			double Evaluate(const std::vector<unsigned>& args) {
-				if (args.size() != 0) throw IncompleteIndexAssignmentException();
 				return value;
 			}
 		private:
@@ -596,9 +668,37 @@ namespace Albus {
 		public:
 			EpsilonTensor(const Indices& indices)
 				: Tensor("epsilon", "\\epsilon", indices) {
+
 				assert(indices[0].GetRange().GetTo()+1 -indices[0].GetRange().GetFrom() == indices.Size());
+				type = TensorType::EPSILON;
+				evaluator = [&](const std::vector<unsigned>& args) -> double {
+                    return EpsilonTensor::Evaluate(args);
+                };
 			}
 		public:
+            /**
+			    \brief Evaluate the Levi-Civita symbol
+
+			 	Evaluate the Levi-Civita symbol. For this we employ
+			 	the representation given by
+
+				\epsilon_{a_1...a_n} = \Pi_{1\le p < q \le n} \frac{a_p-a_q}{p-q}
+
+				This is easier to calculate since no permutation have to
+				be generated.
+			 */
+			static double Evaluate(const std::vector<unsigned>& args) {
+
+                double result = 1.0;
+                for (unsigned p=0; p < args.size(); p++) {
+                    for (unsigned q=p+1; q < args.size(); q++ ) {
+                        result *= static_cast<double>(static_cast<int>(args[q])-static_cast<int>(args[p]))/(q-p);
+                    }
+                }
+                return result != 0 ? result : 0;
+            }
+
+
 			/**
 				Returns the Levi-Civita symbol in 3+1 dim spacetime, where
 			 	the zeroth index is in temporal direction.
@@ -613,27 +713,6 @@ namespace Albus {
 			 */
 			static EpsilonTensor Space(int offset=0) {
 				return EpsilonTensor(Indices::GetRomanSeries(3, {1,3}, offset));
-			}
-		public:
-			/**
-				\brief Evaluate the Levi-Civita symbol
-
-			 	Evaluate the Levi-Civita symbol. For this we employ
-			 	the representation given by
-
-					\epsilon_{a_1...a_n} = \Pi_{1\le p < q \le n} \frac{a_p-a_q}{p-q}
-
-			 	This is easier to calculate since no permutation have to
-			 	be generated.
-			 */
-			virtual double Evaluate(const std::vector<unsigned>& vec) const {
-				double result = 1.0;
-				for (unsigned p=0; p < vec.size(); p++) {
-					for (unsigned q=p+1; q < vec.size(); q++ ) {
-						result *= static_cast<double>(static_cast<int>(vec[q])-static_cast<int>(vec[p]))/(q-p);
-					}
-				}
-				return result != 0 ? result : 0;
 			}
 		};
 
@@ -650,16 +729,35 @@ namespace Albus {
 		class GammaTensor : public Tensor {
 		public:
 			GammaTensor()
-				: Tensor("gamma", "\\gamma", Indices::GetRomanSeries(2, {1,3})), signature({0,3}) { }
+				: Tensor("gamma", "\\gamma", Indices::GetRomanSeries(2, {1,3})), signature({0,3}) {
+
+                type = TensorType::GAMMA;
+                evaluator = [&](const std::vector<unsigned>& args) {
+                    return GammaTensor::Evaluate(args, *this);
+                };
+
+            }
 
 			GammaTensor(const Indices& indices, int p, int q)
 				: Tensor("gamma", "\\gamma", indices), signature({p,q}) {
 				assert(indices.Size() == 2);
+
+                type = TensorType::GAMMA;
+                evaluator = [&](const std::vector<unsigned>& args) {
+                    return GammaTensor::Evaluate(args, *this);
+                };
+
 			}
 
 			GammaTensor(const Indices& indices)
 				: Tensor("gamma", "\\gamma", indices),  signature({0,3}) {
 				assert(indices.Size() == 2);
+
+                type = TensorType::GAMMA;
+                evaluator = [&](const std::vector<unsigned>& args) {
+                    return GammaTensor::Evaluate(args, *this);
+                };
+
 			}
 		public:
 			std::pair<int, int> GetSignature() const { return signature; }
@@ -690,13 +788,14 @@ namespace Albus {
 				Evaluate the tensor components. It returns 0 if evaluated
 			 	off diagonal, -1 for all indices < p and 1 else.
 			 */
-			virtual double Evaluate(const std::vector<unsigned>& vec) const {
+			static double Evaluate(const std::vector<unsigned>& vec, const GammaTensor& gamma) {
+
 				if (vec.size() != 2) {
 					throw IncompleteIndexAssignmentException();
 				}
 
 				if (vec[0] == vec[1]) {
-					 if (vec[0]-indices[0].GetRange().GetFrom() < signature.first) return -1;
+					 if (vec[0]-gamma.indices[0].GetRange().GetFrom() < gamma.signature.first) return -1;
 					 else return 1;
 				}
 				return 0;

@@ -281,10 +281,13 @@ namespace Albus {
 				return *this;
 			}
 		public:
+			/**
+				\brief Returns the partial indices in the given range
+			 */
 			Indices Partial(const Range& range) const {
 				Indices result;
 				for (auto i : range) {
-					result.indices.emplace_back(indices[i]);
+					result.indices.push_back(indices[i]);
 				}
 				return result;
 			}
@@ -317,9 +320,9 @@ namespace Albus {
 			std::vector<unsigned> operator()(T t, Args... args) const {
 				std::vector<unsigned> result;
 				
-				result = Partial(Range(1, indices.size()))(args...);
-
+				result = Partial(Range(1, indices.size()-1))(args...);
 				result.insert(result.begin(), (indices.at(0))(t));
+
 				return result;
 			}
 			
@@ -493,8 +496,7 @@ namespace Albus {
 				std::function< void(const std::vector<unsigned>&, const std::vector<Indices>&, const Indices&) > fn = [&](const std::vector<unsigned>& usedPartitions, const std::vector<Indices>& used, const Indices& remaining) -> void {
 					// If we have used all partitions, add partition to the result
 					if (usedPartitions.size() == partitions.size() && remaining.Size() == 0) {
-						if (commutativityCheck(used))
-							result.push_back(used);
+						if (commutativityCheck(used)) result.push_back(used);
 						return;
 					}
 

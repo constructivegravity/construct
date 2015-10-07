@@ -8,3 +8,8 @@ rebuild:
 
 clean:
 	@rm -r build && rm -r bin
+
+test:
+	bin/testing
+
+.PHONY: test
