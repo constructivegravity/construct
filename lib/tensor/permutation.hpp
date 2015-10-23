@@ -14,7 +14,7 @@
 #include <tensor/index.hpp>
 #include <tensor/tensor.hpp>
 
-namespace Albus {
+namespace Construction {
 	namespace Tensor {
 
 		class IsNoPermutationException : public Exception {
@@ -233,8 +233,36 @@ namespace Albus {
 				return result;
 			}
 
-			// TODO: there is still some problem with the sign. BUT for 3 dimensional epsilon it is fine
 			static Permutation From(const std::vector<int>& indices, const std::vector<int>& to) {
+				if (!Indices::IsPermutationOf(indices, to)) {
+					throw IsNoPermutationException();
+				}
+
+				// Clone the vector
+				auto vec = indices;
+
+				int pos = 0;
+				Permutation result;
+
+				for (int i=0; i<indices.size(); ++i) {
+					auto current = vec[pos];
+					auto id = std::find(to.begin(), to.end(), current) - to.begin();
+
+					if (id == pos) {
+						pos++;
+						continue;
+					}
+
+					result.Insert(pos + 1, id + 1);
+
+					// Do the switch
+					std::iter_swap(vec.begin() + pos, vec.begin() + id);
+				}
+
+				return result;
+			}
+
+			static Permutation From(const std::vector<unsigned>& indices, const std::vector<unsigned>& to) {
 				if (!Indices::IsPermutationOf(indices, to)) {
 					throw IsNoPermutationException();
 				}

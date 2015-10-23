@@ -2,5 +2,5 @@
 #include <catch.hpp>
 
 #include "common.cpp"
-//#include "tensor.cpp"
-#include "vector.cpp"
+#include "tensor.cpp"
+//#include "vector.cpp"

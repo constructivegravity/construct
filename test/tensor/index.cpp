@@ -1,11 +1,10 @@
 #include <tensor/index.hpp>
 
-/*
 SCENARIO("Tensor indices", "[indices]") {
 
     GIVEN(" an indices object") {
 
-        auto indices = Albus::Tensor::Indices::GetRomanSeries(3, {1,3});
+        auto indices = Construction::Tensor::Indices::GetRomanSeries(3, {1,3});
 
         WHEN(" printing the TeX code") {
             THEN(" we have {abc}") {
@@ -31,7 +30,56 @@ SCENARIO("Tensor indices", "[indices]") {
             }
 
             THEN(" and out-of range index should throw an exception") {
-                REQUIRE_THROWS_AS(indices(0,1,1), Albus::Tensor::IndexOutOfRangeException);
+                REQUIRE_THROWS_AS(indices(0,1,1), Construction::Tensor::IndexOutOfRangeException);
+            }
+
+        }
+
+        WHEN(" comparing two indices") {
+
+            auto indexRoman1 = Construction::Tensor::Indices::GetRomanSeries(1, {1,3}, 3)[0];
+            auto indexRoman2 = Construction::Tensor::Indices::GetRomanSeries(1, {1,3}, 8)[0];
+
+            auto indexGreek1 = Construction::Tensor::Indices::GetGreekSeries(1, {1,3}, 2)[0];
+            auto indexGreek2 = Construction::Tensor::Indices::GetGreekSeries(1, {1,3}, 15)[0];
+
+            auto indexSeries1 = Construction::Tensor::Indices::GetSeries(1, "alpha", "\\alpha", {1,3}, 4)[0];
+            auto indexSeries2 = Construction::Tensor::Indices::GetSeries(1, "alpha", "\\alpha", {1,3}, 7)[0];
+
+            THEN(" they are all unequal") {
+                REQUIRE(indexRoman1 != indexRoman2);
+                REQUIRE(indexGreek1 != indexGreek2);
+                REQUIRE(indexSeries1 != indexSeries2);
+
+                REQUIRE(indexRoman1 != indexGreek1);
+                REQUIRE(indexRoman1 != indexSeries1);
+            }
+
+            THEN(" the first is smaller than the second") {
+                REQUIRE(indexRoman1 < indexRoman2);
+                REQUIRE(indexGreek1 < indexGreek2);
+                REQUIRE(indexSeries1 < indexSeries2);
+            }
+
+            THEN(" greeks and romans are incomparable") {
+                REQUIRE_THROWS_AS(indexRoman1 < indexGreek1, Construction::Tensor::IndicesIncomparableException);
+            }
+
+        }
+
+        WHEN(" considering normal ordering") {
+
+            Construction::Tensor::Indices permuted;
+            permuted.Insert(indices[2]);
+            permuted.Insert(indices[0]);
+            permuted.Insert(indices[1]);
+
+            THEN(" the original indices are normal ordered") {
+                REQUIRE(indices.IsNormalOrdered());
+            }
+
+            THEN(" the permuted indices are not") {
+                REQUIRE(!permuted.IsNormalOrdered());
             }
 
         }
@@ -39,4 +87,3 @@ SCENARIO("Tensor indices", "[indices]") {
     }
 
 }
- */

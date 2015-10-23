@@ -4,7 +4,7 @@
 SCENARIO("Tensor containers", "[tensor-container]") {
 
     GIVEN(" a tensor container") {
-        Albus::Tensor::TensorContainer container;
+        Construction::Tensor::TensorContainer container;
 
         WHEN(" looking at the empty container") {
             THEN(" the size should be zero") {
@@ -17,7 +17,7 @@ SCENARIO("Tensor containers", "[tensor-container]") {
         }
 
         WHEN(" inserting a tensor") {
-            auto gamma = Albus::Tensor::GammaTensor::SpatialMetric();
+            auto gamma = Construction::Tensor::GammaTensor::SpatialMetric();
             container.Insert(gamma);
 
             THEN(" the size should be one") {

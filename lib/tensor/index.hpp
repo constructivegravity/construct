@@ -14,7 +14,7 @@
 #include <common/printable.hpp>
 #include <common/range.hpp>
 
-namespace Albus {
+namespace Construction {
 	namespace Tensor {
 		
 		using Common::Printable;
@@ -29,6 +29,69 @@ namespace Albus {
 		class IndexOutOfRangeException : public Exception {
 		public:
 			IndexOutOfRangeException() : Exception("The index assignment is out of range.") { }
+		};
+
+		class IndicesIncomparableException : public Exception {
+		public:
+			IndicesIncomparableException() : Exception("The given indices cannot be compared.") { }
+		};
+
+
+		static const std::map<std::string, std::string> GreekSymbols = {
+				{ "alpha", "\\alpha" },
+				{ "beta", "\\beta" },
+				{ "gamma", "\\gamma" },
+				{ "delta", "\\delta" },
+				{ "epsilon", "\\epsilon" },
+				{ "zeta", "\\zeta" },
+				{ "eta", "\\eta" },
+				{ "theta", "\\theta" },
+				{ "iota", "\\iota" },
+				{ "kappa", "\\kappa" },
+				{ "lambda", "\\lambda" },
+				{ "mu", "\\mu" },
+				{ "nu", "\\nu" },
+				{ "xi", "\\xi" },
+				{ "omicron", "\\omicron" },
+				{ "pi", "\\pi" },
+				{ "rho", "\\rho" },
+				{ "sigma", "\\sigma" },
+				{ "tau", "\\tau" },
+				{ "upsilon", "\\upsilon" },
+				{ "phi", "\\varphi" },
+				{ "chi", "\\chi" },
+				{ "psi", "\\psi" },
+				{ "omega", "\\omega" },
+
+				{ "Alpha", "\\Alpha" },
+				{ "Beta", "\\Beta" },
+				{ "Gamma", "\\Gamma" },
+				{ "Delta", "\\Delta" },
+				{ "Epsilon", "\\Epsilon" },
+				{ "Zeta", "\\Zeta" },
+				{ "Eta", "\\Eta" },
+				{ "Theta", "\\Theta" },
+				{ "Iota", "\\Iota" },
+				{ "Kappa", "\\Kappa" },
+				{ "Lambda", "\\Lambda" },
+				{ "Mu", "\\Mu" },
+				{ "Nu", "\\Nu" },
+				{ "Xi", "\\Xi" },
+				{ "Omicron", "\\Omicron" },
+				{ "Pi", "\\Pi" },
+				{ "Rho", "\\Rho" },
+				{ "Sigma", "\\Sigma" },
+				{ "Tau", "\\Tau" },
+				{ "Upsilon", "\\Upsilon" },
+				{ "Phi", "\\Varphi" },
+				{ "Chi", "\\Chi" },
+				{ "Psi", "\\Psi" },
+				{ "Omega", "\\Omega" },
+		};
+
+		static const std::vector<std::string> GreekIndices = {
+				"mu", "nu", "kappa", "lambda", "alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta", "iota", "xi", "omicron", "pi", "rho", "sigma", "tau", "upsilon", "phi", "chi", "psi", "omega",
+				"Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta", "Eta", "Theta", "Iota", "Kappa", "Lambda", "Mu", "Nu", "Xi", "Omicron", "Pi", "Rho", "Sigma", "Tau", "Upsilon", "Phi", "Chi", "Psi", "Omega",
 		};
 		
 		/**
@@ -109,6 +172,90 @@ namespace Albus {
 			inline bool operator!=(const Index& other) const {
 				return name != other.name || printed_text != other.printed_text;
 			}
+
+			bool operator<(const Index& other) const {
+				// Compare roman indices
+				if (IsRomanIndex()) {
+					if (!other.IsRomanIndex()) throw IndicesIncomparableException();
+
+					int posX = name[0] - 'a';
+					if (posX < 0) posX = name[0] - 'A' + 26;
+
+					int posY = other.name[0] - 'a';
+					if (posY < 0) posY = other.name[0] - 'A' + 26;
+
+					return posX < posY;
+				}
+				// Compare greek indices
+				else if (IsGreekIndex()) {
+					if (!other.IsGreekIndex()) throw IndicesIncomparableException();
+
+					return std::distance(GreekSymbols.find(name), GreekSymbols.find(other.name)) > 0;
+				}
+				// Compare series indices
+				else if (IsSeriesIndex()) {
+					if (!other.IsSeriesIndex()) throw IndicesIncomparableException();
+
+					// If the prefix does not match also throw exception
+					int posDash = name.find("_");
+					if (name.substr(0, posDash) != other.name.substr(0, name.find("_"))) {
+						throw IndicesIncomparableException();
+					}
+
+					int posX = atoi(name.substr(posDash+1, name.length()-posDash-1).c_str());
+					int posY = atoi(other.name.substr(posDash+1, other.name.length()-posDash-1).c_str());
+
+					return posX < posY;
+				}
+				// cannot compare the indices
+				else throw IndicesIncomparableException();
+			}
+
+			inline bool operator<=(const Index& other) const {
+				return (*this == other) || (*this < other);
+			}
+
+			bool operator>(const Index& other) const {
+				// Compare roman indices
+				if (IsRomanIndex()) {
+					if (!other.IsRomanIndex()) throw IndicesIncomparableException();
+
+					int posX = name[0] - 'a';
+					if (posX < 0) posX = name[0] - 'A' + 26;
+
+					int posY = other.name[0] - 'a';
+					if (posY < 0) posY = other.name[0] - 'A' + 26;
+
+					return posX > posY;
+				}
+					// Compare greek indices
+				else if (IsGreekIndex()) {
+					if (!other.IsGreekIndex()) throw IndicesIncomparableException();
+
+					return std::distance(GreekSymbols.find(name), GreekSymbols.find(other.name)) < 0;
+				}
+					// Compare series indices
+				else if (IsSeriesIndex()) {
+					if (!other.IsSeriesIndex()) throw IndicesIncomparableException();
+
+					// If the prefix does not match also throw exception
+					int posDash = name.find("_");
+					if (name.substr(0, posDash) != other.name.substr(0, name.find("_"))) {
+						throw IndicesIncomparableException();
+					}
+
+					int posX = atoi(name.substr(posDash, name.length()-posDash).c_str());
+					int posY = atoi(other.name.substr(posDash, other.name.length()-posDash).c_str());
+
+					return posX > posY;
+				}
+					// cannot compare the indices
+				else throw IndicesIncomparableException();
+			}
+
+			inline bool operator>=(const Index& other) const {
+				return (*this == other) || (*this > other);
+			}
 		public:
 			/**
 				\brief Application functor
@@ -128,6 +275,38 @@ namespace Albus {
 				}
 				return value;
 			}
+		public:
+			/**
+				\brief Checks if the index is roman
+
+			 	Sometimes it is necessary to know if indices are roman, especially
+			 	when comparing indices. Checks if the name has length, is equal to its TeX code
+			 	one and lies in the correct range.
+			 */
+			bool IsRomanIndex() const {
+				return name.length() == 1 && name == printed_text && ((name[0] >= 'a' && name[0] <= 'z') || (name[0] >= 'A' && name[0] <= 'Z'));
+			}
+
+			/**
+				\brief Checks if the index is greek
+
+			 	Sometimes it is necessary to know if indices are roman, especially
+			 	when comparing indices. Checks if the name is part of the greek symbols list
+			 	and the TeX code matches.
+			 */
+			bool IsGreekIndex() const {
+				return GreekSymbols.find(name) != GreekSymbols.end() && GreekSymbols.at(name) == printed_text;
+			}
+
+			/**
+				\brief Checks if the index is part of a series
+
+			 	Sometimes it is necessary to know if indices are part of a series, e.g. \alpha_1, especially
+			 	when comparing indices. Checks if the name and TeX code contain "_".
+			 */
+			bool IsSeriesIndex() const {
+				return name.find("_") != std::string::npos && printed_text.find("_") != std::string::npos;
+			}
 		private:
 			friend class boost::serialization::access;
 
@@ -142,63 +321,6 @@ namespace Albus {
 			std::string name;
 			Range range;
 			bool up = false;
-		};
-		
-		static const std::map<std::string, std::string> GreekSymbols = {
-			{ "alpha", "\\alpha" },
-			{ "beta", "\\beta" },
-			{ "gamma", "\\gamma" },
-			{ "delta", "\\delta" },
-			{ "epsilon", "\\epsilon" },
-			{ "zeta", "\\zeta" },
-			{ "eta", "\\eta" },
-			{ "theta", "\\theta" },
-			{ "iota", "\\iota" },
-			{ "kappa", "\\kappa" },
-			{ "lambda", "\\lambda" },
-			{ "mu", "\\mu" },
-			{ "nu", "\\nu" },
-			{ "xi", "\\xi" },
-			{ "omicron", "\\omicron" },
-			{ "pi", "\\pi" },
-			{ "rho", "\\rho" },
-			{ "sigma", "\\sigma" },
-			{ "tau", "\\tau" },
-			{ "upsilon", "\\upsilon" },
-			{ "phi", "\\varphi" },
-			{ "chi", "\\chi" },
-			{ "psi", "\\psi" },
-			{ "omega", "\\omega" },
-			
-			{ "Alpha", "\\Alpha" },
-			{ "Beta", "\\Beta" },
-			{ "Gamma", "\\Gamma" },
-			{ "Delta", "\\Delta" },
-			{ "Epsilon", "\\Epsilon" },
-			{ "Zeta", "\\Zeta" },
-			{ "Eta", "\\Eta" },
-			{ "Theta", "\\Theta" },
-			{ "Iota", "\\Iota" },
-			{ "Kappa", "\\Kappa" },
-			{ "Lambda", "\\Lambda" },
-			{ "Mu", "\\Mu" },
-			{ "Nu", "\\Nu" },
-			{ "Xi", "\\Xi" },
-			{ "Omicron", "\\Omicron" },
-			{ "Pi", "\\Pi" },
-			{ "Rho", "\\Rho" },
-			{ "Sigma", "\\Sigma" },
-			{ "Tau", "\\Tau" },
-			{ "Upsilon", "\\Upsilon" },
-			{ "Phi", "\\Varphi" },
-			{ "Chi", "\\Chi" },
-			{ "Psi", "\\Psi" },
-			{ "Omega", "\\Omega" },
-		};
-		
-		static const std::vector<std::string> GreekIndices = {
-			"mu", "nu", "kappa", "lambda", "alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta", "iota", "xi", "omicron", "pi", "rho", "sigma", "tau", "upsilon", "phi", "chi", "psi", "omega",
-			"Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta", "Eta", "Theta", "Iota", "Kappa", "Lambda", "Mu", "Nu", "Xi", "Omicron", "Pi", "Rho", "Sigma", "Tau", "Upsilon", "Phi", "Chi", "Psi", "Omega",
 		};
 
 		class Indices;
@@ -262,7 +384,7 @@ namespace Albus {
 			}
 			
 			Indices(Index&& index) {
-				indices.emplace_back(std::move(index));
+				indices.push_back(std::move(index));
 			}
 
 			Indices(const Indices& other)
@@ -297,7 +419,20 @@ namespace Albus {
 			}
 			
 			void Insert(Index&& index) {
-				indices.emplace_back(std::move(index));
+				indices.push_back(std::move(index));
+			}
+
+			void Remove(unsigned id) {
+				//assert(id < indices.size());
+				indices.erase(indices.begin() + id);
+			}
+
+			void Append(const Indices& other) {
+				indices.insert(indices.end(), other.indices.begin(), other.indices.end());
+			}
+
+			void Clear() {
+				indices.clear();
 			}
 		public:
 			bool operator==(const Indices& other) const {
@@ -618,8 +753,68 @@ namespace Albus {
 				return true;
 			}
 
+			static bool IsPermutationOf(const std::vector<unsigned>& one, const std::vector<unsigned>& other) {
+				// if the number of indices does not match then clearly not
+				if (other.size() != one.size()) return false;
+
+				// Iterate over all indices
+				for (auto& index : other) {
+					if (std::find(one.begin(), one.end(), index) == one.end()) return false;
+				}
+
+				// All indices were present => it is a permutation
+				return true;
+			}
+
 			bool ContainsIndex(const Index& index) const {
 				return std::find(indices.begin(), indices.end(), index) != indices.end();
+			}
+		public:
+			/**
+				\brief Check if the indices are in order
+
+				Check if the indices are in order, i.e. each is
+			 	smaller than the next. Order is defined only for
+			 	Roman and Greek letters and series ala \beta_i.
+
+			 	Necessary to implement the canonicalization of
+			 	indices.
+
+			 	\throws IndicesIncompatibleException
+			 */
+			bool IsNormalOrdered() const {
+				// If no indices present, trivially in order
+				if (indices.size() == 0) return true;
+
+				// Dummy variable to keep the last index
+				auto last = indices[0];
+
+				// Iterate over the remaining indices
+				for (unsigned i=1; i<indices.size(); i++) {
+					// if the new index is smaller than the previous
+					// return false
+					if (indices[i] < last) return false;
+
+					// Change the dummy
+					last = indices[i];
+				}
+
+				// The indices are in order due to transitivity of order
+				return true;
+			}
+
+			/**
+				\brief Return the ordered
+			 */
+			Indices Ordered() const {
+				// Copy the indices
+				Indices result = *this;
+
+				// Sort the indices by order
+				std::sort(result.begin(), result.end());
+
+				// Return the ordered indices
+				return result;
 			}
 		private:
 			friend class boost::serialization::access;

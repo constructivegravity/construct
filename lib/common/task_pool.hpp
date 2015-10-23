@@ -10,7 +10,7 @@
 #include <functional>
 #include <stdexcept>
 
-namespace Albus {
+namespace Construction {
     namespace Common {
 
         class TaskPool {

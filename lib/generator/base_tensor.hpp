@@ -4,13 +4,15 @@
 
 #include <tensor/index.hpp>
 #include <tensor/tensor.hpp>
+#include <tensor/tensor_container.hpp>
 
-using Albus::Tensor::Indices;
-using Albus::Tensor::Tensor;
-using Albus::Tensor::TensorPointer;
-using Albus::Tensor::EpsilonTensor;
-using Albus::Tensor::MultipliedTensor;
-using Albus::Tensor::GammaTensor;
+using Construction::Tensor::Indices;
+using Construction::Tensor::Tensor;
+using Construction::Tensor::TensorContainer;
+using Construction::Tensor::TensorPointer;
+using Construction::Tensor::EpsilonTensor;
+using Construction::Tensor::MultipliedTensor;
+using Construction::Tensor::GammaTensor;
 
 template<typename T, typename S>
 std::ostream& operator<<(std::ostream& os, const std::pair<S,T>& vec) {
@@ -29,19 +31,30 @@ std::ostream& operator<<(std::ostream& os, const std::vector<T>& vec) {
     return os;
 }
 
-namespace Albus {
+namespace Construction {
     namespace Generator {
 
         class BaseTensorGenerator {
         public:
-            std::vector<TensorPointer> Generate(unsigned order) {
-                // Only have tensors with order > 1
+            TensorContainer Generate(unsigned order) {
+                // Stuff
                 assert(order > 1);
 
                 // Generate indices
                 auto indices = Indices::GetRomanSeries(order, {1,3}, 0);
 
-                std::vector<TensorPointer> result;
+                return Generate(indices);
+            }
+
+            TensorContainer Generate(const Indices& indices) {
+                unsigned order = indices.Size();
+                for (auto& index : indices) {
+                    if (index.GetRange() != Common::Range(1,3)) {
+                        // throw error
+                    }
+                }
+
+                TensorContainer result;
 
                 // Generate partitions
                 unsigned numEpsilons = 0;
@@ -66,20 +79,34 @@ namespace Albus {
 
                 // Generate all the tensors with the given partitions
                 for (auto& partition : partitions) {
-                    TensorPointer T;
+
+                    // Join all indices in the partition
+                    Tensor::Indices indices;
+
+                    for (auto& p : partition) {
+                        indices.Append(p);
+                    }
+
+                    result.Insert(std::make_shared<Tensor::EpsilonGammaTensor>(numEpsilons, numGammas, indices));
+
+                    /*Tensor::Tensor T;
+                    //TensorPointer T;
                     if (numEpsilons == 1) {
-                        T = std::make_shared<EpsilonTensor>(EpsilonTensor(partition[0]));
+                        T = EpsilonTensor(partition[0]);
+                        //T = std::make_shared<EpsilonTensor>(EpsilonTensor(partition[0]));
                     } else {
-                        T = std::make_shared<GammaTensor>(GammaTensor(partition[0]));
+                        T = GammaTensor(partition[0]);
+                        //T = std::make_shared<GammaTensor>(GammaTensor(partition[0]));
                     }
 
                     int max = (numEpsilons == 1) ? numGammas : numGammas - 1;
                     for (int i = 1; i <= max; i++) {
-                        TensorPointer S = std::move(T);
-                        T = std::make_shared<MultipliedTensor>(S, std::make_shared<GammaTensor>(GammaTensor(partition[i])));
+                        Tensor::Tensor S = T;
+                        T = MultipliedTensor(std::make_shared<Tensor::Tensor>(S), std::make_shared<GammaTensor>(GammaTensor(partition[i])));
+                        //T = std::make_shared<MultipliedTensor>(S, std::make_shared<GammaTensor>(GammaTensor(partition[i])));
                     }
 
-                    result.emplace_back(std::move(T));
+                    result.Insert(std::move(T));*/
                 }
 
                 return result;

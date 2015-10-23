@@ -3,7 +3,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace Albus {
+namespace Construction {
 
     class Exception : public std::runtime_error {
     public:

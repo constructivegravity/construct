@@ -1,10 +1,12 @@
 # Catch flavoured testing
-set(CATCH_INCLUDE_DIRS "${ALBUS_EXTERNAL_DIRECTORY}/catch")
+set(CATCH_INCLUDE_DIRS "${CONSTRUCTION_EXTERNAL_DIRECTORY}/catch")
 include_directories(${CATCH_INCLUDE_DIRS})
 
 enable_testing(true)
 
 add_executable(testing main.cpp)
+target_link_libraries(testing ${Boost_LIBRARIES})
+
 add_test(NAME runtesting
     COMMAND ${CMAKE_COMMAND}
     -DTEST_PROG=$<TARGET_FILE:testing>

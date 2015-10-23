@@ -5,7 +5,7 @@
 
 #include <sstream>
 
-namespace Albus {
+namespace Construction {
     namespace Vector {
 
         class DimensionsDoNotMatchException : public Exception {
@@ -61,13 +61,11 @@ namespace Albus {
                 n = list[0].GetDimension();
                 data = new float[n*m];
 
-                unsigned i=0;
                 for (unsigned i=0; i<m; i++) {
                     assert(list[i].GetDimension() == n);
-                    for (int j=0; j<list[i].GetDimension(); j++) {
+                    for (int j=0; j<n; j++) {
                         At(j,i) = list[i][j];
                     }
-                    i++;
                 }
             }
 
@@ -368,14 +366,12 @@ namespace Albus {
                             float x = At(i, lead);
                             for (unsigned k=0; k<GetNumberOfColumns(); k++) {
                                 float y = At(r,k);
-                                result(i,k) -= x*At(r,k);
+                                At(i,k) -= x*At(r,k);
                             }
                         }
                     }
                     lead++;
                 }
-
-                return result;
             }
         public:
             void SwapRows(unsigned i, unsigned j) {
@@ -408,8 +404,8 @@ namespace Albus {
                         os << v(i,j);
                         if (j != v.m-1) os << ", ";
                     }
-                    os << "]" ;//<< std::endl;
-                    if (i != v.n-1) os << ", ";
+                    os << "]"; //<< std::endl;
+                    if (i != v.n-1) os << ", " << std::endl;
                 }
                 os << "]";
                 return os;

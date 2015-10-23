@@ -4,9 +4,9 @@
 
 #add_subdirectory(module)
 
-add_executable(albus main.cpp)
-#target_link_libraries(albus module)
+add_executable(construct main.cpp)
+#target_link_libraries(Construction module)
 
-#target_link_libraries(albus )
+#target_link_libraries(Construction )
 
-target_link_libraries(albus ${Boost_LIBRARIES})
+target_link_libraries(construct ${Boost_LIBRARIES})

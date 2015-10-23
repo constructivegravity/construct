@@ -2,9 +2,9 @@
 
 #include <string>
 
-namespace Albus {
+namespace Construction {
 	namespace Common {
-	
+
 		/**
 			\class Printable
 		
@@ -13,6 +13,7 @@ namespace Albus {
 		class Printable {
 		public:
 			Printable() = default;
+
 			Printable(const std::string& printed) : printed_text(printed) { }
 		public:
 			std::string GetPrintedText() const { return printed_text; }

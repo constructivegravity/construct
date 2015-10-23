@@ -8,7 +8,7 @@
 
 #include <tensor/tensor.hpp>
 
-namespace Albus {
+namespace Construction {
     namespace Tensor {
 
         /**
@@ -21,15 +21,34 @@ namespace Albus {
          */
         class TensorContainer {
         public:
-            typedef std::vector<Tensor>             ContainerType;
+            typedef std::vector<TensorPointer>      ContainerType;
             typedef ContainerType::iterator         Iterator;
             typedef ContainerType::const_iterator   ConstIterator;
         public:
             TensorContainer() = default;
 
+            TensorContainer(const TensorContainer& other) : data(other.data) { }
+            TensorContainer(TensorContainer&& other) : data(std::move(other.data)) { }
         public:
-            void Insert(const Tensor& obj) { data.push_back(obj); }
-            void Insert(Tensor&& obj) { data.push_back(std::move(obj)); }
+            TensorContainer& operator=(const TensorContainer& other) {
+                data = other.data;
+                return *this;
+            }
+
+            TensorContainer& operator=(TensorContainer&& other) {
+                data = std::move(other.data);
+                return *this;
+            }
+        public:
+            void Insert(Tensor& obj) {
+                data.push_back(std::shared_ptr<Tensor>(std::shared_ptr<Tensor>(), &obj));
+            }
+
+            void Insert(const TensorPointer& pointer) {
+                data.push_back(std::move(pointer));
+            }
+
+            //void Insert(Tensor&& obj) { data.push_back(std::move(obj)); }
 
             void Pop() { data.pop_back(); }
             void Remove(unsigned i) { data.erase(data.begin() + i); }
@@ -38,16 +57,18 @@ namespace Albus {
 
             bool IsEmpty() const { return data.size() == 0; }
         public:
-            Tensor& At(unsigned i) { return data.at(i); }
-            Tensor At(unsigned i) const { return data.at(i); }
+            Tensor& At(unsigned i) { return *data.at(i); }
+            Tensor At(unsigned i) const { return *data.at(i); }
 
-            Tensor& operator[](unsigned i) { return data[i]; }
-            Tensor operator[](unsigned i) const { return data[i]; }
+            TensorPointer Get(unsigned i) const { return data.at(i); }
 
-            Tensor& Front() { return data[0]; }
-            Tensor Front() const { return data[0]; }
-            Tensor& Back() { return data[data.size()-1]; }
-            Tensor Back() const { return data[data.size()-1]; }
+            Tensor& operator[](unsigned i) { return *data[i]; }
+            Tensor operator[](unsigned i) const { return *data[i]; }
+
+            Tensor& Front() { return *data[0]; }
+            Tensor Front() const { return *data[0]; }
+            Tensor& Back() { return *data[data.size()-1]; }
+            Tensor Back() const { return *data[data.size()-1]; }
         public:
             Iterator begin() { return data.begin(); }
             Iterator end()   { return data.end(); }
@@ -68,6 +89,16 @@ namespace Albus {
 
             void LoadFromFile(const std::string& filename) {
 
+            }
+        public:
+            friend std::ostream& operator<<(std::ostream& os, const TensorContainer& container) {
+                os << "[";
+                for (int i=0; i<container.Size(); i++) {
+                    os << container.data[i]->ToString();
+                    if (i != container.Size()-1) os << ", ";
+                }
+                os << "]";
+                return os;
             }
         private:
             ContainerType data;

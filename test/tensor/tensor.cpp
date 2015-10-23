@@ -2,11 +2,13 @@
 
 #include <tensor/tensor.hpp>
 
+#include <boost/archive/text_oarchive.hpp>
+
 SCENARIO("General tensors", "[tensor]") {
 
     GIVEN(" a tensor with two indices") {
 
-        Albus::Tensor::Tensor T("T", "T", Albus::Tensor::Indices::GetRomanSeries(2, {1,3}));
+        Construction::Tensor::Tensor T("T", "T", Construction::Tensor::Indices::GetRomanSeries(2, {1,3}));
 
         WHEN(" printing the TeX code") {
             std::stringstream ss;
@@ -37,6 +39,17 @@ SCENARIO("General tensors", "[tensor]") {
 
         }
 
+        WHEN(" serializing the tensor") {
+
+            std::stringstream ss;
+            {
+                boost::archive::text_oarchive oa(ss);
+                oa << T;
+            }
+            std::cout << ss.str() << std::endl;
+
+        }
+
     }
 
 }
@@ -49,7 +62,7 @@ SCENARIO("Epsilon tensor", "[epsilon-tensor]") {
     // Levi-Civita symbol in three dimensions, i.e. on a spatial slice
     GIVEN(" epsilon in three dimensions") {
 
-        auto epsilon = Albus::Tensor::EpsilonTensor::Space();
+        auto epsilon = Construction::Tensor::EpsilonTensor::Space();
 
         // Look at the indices
         WHEN(" looking at the indices") {
@@ -115,7 +128,7 @@ SCENARIO("Epsilon tensor", "[epsilon-tensor]") {
             }
 
             THEN(" IsEpsilon returns true even after cast") {
-                Albus::Tensor::Tensor t = epsilon;
+                Construction::Tensor::Tensor t = epsilon;
                 REQUIRE(t.IsEpsilonTensor());
             }
         }
@@ -123,7 +136,7 @@ SCENARIO("Epsilon tensor", "[epsilon-tensor]") {
 
     GIVEN(" epsilon in four dimensions") {
 
-        auto epsilon = Albus::Tensor::EpsilonTensor::SpaceTime();
+        auto epsilon = Construction::Tensor::EpsilonTensor::SpaceTime();
 
         // Look at the indices
         WHEN(" looking at the indices") {
@@ -132,6 +145,10 @@ SCENARIO("Epsilon tensor", "[epsilon-tensor]") {
             // Only allow three indices
             THEN(" we have exactly four") {
                 REQUIRE(indices.Size() == 4);
+            }
+
+            THEN(" cyclic permutation is not 1") {
+                REQUIRE(epsilon(1,2,3,0) == -1);
             }
 
         }
@@ -144,7 +161,7 @@ SCENARIO("Metric tensor", "[gamma-tensor]") {
 
     GIVEN(" a spatial metric") {
 
-        auto gamma = Albus::Tensor::GammaTensor::SpatialMetric();
+        auto gamma = Construction::Tensor::GammaTensor::SpatialMetric();
 
         WHEN(" considering the indices") {
             auto indices = gamma.GetIndices();
@@ -178,11 +195,88 @@ SCENARIO("Metric tensor", "[gamma-tensor]") {
 
 }
 
+SCENARIO("Epsilon Gamma", "[epsilon-gamma]") {
+
+    GIVEN(" a tensor with one epsilon and three gammas") {
+
+        Construction::Tensor::EpsilonGammaTensor T(1, 3, Construction::Tensor::Indices::GetRomanSeries(9, {1,3}));
+
+        WHEN(" printing the TeX code") {
+            REQUIRE(T.ToString() == "\\epsilon_{abc}\\gamma_{de}\\gamma_{fg}\\gamma_{hi}");
+        }
+
+        WHEN(" considering some components") {
+            REQUIRE(T(1, 1, 2, 3, 1, 2, 1, 2, 1) == 0.0);
+            REQUIRE(T(1, 2, 3, 1, 1, 2, 2, 3, 3) == 1.0);
+            REQUIRE(T(1, 3, 2, 1, 1, 2, 2, 3, 3) == -1);
+        }
+
+        WHEN(" serializing the tensor") {
+
+            std::stringstream ss;
+
+            // Scope based output
+            {
+                boost::archive::binary_oarchive oa(ss);
+                oa << T;
+            }
+
+            std::string output = ss.str();
+
+            THEN(" the deserialized tensor has the correct indices") {
+
+
+
+            }
+
+        }
+
+        WHEN(" considering the canonicalization") {
+            Construction::Tensor::Indices indices;
+            indices.Insert(Construction::Tensor::Index("a", {1,3}));
+            indices.Insert(Construction::Tensor::Index("c", {1,3}));
+            indices.Insert(Construction::Tensor::Index("b", {1,3}));
+            indices.Insert(Construction::Tensor::Index("g", {1,3}));
+            indices.Insert(Construction::Tensor::Index("f", {1,3}));
+            indices.Insert(Construction::Tensor::Index("e", {1,3}));
+            indices.Insert(Construction::Tensor::Index("d", {1,3}));
+
+            Construction::Tensor::EpsilonGammaTensor S(1,2, indices);
+
+            THEN("We get the correct result") {
+                auto canon = S.Canonicalize();
+                REQUIRE(canon->ToString() == "-\\epsilon_{abc}\\gamma_{de}\\gamma_{fg}");
+            }
+
+        }
+
+    }
+
+    GIVEN(" a tensor with 1 epsilon and 1 gamma with non-standard indices") {
+
+        Construction::Tensor::Indices indices;
+        indices.Insert(Construction::Tensor::Index("a", {1,3}));
+        indices.Insert(Construction::Tensor::Index("c", {1,3}));
+        indices.Insert(Construction::Tensor::Index("b", {1,3}));
+        indices.Insert(Construction::Tensor::Index("e", {1,3}));
+        indices.Insert(Construction::Tensor::Index("d", {1,3}));
+
+        Construction::Tensor::EpsilonGammaTensor S(1,1, indices);
+
+        WHEN(" canonicalizing this tensor") {
+            auto canon = S.Canonicalize();
+
+            REQUIRE(canon->ToString() == "-\\epsilon_{abc}\\gamma_{de}");
+        }
+    }
+
+}
+
 
 SCENARIO("Addition", "[tensor-addition]") {
 
-    auto gamma = Albus::Tensor::GammaTensor::SpatialMetric();
-    auto gamma2 = Albus::Tensor::GammaTensor::SpatialMetric();
+    auto gamma = Construction::Tensor::GammaTensor::SpatialMetric();
+    auto gamma2 = Construction::Tensor::GammaTensor::SpatialMetric();
 
     GIVEN(" two tensors (twice the metric)") {
 

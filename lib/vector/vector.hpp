@@ -6,7 +6,7 @@
 
 #include <common/error.hpp>
 
-namespace Albus {
+namespace Construction {
     namespace Vector {
 
         class IncompatibleDimensionsException : public Exception {

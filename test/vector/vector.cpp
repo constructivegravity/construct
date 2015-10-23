@@ -8,7 +8,7 @@ SCENARIO("Vector class", "[vectors]") {
 
         WHEN(" considering a three-dimensional vector") {
 
-            Albus::Vector::Vector v = {1,3,-2};
+            Construction::Vector::Vector v = {1,3,-2};
 
             THEN(" the dimension is three") {
                 REQUIRE(v.GetDimension() == 3);
@@ -28,7 +28,7 @@ SCENARIO("Vector class", "[vectors]") {
             }
 
             THEN(" access beyond dimension throws exception") {
-                REQUIRE_THROWS_AS(v[3], Albus::Vector::OutOfBoundariesException);
+                REQUIRE_THROWS_AS(v[3], Construction::Vector::OutOfBoundariesException);
             }
 
             THEN(" negation is correct") {
@@ -56,8 +56,8 @@ SCENARIO("Vector class", "[vectors]") {
 
         WHEN(" considering two vectors") {
 
-            Albus::Vector::Vector v = {1,3,-2};
-            Albus::Vector::Vector w = {3,1,4};
+            Construction::Vector::Vector v = {1,3,-2};
+            Construction::Vector::Vector w = {3,1,4};
 
             THEN(" addition is correct") {
                 auto x = v+w;

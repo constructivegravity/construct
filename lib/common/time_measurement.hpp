@@ -3,7 +3,7 @@
 #include <chrono>
 #include <ostream>
 
-namespace Albus {
+namespace Construction {
     namespace Common {
 
         class TimeMeasurement {
