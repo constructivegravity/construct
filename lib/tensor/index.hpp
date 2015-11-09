@@ -5,20 +5,18 @@
 #include <sstream>
 #include <map>
 
-#include <boost/archive/binary_iarchive.hpp>
-#include <boost/archive/binary_oarchive.hpp>
-#include <boost/serialization/vector.hpp>
-#include <boost/serialization/string.hpp>
-
 #include <common/error.hpp>
 #include <common/printable.hpp>
 #include <common/range.hpp>
+#include <common/serializable.hpp>
+#include <common/task_pool.hpp>
 
 namespace Construction {
 	namespace Tensor {
 		
 		using Common::Printable;
 		using Common::Range;
+		using Common::Serializable;
 
 		class IncompleteIndexAssignmentException : public Exception {
 		public:
@@ -103,7 +101,7 @@ namespace Construction {
 			just marks a slot to plug a specific combination for the
 			valid range of the index.
 		 */
-		class Index : public Printable {
+		class Index : public Printable, Serializable<Index> {
 		public:
 			/**
 				\brief Constructor of an index
@@ -112,6 +110,8 @@ namespace Construction {
 				and a printable version in form of LaTeX code. It is also important to give a 
 				range to the index.
 			 */
+			Index() : range(1,3) { }
+
 			Index(const std::string& name, const std::string& printable, const Range& range) 
 				: Printable(printable), name(name), range(range) { }
 			
@@ -307,15 +307,26 @@ namespace Construction {
 			bool IsSeriesIndex() const {
 				return name.find("_") != std::string::npos && printed_text.find("_") != std::string::npos;
 			}
-		private:
-			friend class boost::serialization::access;
+		public:
+			void Serialize(std::ostream& os) const {
+				os << name << ";";
+				os << printed_text << ";";
+				range.Serialize(os);
+			}
 
-			template<class Archive>
-			void serialize(Archive& ar, const unsigned int version) {
-				ar & name;
-				ar & printed_text;
-				ar & range;
-				ar & up;
+			static std::shared_ptr<Index> Deserialize(std::istream& is) {
+				// read name
+				std::string name;
+				std::getline(is, name, ';');
+
+				// read printed_text
+				std::string printed_text;
+				std::getline(is, printed_text, ';');
+
+				// read range
+				auto rangePtr = Range::Deserialize(is);
+
+				return std::make_shared<Index>(name, printed_text, *rangePtr);
 			}
 		private:
 			std::string name;
@@ -369,7 +380,7 @@ namespace Construction {
 		/**
 			\class Indices
 		 */
-		class Indices : public Printable {
+		class Indices : public Printable, Serializable<Indices> {
 		public:
 			Indices() = default;
 		
@@ -513,11 +524,23 @@ namespace Construction {
 	
 				return ss.str();
 			}
+
+			std::string ToCommand() const {
+				std::stringstream ss;
+				ss << "\"";
+
+				for (int i=0; i< indices.size(); i++) {
+					ss << indices[i];
+					if (i != indices.size()-1) ss << " ";
+				}
+
+				ss << "\"";
+
+				return ss.str();
+			}
 		public:
 			/**
 				Get a partition of n indices. Note that this is up to permutation.
-
-			 	TODO: parallelize this
 			 */
 			std::vector<std::pair<Indices, Indices>> GetAllPartitions(unsigned n) const {
 				// Check if the number of indices we wish to draw from the indices is
@@ -526,8 +549,19 @@ namespace Construction {
 
 				std::vector< std::pair<Indices, Indices> > result;
 
+				/*std::mutex mutex, finishedMutex;
+				std::vector<std::thread> threads;
+				bool finished = false;*/
+
+				// Calculate the number of partitions
+				std::function<int(unsigned, unsigned)> binomialCoeff = [&](unsigned n, unsigned k) -> int {
+					if (k == n || k == 0) return 1;
+					return binomialCoeff(n-1, k-1) + binomialCoeff(n-1, k);
+				};
+				int size = binomialCoeff(indices.size(), n);
+
 				// Use a helper method
-				std::function<void(const std::vector<unsigned>&, const std::vector<unsigned>&)> fn = [&](const std::vector<unsigned>& usedIndices, const std::vector<unsigned>& neglectedIndices) -> void {
+				std::function<void(std::vector<unsigned>, std::vector<unsigned>)> fn = [&](std::vector<unsigned> usedIndices, std::vector<unsigned> neglectedIndices) -> void {
 					// If we have enough used indices finish the partition
 					if (usedIndices.size() == n) {
 						Indices used;
@@ -545,7 +579,10 @@ namespace Construction {
 						}
 
 						// Add partition
-						result.push_back({ used, remaining });
+						{
+							//std::unique_lock<std::mutex> lock(mutex);
+							result.push_back({used, remaining});
+						}
 						return;
 					}
 
@@ -554,28 +591,57 @@ namespace Construction {
 						return;
 					}
 
-					// Obtain current index
+					// Obta in current index
 					unsigned current = usedIndices.size() + neglectedIndices.size();
 
 					// Consider it as used index
 					{
 						std::vector<unsigned> newUsedIndices = usedIndices;
+						std::vector<unsigned> newNeglectedIndices = neglectedIndices;
+
 						newUsedIndices.push_back(current);
 
-						fn(newUsedIndices, neglectedIndices);
+						fn(newUsedIndices, newNeglectedIndices);
+						//pool.Enqueue(fn, newUsedIndices, newNeglectedIndices);
+						/*std::unique_lock<std::mutex> lock(finishedMutex);
+						if (!finished) threads.emplace_back(std::thread(fn, newUsedIndices, newNeglectedIndices));*/
 					}
 
 					// Consider it as neglected index
 					{
+						std::vector<unsigned> newUsedIndices = usedIndices;
 						std::vector<unsigned> newNeglectedIndices = neglectedIndices;
+
 						newNeglectedIndices.push_back(current);
 
-						fn(usedIndices, newNeglectedIndices);
+						//pool.Enqueue(fn, newUsedIndices, newNeglectedIndices);
+						fn(newUsedIndices, newNeglectedIndices);
+						/*std::unique_lock<std::mutex> lock(finishedMutex);
+						if (!finished) threads.emplace_back(std::thread(fn, newUsedIndices, newNeglectedIndices));*/
 					}
 				};
 
 				// Start recursion
 				fn({}, {});
+
+				/*std::vector<unsigned> v1, v2;
+				//pool.Enqueue(fn, v1, v2);
+				threads.emplace_back(std::thread(fn, v1, v2));
+
+				// Wait for the recursion to finish
+				while (true) {
+					std::unique_lock<std::mutex> lock(mutex);
+					if (result.size() == size) {
+						std::unique_lock<std::mutex> lock(finishedMutex);
+						finished = true;
+						break;
+					}
+				}
+
+				// Join the remaining threads
+				/*for (auto& thread : threads) {
+					thread.detach();
+				}*/
 
 				return result;
 			}
@@ -652,6 +718,9 @@ namespace Construction {
 				};
 
 				fn({}, {}, *this);
+				/*std::vector<unsigned> used1;
+				std::vector<Indices> used2;
+				pool.Enqueue(fn, used1, used2, *this);*/
 
 				return result;
 			}
@@ -816,12 +885,33 @@ namespace Construction {
 				// Return the ordered indices
 				return result;
 			}
-		private:
-			friend class boost::serialization::access;
+		public:
+			void Serialize(std::ostream& os) const {
+				// Write the size of the indices
+				unsigned size = indices.size();
+				os.write(reinterpret_cast<const char*>(&size), sizeof(size));
 
-			template<class Archive>
-			void serialize(Archive& ar, const unsigned int version) {
-				ar & indices;
+				// Write the N indices
+				for (auto& index : indices) {
+					index.Serialize(os);
+				}
+			}
+
+			static std::shared_ptr<Indices> Deserialize(std::istream& is) {
+				// Read size
+				unsigned size;
+				is.read(reinterpret_cast<char*>(&size), sizeof(unsigned));
+
+				// Create result
+				auto result = std::make_shared<Indices>();
+
+				// Read indices
+				for (int i=0; i<size; i++) {
+					auto indexPtr = Index::Deserialize(is);
+					result->Insert(*indexPtr);
+				}
+
+				return std::move(result);
 			}
 		private:
 			std::vector<Index> indices;

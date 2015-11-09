@@ -131,8 +131,14 @@ namespace Construction {
              */
             void ValidateArguments() const {
                 // If sizes do not match return false
-                if (arguments.size() != ArgumentDictionary::Instance()->Size(name)) {
-                    throw WrongNumberOfArgumentsException();
+                if (ArgumentDictionary::Instance()->IsRepeatedArgument(name)) {
+                    if (arguments.size() < ArgumentDictionary::Instance()->Size(name)) {
+                        throw WrongNumberOfArgumentsException();
+                    }
+                } else {
+                    if (arguments.size() != ArgumentDictionary::Instance()->Size(name)) {
+                        throw WrongNumberOfArgumentsException();
+                    }
                 }
                 
                 for (int i=0; i<arguments.size(); i++) {
@@ -155,6 +161,8 @@ namespace Construction {
             }
         public:
             bool ReturnsTensors() const { return returnsTensors; }
+
+            static bool Cachable() { return true; }
         public:
             virtual std::string Help() const = 0;
             virtual TensorContainer Execute() const = 0;

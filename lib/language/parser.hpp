@@ -287,6 +287,9 @@ namespace Construction {
                         continue;
                     }
 
+                    // If a comment starts, stop parsing
+                    if (c == "#") break;
+
                     // Ignore white spaces
                     if (c == " ") continue;
 
@@ -348,7 +351,7 @@ namespace Construction {
             }
         private:
             void GetNext() {
-                if (currentPos < tokens.size()) {
+                if (currentPos < tokens.size()-1) {
                     current = tokens[++currentPos];
                     if (currentPos < tokens.size()-1)
                         lookAhead = tokens[currentPos+1];
@@ -500,7 +503,7 @@ namespace Construction {
                 Lexalize(code);
 
                 if (tokens.size() < 1) {
-                    // throw error
+                    return nullptr;
                 }
 
                 current = tokens[0];

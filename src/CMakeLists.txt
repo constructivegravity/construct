@@ -10,3 +10,11 @@ add_executable(construct main.cpp)
 #target_link_libraries(Construction )
 
 target_link_libraries(construct ${Boost_LIBRARIES})
+
+
+add_executable(coefficients coefficients.cpp)
+#target_link_libraries(Construction module)
+
+#target_link_libraries(Construction )
+
+target_link_libraries(coefficients ${Boost_LIBRARIES})

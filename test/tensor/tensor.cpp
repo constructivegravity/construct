@@ -42,11 +42,29 @@ SCENARIO("General tensors", "[tensor]") {
         WHEN(" serializing the tensor") {
 
             std::stringstream ss;
+            Construction::Tensor::EpsilonGammaTensor tensor(1,2, Construction::Tensor::Indices::GetRomanSeries(7, {1,3}));
+            Construction::Tensor::GammaTensor gamma(Construction::Tensor::Indices::GetRomanSeries(2, {1,3}));
+
+            tensor.Serialize(ss);
+            //gamma.Serialize(ss);
+            //std::cout << ss.str() << std::endl;
+            //std::cout << "Length: " << ss.str().size() << std::endl;
+
+            THEN(" the deserialized tensor is correct") {
+                std::stringstream is(ss.str());
+                auto read = Construction::Tensor::Tensor::Deserialize(is);
+                //std::cout << read->ToString() << std::endl;
+
+                /*auto read2 = Construction::Tensor::Tensor::Deserialize(is);
+                std::cout << read2->ToString() << std::endl;*/
+            }
+
+            /*std::stringstream ss;
             {
                 boost::archive::text_oarchive oa(ss);
                 oa << T;
             }
-            std::cout << ss.str() << std::endl;
+            std::cout << ss.str() << std::endl;*/
 
         }
 
@@ -211,7 +229,7 @@ SCENARIO("Epsilon Gamma", "[epsilon-gamma]") {
             REQUIRE(T(1, 3, 2, 1, 1, 2, 2, 3, 3) == -1);
         }
 
-        WHEN(" serializing the tensor") {
+        /*WHEN(" serializing the tensor") {
 
             std::stringstream ss;
 
@@ -222,14 +240,23 @@ SCENARIO("Epsilon Gamma", "[epsilon-gamma]") {
             }
 
             std::string output = ss.str();
+            std::cout << T << std::endl;
+            std::cout << output << std::endl;
 
             THEN(" the deserialized tensor has the correct indices") {
 
+                Construction::Tensor::Tensor t;
 
+                // Scope based input
+                {
+                    boost::archive::binary_iarchive ia(ss);
+                    ia >> t;
+                }
 
+                std::cout << t << std::endl;
             }
 
-        }
+        }*/
 
         WHEN(" considering the canonicalization") {
             Construction::Tensor::Indices indices;

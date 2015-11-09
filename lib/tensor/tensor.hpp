@@ -9,6 +9,7 @@
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/serialization/export.hpp>
 #include <boost/serialization/utility.hpp>
+#include <boost/serialization/shared_ptr.hpp>
 
 #include <common/task_pool.hpp>
 #include <tensor/permutation.hpp>
@@ -59,7 +60,7 @@ namespace Construction {
 		 	we do not implement the Einstein sum convention here. This may
 		 	follow in the future.
 		 */
-		class Tensor : public Printable {
+		class Tensor : public Printable, Serializable<Tensor> {
 		public:
 			enum class TensorType {
 				ADDITION = 1,
@@ -72,6 +73,8 @@ namespace Construction {
 				EPSILON = 201,
 				GAMMA = 202,
 				EPSILONGAMMA = 203,
+
+				SUBSTITUTE = 301,
 
 				CUSTOM = -1
 			};
@@ -264,9 +267,24 @@ namespace Construction {
 
             bool IsScalar() const { return type == TensorType::SCALAR; }
             bool IsNumeric() const { return type == TensorType::NUMERIC; }
+			bool IsSubstitute() const { return type == TensorType::SUBSTITUTE; }
 
             bool IsEpsilonTensor() const { return type == TensorType::EPSILON; }
             bool IsGammaTensor() const { return type == TensorType::GAMMA; }
+
+			std::string TypeToString() const {
+				switch (type) {
+					case TensorType::ADDITION: return "Addition";
+					case TensorType::MULTIPLICATION: return "Multiplication";
+					case TensorType::SCALED: return "Scaled";
+					case TensorType::SCALAR: return "Scalar";
+					case TensorType::SUBSTITUTE: return "Substitute";
+					case TensorType::GAMMA: return "Gamma";
+					case TensorType::EPSILON: return "Epsilon";
+					case TensorType::EPSILONGAMMA: return "EpsilonGamma";
+					default: return "Custom";
+				}
+			}
 		public:
 			/**
 				\brief Multiplication of two tensors
@@ -405,6 +423,9 @@ namespace Construction {
 			/*bool IsEqual(const Tensor& tensor) const {
 				return (*this - tensor).IsZero();
 			}*/
+		public:
+			void Serialize(std::ostream& os) const override;
+			static std::shared_ptr<Tensor> Deserialize(std::istream& is);
 		private:
 			friend class boost::serialization::access;
 
@@ -414,10 +435,10 @@ namespace Construction {
 			 */
 			template<class Archive>
 			void serialize(Archive& ar, const unsigned int version) {
-				ar & name;
+				/*ar & name;
 				ar & printed_text;
                 ar & type;
-				ar & indices;
+				ar & indices;*/
 			}
 		protected:
 			std::string name;
@@ -462,8 +483,19 @@ namespace Construction {
 			 */
 			virtual std::string ToString() const override;
 		public:
-			TensorPointer GetFirst() const { return A; }
-			TensorPointer GetSecond() const { return B; }
+			inline TensorPointer GetFirst() const { return A; }
+			inline TensorPointer GetSecond() const { return B; }
+		public:
+			static void DoSerialize(std::ostream& os, const AddedTensor& tensor) {
+				tensor.A->Serialize(os);
+				tensor.B->Serialize(os);
+			}
+
+			static TensorPointer DoDeserialize(std::istream& is, const Indices& indices) {
+				auto A = Tensor::Deserialize(is);
+				auto B = Tensor::Deserialize(is);
+				return std::make_shared<AddedTensor>(std::move(A), std::move(B));
+			}
 		public:
 			/**
 				Set the indices to the new order
@@ -600,6 +632,17 @@ namespace Construction {
 				return (*A)(assignment1) * (*B)(assignment2);
 			}
 		public:
+			static void DoSerialize(std::ostream& os, const MultipliedTensor& tensor) {
+				tensor.A->Serialize(os);
+				tensor.B->Serialize(os);
+			}
+
+			static TensorPointer DoDeserialize(std::istream& is, const Indices& indices) {
+				auto A = Tensor::Deserialize(is);
+				auto B = Tensor::Deserialize(is);
+				return std::make_shared<MultipliedTensor>(std::move(A), std::move(B));
+			}
+
 			template<class Archive>
 			void serialize(Archive& ar, const unsigned version) {
 				ar & boost::serialization::base_object<Tensor>(*this);
@@ -707,6 +750,20 @@ namespace Construction {
 			double GetScale() const { return c; }
 			void SetScale(double c) { this->c = c; }
 		public:
+			static void DoSerialize(std::ostream& os, const ScaledTensor& tensor) {
+				os.write(reinterpret_cast<const char*>(&tensor.c), sizeof(&tensor.c));
+				tensor.A->Serialize(os);
+			}
+
+			static TensorPointer DoDeserialize(std::istream& is, const Indices& indices) {
+				auto A = Tensor::Deserialize(is);
+
+				double c;
+				is.read(reinterpret_cast<char*>(&c), sizeof(c));
+
+				return std::make_shared<ScaledTensor>(std::move(A), c);
+			}
+
 			template<class Archive>
 			void serialize(Archive& ar, const unsigned version) {
 				ar & boost::serialization::base_object<Tensor>(*this);
@@ -768,10 +825,81 @@ namespace Construction {
 		}
 
 		/**
+		 	\class SubstituteTensor
+
+		 	Tensor that only changes the index structure. This is
+		 	just a helper class.
+		 */
+		class SubstituteTensor : public Tensor {
+		public:
+			SubstituteTensor(TensorPointer A, const Indices& indices) : Tensor("", "", indices), A(A) {
+				type = TensorType::SUBSTITUTE;
+
+				if (!indices.IsPermutationOf(A->GetIndices())) {
+					throw Exception("The indices have to be a permutation of each other");
+				}
+			}
+		public:
+			virtual TensorPointer Clone() const override {
+				return std::make_shared<SubstituteTensor>(
+						std::move(A->Clone()),
+						indices
+				);
+			}
+		public:
+			bool IsAddedTensor() const {
+				return A->IsAddedTensor();
+			}
+		public:
+			virtual std::string ToString() const override {
+				return A->ToString();
+			}
+
+			virtual double Evaluate(const std::vector<unsigned>& args) const override {
+				// If number of args and indices differ return
+				if (args.size() != indices.Size()) {
+					throw IncompleteIndexAssignmentException();
+				}
+
+				// Create index assignments
+				IndexAssignments assignment;
+				for (int i=0; i<args.size(); i++) {
+					assignment[indices[i].GetName()] = args[i];
+				}
+
+				return (*A)(assignment);
+			}
+		public:
+			/**
+				Set the indices to the new order
+			 */
+			virtual void SetIndices(const Indices& newIndices) override {
+				// Need to permute the indices in A and B
+				auto permutationA = Permutation::From(indices, A->GetIndices());
+
+				indices = newIndices;
+				A->SetIndices(permutationA(newIndices));
+			}
+		public:
+			static void DoSerialize(std::ostream& os, const SubstituteTensor& tensor) {
+				tensor.A->Serialize(os);
+			}
+
+			static TensorPointer DoDeserialize(std::istream& is, const Indices& indices) {
+				auto A = Tensor::Deserialize(is);
+				return std::make_shared<SubstituteTensor>(std::move(A), indices);
+			}
+		private:
+			TensorPointer A;
+		};
+
+		/**
 			\class ScalarTensor
 		 */
 		class ScalarTensor : public Tensor {
 		public:
+			ScalarTensor(double value) : value(value) { }
+
 			ScalarTensor(const std::string& name, const std::string& printed_text, double value)
 				: Tensor(name, printed_text, Indices()), value(value) {
 
@@ -794,10 +922,21 @@ namespace Construction {
 				return value;
 			}
 		public:
+			static void DoSerialize(std::ostream& os, const ScalarTensor& tensor) {
+				os.write(reinterpret_cast<const char*>(&tensor.value), sizeof(tensor.value));
+			}
+
+			static TensorPointer DoDeserialize(std::istream& is, const Indices& indices) {
+				double value;
+				is.read(reinterpret_cast<char*>(&value), sizeof(value));
+
+				return std::make_shared<ScalarTensor>(value);
+			}
+
 			template<class Archive>
 			void serialize(Archive& ar, const unsigned version) {
-				ar & boost::serialization::base_object<Tensor>(*this);
-				ar & value;
+				/*ar & boost::serialization::base_object<Tensor>(*this);
+				ar & value;*/
 			}
 		private:
 			double value;
@@ -973,10 +1112,26 @@ namespace Construction {
 				return std::move(std::make_shared<GammaTensor>(sortedIndices, signature.first, signature.second));
 			}
 		public:
+			static void DoSerialize(std::ostream& os, const GammaTensor& tensor) {
+				int p = tensor.signature.first;
+				int q = tensor.signature.second;
+
+				os.write(reinterpret_cast<const char*>(&p), sizeof(p));
+				os.write(reinterpret_cast<const char*>(&q), sizeof(q));
+			}
+
+			static TensorPointer DoDeserialize(std::istream& is, const Indices& indices) {
+				int p, q;
+				is.read(reinterpret_cast<char*>(&p), sizeof(p));
+				is.read(reinterpret_cast<char*>(&q), sizeof(q));
+
+				return std::make_shared<GammaTensor>(indices, p, q);
+			}
+
 			template<class Archive>
 			void serialize(Archive& ar, const unsigned version) {
-				ar & boost::serialization::base_object<Tensor>(*this);
-				ar & signature;
+				/*ar & boost::serialization::base_object<Tensor>(*this);
+				ar & signature;*/
 			}
 		private:
 			std::pair<int, int> signature;
@@ -999,7 +1154,7 @@ namespace Construction {
 		 */
 		class EpsilonGammaTensor : public Tensor {
 		public:
-			EpsilonGammaTensor(unsigned numEpsilon, unsigned numGamma, const Indices& indices) : Tensor("EpsilonGamma", "\\epsilon\\gamma", indices), numEpsilon(numEpsilon), numGamma(numGamma) {
+			EpsilonGammaTensor(unsigned numEpsilon, unsigned numGamma, const Indices& indices) : /*Tensor("EpsilonGamma", "\\epsilon\\gamma", indices)*/ Tensor("", "", indices), numEpsilon(numEpsilon), numGamma(numGamma) {
 				assert(numEpsilon * 3 + numGamma*2 == indices.Size());
 
 				type = TensorType::EPSILONGAMMA;
@@ -1141,17 +1296,136 @@ namespace Construction {
 		public:
 			friend class boost::serialization::access;
 
+			static void DoSerialize(std::ostream& os, const EpsilonGammaTensor& tensor) {
+				/*unsigned numEpsilon = tensor.numEpsilon;
+				unsigned numGamma = tensor.numGamma;
+
+				os.write(reinterpret_cast<const char*>(&tensor.numEpsilon), sizeof(tensor.numEpsilon));
+				os.write(reinterpret_cast<const char*>(&tensor.numGamma), sizeof(tensor.numGamma));*/
+			}
+
+			static TensorPointer DoDeserialize(std::istream& is, const Indices& indices) {
+				unsigned numEpsilon = (indices.Size() % 2 == 0) ? 0 : 1;
+				unsigned numGamma = (indices.Size() % 2 == 0) ? indices.Size()/2 : (indices.Size()-3)/2;
+				return std::make_shared<EpsilonGammaTensor>(numEpsilon, numGamma, indices);
+			}
+
 			template<class Archive>
 			void serialize(Archive& ar, const unsigned version) {
-				ar & boost::serialization::base_object<Tensor>(*this);
+				/*ar & boost::serialization::base_object<Tensor>(*this);
 
 				ar & numEpsilon;
-				ar & numGamma;
+				ar & numGamma;*/
 			}
 		private:
 			unsigned numEpsilon;
 			unsigned numGamma;
 		};
+
+
+
+
+
+
+
+		void Tensor::Serialize(std::ostream& os) const {
+			// Serialize name and printed_text
+			os << name << ";" << printed_text << ";";
+
+			// Serialize the indices
+			indices.Serialize(os);
+
+			// Write type
+			int typeC = static_cast<int>(type);
+			os.write(reinterpret_cast<const char*>(&typeC), sizeof(typeC));
+
+			switch (type) {
+				case Tensor::TensorType::ADDITION:
+					AddedTensor::DoSerialize(os, *static_cast<const AddedTensor*>(this));
+					break;
+				case Tensor::TensorType::MULTIPLICATION:
+					MultipliedTensor::DoSerialize(os, *static_cast<const MultipliedTensor*>(this));
+					break;
+				case Tensor::TensorType::SCALED:
+					ScaledTensor::DoSerialize(os, *static_cast<const ScaledTensor*>(this));
+					break;
+				case Tensor::TensorType::SUBSTITUTE:
+					SubstituteTensor::DoSerialize(os, *static_cast<const SubstituteTensor*>(this));
+					break;
+				case Tensor::TensorType::SCALAR:
+					ScalarTensor::DoSerialize(os, *static_cast<const ScalarTensor*>(this));
+					break;
+				case Tensor::TensorType::EPSILONGAMMA:
+					EpsilonGammaTensor::DoSerialize(os, *static_cast<const EpsilonGammaTensor*>(this));
+					break;
+				case Tensor::TensorType::GAMMA:
+					GammaTensor::DoSerialize(os, *static_cast<const GammaTensor*>(this));
+					break;
+
+				default: break;
+			}
+		}
+
+		TensorPointer Tensor::Deserialize(std::istream& is) {
+			// Read name
+			std::string name;
+			std::getline(is, name, ';');
+
+			// Read printed text
+			std::string printed_text;
+			std::getline(is, printed_text, ';');
+
+			// Read indices
+			auto indices = *Indices::Deserialize(is);
+
+			// Read type
+			int typeC;
+			is.read(reinterpret_cast<char*>(&typeC), sizeof(typeC));
+			TensorType type = static_cast<TensorType>(typeC);
+
+			TensorPointer result;
+
+			// If not a standard tensor, do the specific serialization stuff
+			switch (type) {
+				case TensorType::ADDITION:
+					result = std::move(AddedTensor::DoDeserialize(is, indices));
+					break;
+
+				case TensorType::MULTIPLICATION:
+					result = std::move(MultipliedTensor::DoDeserialize(is, indices));
+					break;
+
+				case TensorType::SCALED:
+					result = std::move(ScaledTensor::DoDeserialize(is, indices));
+					break;
+
+				case TensorType::SCALAR:
+					result = std::move(ScalarTensor::DoDeserialize(is, indices));
+					break;
+
+				case TensorType::GAMMA:
+					result = std::move(GammaTensor::DoDeserialize(is, indices));
+					break;
+
+				case TensorType::EPSILONGAMMA:
+					result = std::move(EpsilonGammaTensor::DoDeserialize(is, indices));
+					break;
+
+				case TensorType::SUBSTITUTE:
+					result = std::move(SubstituteTensor::DoDeserialize(is, indices));
+					break;
+
+				default:
+					result = std::make_shared<Tensor>(name, printed_text, indices);
+					break;
+			}
+
+			// Assign the name and printed text
+			result->SetName(name);
+			result->SetPrintedText(printed_text);
+
+			return std::move(result);
+		}
 
 	}
 }

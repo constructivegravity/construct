@@ -19,7 +19,7 @@ set(CONSTRUCTION_EXTERNAL_DIRECTORY "${CONSTRUCTION_MAIN_DIRECTORY}/external")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "../../bin")
 
 # Use boost
-find_package(Boost COMPONENTS system serialization REQUIRED)
+find_package(Boost COMPONENTS system serialization iostreams REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 
 # Documentation

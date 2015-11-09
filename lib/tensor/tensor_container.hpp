@@ -6,10 +6,14 @@
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/serialization/vector.hpp>
 
+#include <common/serializable.hpp>
+
 #include <tensor/tensor.hpp>
 
 namespace Construction {
     namespace Tensor {
+
+        using Common::Serializable;
 
         /**
             \class TensorContainer
@@ -19,7 +23,7 @@ namespace Construction {
             Container class to manage several tensors. It especially
             allows streaming in and out of a file.
          */
-        class TensorContainer {
+        class TensorContainer : public Serializable<TensorContainer> {
         public:
             typedef std::vector<TensorPointer>      ContainerType;
             typedef ContainerType::iterator         Iterator;
@@ -78,9 +82,34 @@ namespace Construction {
         public:
             friend class boost::serialization::access;
 
+            virtual void Serialize(std::ostream& os) const {
+                // Write size of container
+                size_t size = data.size();
+                os.write(reinterpret_cast<const char*>(&size), sizeof(size));
+
+                // Store every tensor
+                for (auto& t : data) {
+                    t->Serialize(os);
+                }
+            }
+
+            static std::shared_ptr<TensorContainer> Deserialize(std::istream& is) {
+                size_t size;
+                is.read(reinterpret_cast<char*>(&size), sizeof(size));
+
+                auto result = std::make_shared<TensorContainer>();
+
+                for (int i=0; i<size; i++) {
+                    auto tensor =  Tensor::Deserialize(is);
+                    result->Insert(std::move(tensor));
+                }
+
+                return std::move(result);
+            }
+
             template<class Archive>
             void serialize(Archive& ar, const unsigned version) {
-
+                ar & data;
             }
 
             void SaveToFile(const std::string& filename) {
@@ -91,13 +120,19 @@ namespace Construction {
 
             }
         public:
-            friend std::ostream& operator<<(std::ostream& os, const TensorContainer& container) {
-                os << "[";
-                for (int i=0; i<container.Size(); i++) {
-                    os << container.data[i]->ToString();
-                    if (i != container.Size()-1) os << ", ";
+            std::string ToString() const {
+                std::stringstream ss;
+                ss << "[";
+                for (int i=0; i<data.size(); i++) {
+                    ss << data[i]->ToString();
+                    if (i != data.size()-1) ss << ", ";
                 }
-                os << "]";
+                ss << "]";
+                return ss.str();
+            }
+
+            friend std::ostream& operator<<(std::ostream& os, const TensorContainer& container) {
+                os << container.ToString();
                 return os;
             }
         private:

@@ -53,6 +53,12 @@ namespace Construction {
             }
 
         public:
+            template<class F, class... Args>
+            auto EnqueueCopy(F &&f, Args ... args)
+            -> std::future<typename std::result_of<F(Args...)>::type> {
+                return Enqueue(f, args...);
+            }
+
             /**
                 Enqueue some task to the thread pool. It may obtain parameters.
 
@@ -88,6 +94,24 @@ namespace Construction {
                 // Wake up one thread and return the future
                 condition.notify_one();
                 return res;
+            }
+
+            bool Empty() {
+                return tasks.empty();
+            }
+
+            // Wait for all tasks to finish
+            void Wait() {
+                std::thread block([&]() {
+                    // Scope based locking
+                    while (true) {
+                        std::unique_lock<std::mutex> lock(tasksMutex);
+                        if (tasks.empty()) return;
+                    }
+                });
+
+                // Wait to finish
+                block.join();
             }
 
             void Shutdown() {

@@ -84,6 +84,36 @@ SCENARIO("Tensor indices", "[indices]") {
 
         }
 
+        WHEN(" seralizing indices") {
+
+            std::stringstream ss;
+            indices.Serialize(ss);
+            std::string output = ss.str();
+
+            THEN(" the deserialized indices are the same") {
+                std::stringstream st (output);
+                auto newIndices = Construction::Tensor::Indices::Deserialize(st);
+
+                REQUIRE(*newIndices == indices);
+            }
+
+        }
+
+        WHEN(" looking at all partitions") {
+            auto newIndices = Construction::Tensor::Indices::GetRomanSeries(8, {1,3});
+            auto result = newIndices.GetAllPartitions({2,2,2,2});
+
+            for (auto& partition : result) {
+                for (auto& indices : partition) {
+                    std::cout << indices << " ";
+                }
+                std::cout << std::endl;
+            }
+
+            //REQUIRE(result.size() == 8*7);
+
+        }
+
     }
 
 }

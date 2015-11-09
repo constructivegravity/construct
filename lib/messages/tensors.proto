@@ -1,0 +1,52 @@
+package construction;
+
+/**
+    A tensor index that can be both co- and contravariant.
+    It contains the name and LaTeX code.
+ */
+message Index {
+    required string name = 1;
+    required string printed = 2;
+    optional bool up = 3;
+};
+
+/**
+    A collection of indices.
+ */
+message Indices {
+    repeated Index indices = 1;
+};
+
+message TensorInfo {
+    enum Type {
+        UNKNOWN = 1;
+
+        EPSILON = 2;
+        GAMMA = 3;
+
+        EPSILONGAMMA = 4;
+
+        ADDED = 5;
+        MULTIPLIED = 6;
+        SCALED = 7;
+        SUBSTITUTED = 8;
+    }
+
+    required string name = 1;
+    required string printed = 2;
+    required Type type = 3;
+    required Indices indices = 4;
+};
+
+message BaseTensor {
+    required TensorInfo info = 1;
+};
+
+message SymmetrizedTensor {
+    optional TensorInfo info = 1;
+    repeated BaseTensor tensors = 2;
+};
+
+message Tensors {
+    repeated SymmetrizedTensor tensors = 1;
+};

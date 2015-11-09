@@ -35,18 +35,34 @@ namespace Construction {
                 auto it = factory.find(name);
                 if (it == factory.end()) return false;
 
-                auto iter = it->second.find(pos);
-                if (iter == it->second.end()) return false;
+                // If pos is larger than the number of registered arguments, set to last
+                if (it->second.second && pos >= it->second.first.size()) {
+                    pos = it->second.first.size()-1;
+                }
+
+                auto iter = it->second.first.find(pos);
+                if (iter == it->second.first.end()) return false;
 
                 return iter->second == type;
+            }
+
+            bool IsRepeatedArgument(const std::string& name) const {
+                auto it = factory.find(name);
+                if (it == factory.end()) return false;
+                return it->second.second;
             }
 
             ArgumentType Type(const std::string& name, int pos) const {
                 auto it = factory.find(name);
                 if (it == factory.end()) return ArgumentType::UNKNOWN;
 
-                auto iter = it->second.find(pos);
-                if (iter == it->second.end()) return ArgumentType::UNKNOWN;
+                // If pos is larger than the number of registered arguments, set to last
+                if (it->second.second && pos >= it->second.first.size()) {
+                    pos = it->second.first.size()-1;
+                }
+
+                auto iter = it->second.first.find(pos);
+                if (iter == it->second.first.end()) return ArgumentType::UNKNOWN;
 
                 return iter->second;
             }
@@ -64,27 +80,29 @@ namespace Construction {
                 auto it = factory.find(name);
                 if (it == factory.end()) return 0;
 
-                return it->second.size();
+                return it->second.first.size();
             }
 
-            void RegisterArgument(const std::string& name, int pos, ArgumentType type) {
-                factory[name][pos] = type;
+            void RegisterArgument(const std::string& name, int pos, ArgumentType type, bool repeatLast=false) {
+                factory[name].first[pos] = type;
+                factory[name].second = repeatLast;
             }
         private:
-            std::map<std::string, std::map<int, ArgumentType> > factory;
+            std::map<std::string, std::pair<std::map<int, ArgumentType>, bool> > factory;
         };
 
         template<int number, ArgumentType type>
         class Argument {
         public:
-            Argument(const std::string& name) {
-                ArgumentDictionary::Instance()->RegisterArgument(name, number, type);
+            Argument(const std::string& name, bool repeatLast=false) {
+                ArgumentDictionary::Instance()->RegisterArgument(name, number, type, repeatLast);
             }
         };
 
         typedef std::vector<std::shared_ptr<BaseArgument>> Arguments;
 
 #define REGISTER_ARGUMENT(name, pos, type) static Argument<pos, type> name##_arg##pos (#name)
+#define REGISTER_REPEATED_ARGUMENT(name, pos, type) static Argument<pos, type> name##_arg##pos (#name, true)
 
         /**
             \class IndexArgument

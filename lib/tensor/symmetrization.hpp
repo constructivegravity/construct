@@ -5,23 +5,25 @@
 namespace Construction {
     namespace Tensor {
 
-
-
         class Symmetrization {
         public:
-            Symmetrization(const std::vector<unsigned>& indices) : indices(indices) { }
+            Symmetrization(bool scaledResult=false) : scaledResult(scaledResult) { }
+            Symmetrization(const std::vector<unsigned>& indices, bool scaledResult=false) : indices(indices), scaledResult(scaledResult) { }
 
-            Symmetrization(const Symmetrization& other) : indices(other.indices) { }
-            Symmetrization(Symmetrization&& other) : indices(std::move(other.indices)) { }
+            Symmetrization(const Symmetrization& other) : indices(other.indices), scaledResult(other.scaledResult) { }
+            Symmetrization(Symmetrization&& other) : indices(std::move(other.indices)), scaledResult(std::move(other.scaledResult)) { }
         public:
             /**
                 \brief Calculate the index combinations by permutation
 
 
              */
-            std::vector<Indices> PermuteIndices(const Indices& indices) const {
+            virtual std::vector<Indices> PermuteIndices(const Indices& indices) const {
                 // Generate all the index permutations between the numbers in indices
                 std::vector<Indices> permutations;
+
+                // Task pool
+                //Common::TaskPool pool;
 
                 // Helper method
                 std::function<void(unsigned, Indices, Indices)> fn;
@@ -35,6 +37,7 @@ namespace Construction {
                             used.Insert(indices[i]);
                             unused.Remove(std::distance(unused.begin(), std::find(unused.begin(), unused.end(), indices[i])));
                             fn(i+1, used, unused);
+                            //pool.Enqueue(fn, i+1, used, unused);
                         } else {
                             // else, iterate over the indices to change
                             for (auto& k : this->indices) {
@@ -49,12 +52,20 @@ namespace Construction {
                                     newUnused.Remove(std::distance(newUnused.begin(), it));
                                     newUsed.Insert(indices[k - 1]);
                                     fn(i + 1, newUsed, newUnused);
+                                    //pool.Enqueue(fn, i+1, newUsed, newUnused);
                                 }
                             }
                         }
                     }
                 };
+
+                // Let the magic happen ...
+                //Indices empty = {};
+                //pool.Enqueue(fn, 0, empty, indices);
                 fn(0, {}, indices);
+
+                // Wait for everything to finish
+                //pool.Wait();
 
                 return permutations;
             }
@@ -66,15 +77,34 @@ namespace Construction {
              */
             std::vector<TensorPointer> Symmetrize(const ConstTensorPointer& tensor) const {
                 // Calculate all the required permutations of the indices
-                auto permutations = PermuteIndices(tensor->GetIndices());
+                auto indices = tensor->GetIndices();
+                auto permutations = PermuteIndices(indices);
 
-                // Construct the linear combination
+                // Initialize result
                 std::vector<TensorPointer> tensors;
-                for (auto& permutation : permutations) {
+
+                // Helper function
+                auto fn = [&](const Indices& permutation) {
                     auto clone = tensor->Clone();
                     clone->SetIndices(permutation);
-                    tensors.push_back(std::move(clone));
+
+                    if (permutation == indices)
+                        tensors.push_back(std::move(clone));
+                    else
+                        tensors.push_back(std::make_shared<SubstituteTensor>(std::move(clone), indices));
+                };
+
+                // Generate threads
+                std::vector<std::thread> threads;
+                for (auto& permutation : permutations) {
+                    fn(permutation);
+                    //threads.emplace_back(std::thread(fn, permutation));
                 }
+
+                // Wait for all threads to finish
+                /*for (auto& thread : threads) {
+                    thread.join();
+                }*/
 
                 return tensors;
             }
@@ -95,7 +125,10 @@ namespace Construction {
                 //return std::move(last);
 
                 if (!std::make_shared<ScaledTensor>(last, 1.0/tensors.size())->IsEqual(*tensor)) {
-                    return last; //std::move(last);
+                    if (scaledResult)
+                        return std::move(std::make_shared<ScaledTensor>(std::move(last), 1.0/tensors.size()));
+                    else
+                        return last;
                 } else {
                     return tensor->Clone(); //std::move(tensor->Clone());
                 }
@@ -120,41 +153,16 @@ namespace Construction {
             }
         private:
             std::vector<unsigned> indices;
+        protected:
+            bool scaledResult = false;
         };
 
         class AntiSymmetrization : public Symmetrization {
         public:
-            AntiSymmetrization(const std::vector<unsigned>& indices) : Symmetrization(indices) { }
+            AntiSymmetrization(const std::vector<unsigned>& indices, bool scaledResult=false) : Symmetrization(indices, scaledResult) { }
         public:
             virtual TensorPointer operator()(const Tensor& tensor) const override {
-                auto tensors = Symmetrize(ConstTensorPointer(ConstTensorPointer(), &tensor));
-
-                // Construct the tensor sum
-                TensorPointer last = std::move(tensors[0]);
-                for (int i=1; i<tensors.size(); i++) {
-                    // Find sign
-                    int sign = Permutation::From(tensors[i]->GetIndices(), tensor.GetIndices()).Sign();
-
-                    if (sign > 0) {
-                        last = std::move(std::make_shared<AddedTensor>(std::move(last), std::move(tensors[i])));
-                    } else {
-                        TensorPointer current = std::move(tensors[i]);
-
-                        // If the tensor is already scaled, simply rescale. Simplifies much especially printing
-                        if (current->IsScaledTensor()) {
-                            static_cast<ScaledTensor*>(current.get())->SetScale(-static_cast<ScaledTensor*>(current.get())->GetScale());
-                        }
-                        // scale the tensor
-                        else {
-                            current = std::make_shared<ScaledTensor>(current, -1);
-                        }
-
-                        last = std::move(std::make_shared<AddedTensor>(std::move(last), std::move(current)));
-                    }
-                }
-
-                return std::move(last);
-                return std::move(std::make_shared<ScaledTensor>(std::move(last), 1.0/tensors.size()));
+                return (*this)(ConstTensorPointer(ConstTensorPointer(), &tensor));
             }
 
             virtual TensorPointer operator()(const ConstTensorPointer& tensor) const override {
@@ -184,10 +192,83 @@ namespace Construction {
                     }
                 }
 
-                return std::move(last);
+                //return std::move(last);
+
+                if (!std::make_shared<ScaledTensor>(last, 1.0/tensors.size())->IsEqual(*tensor)) {
+                    if (scaledResult)
+                        return std::move(std::make_shared<ScaledTensor>(std::move(last), 1.0/tensors.size()));
+                    else
+                        return last;
+                } else {
+                    return tensor->Clone(); //std::move(tensor->Clone());
+                }
+
                 return std::move(std::make_shared<ScaledTensor>(std::move(last), 1.0/tensors.size()));
             }
         };
+
+        class BlockSymmetrization : public Symmetrization {
+        public:
+            BlockSymmetrization(const std::vector<std::pair<unsigned, unsigned>>& blocks, bool scaledResult=false) : blocks(blocks), Symmetrization(scaledResult) { }
+        public:
+            /**
+                \brief Calculate the index combinations by permutation
+
+
+             */
+            virtual std::vector<Indices> PermuteIndices(const Indices& indices) const override {
+                // Create the shortened indices, each block exchanged with a multi-index
+                Indices shortened = indices;
+                std::vector<unsigned> toPermute;
+                std::map<Index, Indices> groups;
+
+                for (int i=0; i<blocks.size(); i++) {
+                    if (blocks[i].second < blocks[i].first) continue;
+
+                    auto index = indices[blocks[i].first-1];
+                    groups[index].Insert(index);
+
+                    // Add index to permute
+                    for (int j=blocks[i].first+1; j<=blocks[i].second; j++) {
+                        auto next = indices[j-1];
+                        groups[index].Insert(next);
+
+                        int id = shortened.IndexOf(next);
+                        shortened.Remove(id);
+                    }
+                    toPermute.push_back(shortened.IndexOf(index)+1);
+                }
+
+                // Create permutation of the blocks
+                Symmetrization sym(toPermute);
+                std::vector<Indices> temporaryPermutations = sym.PermuteIndices(shortened);
+
+                // Get back the original terms
+                std::vector<Indices> permutations;
+                for (auto& permutation : temporaryPermutations) {
+                    Indices newIndices;
+
+                    for (auto& index : permutation) {
+                        auto it = groups.find(index);
+
+                        // If the index is not part of the multi-indices, push back the index
+                        if (it == groups.end()) {
+                            newIndices.Insert(index);
+                            continue;
+                        }
+
+                        newIndices.Append(it->second);
+                    }
+
+                    permutations.push_back(newIndices);
+                }
+
+                return permutations;
+            }
+        private:
+            std::vector< std::pair<unsigned, unsigned> > blocks;
+        };
+
 
     }
 }

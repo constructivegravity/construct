@@ -1,10 +1,11 @@
 #pragma once
 
-#include <boost/archive/binary_iarchive.hpp>
-#include <boost/archive/binary_oarchive.hpp>
+#include <common/serializable.hpp>
 
 namespace Construction {
 	namespace Common {
+
+		using Common::Serializable;
 		
 		/**
 			\class Range
@@ -15,7 +16,7 @@ namespace Construction {
 			is for example used for the indices of the tensor that may range
 			from 1 to D or 0 to D.
 		 */
-		class Range {
+		class Range : public Serializable<Range> {
 		public:
 			Range(unsigned from, unsigned to) : from(from), to(to) { }
 			
@@ -117,13 +118,42 @@ namespace Construction {
 				}
 				return result;
 			}
-		private:
-			friend class boost::serialization::access;
+		public:
+			virtual void Serialize(std::ostream& os) const {
+				os << "{" << from << "," << to << "}";
+			}
 
-			template<class Archive>
-			void serialize(Archive& ar, const unsigned int version) {
-				ar & from;
-				ar & to;
+			static std::shared_ptr<Range> Deserialize(std::istream& is) {
+				// Read initial bracket
+				{
+					char c;
+					is >> c;
+					if (c != '{') throw WrongFormatException();
+				}
+
+				// Read from
+				unsigned f;
+				is >> f;
+
+				// Read comma
+				{
+					char c;
+					is >> c;
+					if (c != ',') throw WrongFormatException();
+				}
+
+				// Read to
+				unsigned t;
+				is >> t;
+
+				// Read final bracket
+				{
+					char c;
+					is >> c;
+					if (c != '}') throw WrongFormatException();
+				}
+
+				return std::make_shared<Range>(f,t);
 			}
 		private:
 			unsigned from;

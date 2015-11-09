@@ -4,6 +4,8 @@
 #include <tensor/tensor.hpp>
 #include <tensor/tensor_container.hpp>
 
+#include <common/time_measurement.hpp>
+
 #include <generator/base_tensor.hpp>
 #include <generator/equivalent_selector.hpp>
 #include <generator/basis_selector.hpp>
@@ -37,6 +39,10 @@ namespace Construction {
             TensorContainer AntiSymmetrize(const TensorContainer& tensors, const Indices& indices);
             TensorContainer BlockSymmetrize(const TensorContainer& tensors, const std::vector<Indices>& indices);
 
+            bool IsSymmetric(const TensorPointer& tensors, const Indices& indices);
+            bool IsAntiSymmetric(const TensorPointer& tensors, const Indices& indices);
+            bool IsBlockSymmetric(const TensorPointer& tensors, const std::vector<Indices>& indices);
+
             TensorContainer LinearIndependent(const TensorContainer& tensors);
             Generator::LinearDependentSelector::ResultType LinearDependent(const TensorContainer& tensors);
 
@@ -45,9 +51,6 @@ namespace Construction {
             /**
                 Implementation
              */
-
-
-
             TensorContainer Tensor(const Indices& indices) {
                 Generator::BaseTensorGenerator generator;
 
@@ -83,9 +86,14 @@ namespace Construction {
             }
 
             TensorContainer Symmetrize(const TensorContainer& tensors, const Indices& indices) {
+                Common::TimeMeasurement time;
+
                 // Get the original indices
                 Construction::Generator::SymmetrizedTensorGenerator symmetrizer(indices);
                 auto result = symmetrizer(tensors);
+
+                time.Stop();
+                //std::cout << "  \033[90m" << time << "\033[0m" << std::endl;
 
                 return result;
             }
@@ -98,9 +106,80 @@ namespace Construction {
                 return result;
             }
 
+            TensorContainer ExchangeSymmetrize(const TensorContainer& tensors, const Indices& indices) {
+                Common::TimeMeasurement time;
+
+                // Get the original indices
+                Construction::Generator::ExchangeSymmetrizedTensorGenerator symmetrizer(indices);
+                auto result = symmetrizer(tensors);
+
+                time.Stop();
+                //std::cout << "  \033[90m" << time << "\033[0m" << std::endl;
+
+                return result;
+            }
+
             TensorContainer BlockSymmetrize(const TensorContainer& tensors, const std::vector<Indices>& blocks) {
-                // TODO: implement
-                return TensorContainer();
+                Construction::Generator::BlockSymmetrizedTensorGenerator symmetrizer(blocks);
+                auto result = symmetrizer(tensors);
+                return result;
+            }
+
+            bool IsSymmetric(const TensorPointer& tensor, const Indices& indices) {
+                // Get the original indices
+                Construction::Generator::SymmetrizedTensorGenerator symmetrizer(indices);
+
+                // Insert into container
+                TensorContainer container;
+                container.Insert(tensor);
+
+                // Symmetrize
+                auto result = symmetrizer(container, true);
+
+                // If no tensor is returned, then the original one
+                // is antisymmetric in the given indices, so return false
+                if (result.Size() == 0) return false;
+
+                // Compare if the symmetrized tensor is identical to the original
+                return result.Get(0)->IsEqual(*tensor);
+            }
+
+            bool IsAntiSymmetric(const TensorPointer& tensor, const Indices& indices) {
+                // Get the original indices
+                Construction::Generator::AntiSymmetrizedTensorGenerator symmetrizer(indices);
+
+                // Insert into container
+                TensorContainer container;
+                container.Insert(tensor);
+
+                // Symmetrize
+                auto result = symmetrizer(container, true);
+
+                // If no tensor is returned, then the original one
+                // is antisymmetric in the given indices, so return false
+                if (result.Size() == 0) return false;
+
+                // Compare if the symmetrized tensor is identical to the original
+                return result.Get(0)->IsEqual(*tensor);
+            }
+
+            bool IsBlockSymmetric(const TensorPointer& tensor, const std::vector<Indices>& indices) {
+                // Get the original indices
+                Construction::Generator::BlockSymmetrizedTensorGenerator symmetrizer(indices);
+
+                // Insert into container
+                TensorContainer container;
+                container.Insert(tensor);
+
+                // Symmetrize
+                auto result = symmetrizer(container, true);
+
+                // If no tensor is returned, then the original one
+                // is antisymmetric in the given indices, so return false
+                if (result.Size() == 0) return false;
+
+                // Compare if the symmetrized tensor is identical to the original
+                return result.Get(0)->IsEqual(*tensor);
             }
 
             TensorContainer LinearIndependent(const TensorContainer& tensors) {

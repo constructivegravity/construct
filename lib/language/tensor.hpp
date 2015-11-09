@@ -85,6 +85,10 @@ namespace Construction {
                 return "DegreesOfFreedom(<Tensors>)";
             }
 
+            static bool Cachable() {
+                return false;
+            }
+
             TensorContainer Execute() const {
                 std::cout << "  \033[32m" << API::DegreesOfFreedom(GetTensors(0)) << "\033[0m" << std::endl;
                 return TensorContainer();

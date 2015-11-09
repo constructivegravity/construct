@@ -72,6 +72,15 @@ int main(int argc, char** argv) {
 
 	Construction::Language::CLI cli;
 
+	// If there is a filename given, execute this
+	if (argc >= 2) {
+		std::string filename = argv[1];
+		cli.ExecuteScript(filename);
+		return 0;
+	}
+
+	// CLI mode
+
 	std::cout << "> ";
 	std::string input;
 	while (std::getline(std::cin, input)) {
