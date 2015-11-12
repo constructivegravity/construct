@@ -4,6 +4,7 @@
 #include <vector>
 #include <sstream>
 #include <map>
+#include <algorithm>
 
 #include <common/error.hpp>
 #include <common/printable.hpp>

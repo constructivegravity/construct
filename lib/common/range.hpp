@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include <common/serializable.hpp>
 
 namespace Construction {

@@ -1,5 +1,6 @@
 #include <thread>
 
+#include <common/task_pool.hpp>
 #include <common/time_measurement.hpp>
 
 #include <tensor/index.hpp>
@@ -202,33 +203,35 @@ int main(int argc, char** argv) {
     auto coefficients = GenerateCoefficientList(4,3);
 
     std::vector<std::thread> threads;
+    Construction::Common::TaskPool pool (20);
 
     for (auto& c : coefficients) {
 
-        threads.push_back(
-                std::thread([&]() {
-                    std::string cmd;
-                    auto tensor = GenerateTensor(c, database, mutex, cmd);
+        pool.Enqueue([&]() {
+            std::string cmd;
+            auto tensor = GenerateTensor(c, database, mutex, cmd);
 
-                    coutMutex.lock();
-                    std::cerr << "Finished " << ToString(c) << " ..." << std::endl;
-                    coutMutex.unlock();
+            coutMutex.lock();
+            std::cerr << "Finished " << ToString(c) << " ..." << std::endl;
+            coutMutex.unlock();
 
-                    coutMutex.lock();
-                    std::cout << TensorToString("\\lambda", c, tensor) << std::endl;
-                    coutMutex.unlock();
+            coutMutex.lock();
+            std::cout << TensorToString("\\lambda", c, tensor) << std::endl;
+            coutMutex.unlock();
 
-                    mutex.lock();
-                    database[cmd] = tensor;
+            mutex.lock();
+            database[cmd] = tensor;
 
-                    database.SaveToFile("tensors.db");
-                    mutex.unlock();
-                })
-        );
+            database.SaveToFile("tensors.db");
+            mutex.unlock();
+        });
+
     }
 
+    pool.Wait();
+
     // Wait for all tasks to finish
-    for (auto& thread : threads) thread.join();
+    //for (auto& thread : threads) thread.join();
 
     /*
 
