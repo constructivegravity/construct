@@ -7,7 +7,7 @@ namespace Construction {
 
         class Symmetrization {
         public:
-            Symmetrization(bool scaledResult=false) : scaledResult(scaledResult) { }
+            Symmetrization(bool scaledResult=true) : scaledResult(scaledResult) { }
             Symmetrization(const std::vector<unsigned>& indices, bool scaledResult=false) : indices(indices), scaledResult(scaledResult) { }
 
             Symmetrization(const Symmetrization& other) : indices(other.indices), scaledResult(other.scaledResult) { }
@@ -154,7 +154,7 @@ namespace Construction {
         private:
             std::vector<unsigned> indices;
         protected:
-            bool scaledResult = false;
+            bool scaledResult = true;
         };
 
         class AntiSymmetrization : public Symmetrization {
@@ -171,10 +171,13 @@ namespace Construction {
                 // Construct the tensor sum
                 TensorPointer last = std::move(tensors[0]);
                 for (int i=1; i<tensors.size(); i++) {
+                    auto _indices = (tensors[i]->IsSubstitute()) ? std::dynamic_pointer_cast<const SubstituteTensor>(tensors[i])->GetPermutedIndices() : tensors[i]->GetIndices();
+
                     // Find sign
-                    int sign = Permutation::From(tensors[i]->GetIndices(), tensor->GetIndices()).Sign();
+                    int sign = Permutation::From(_indices, tensor->GetIndices()).Sign();
 
                     if (sign > 0) {
+                        std::cout << sign << std::endl;
                         last = std::move(std::make_shared<AddedTensor>(std::move(last), std::move(tensors[i])));
                     } else {
                         TensorPointer current = std::move(tensors[i]);
@@ -183,7 +186,7 @@ namespace Construction {
                         if (current->IsScaledTensor()) {
                             static_cast<ScaledTensor*>(current.get())->SetScale(-static_cast<ScaledTensor*>(current.get())->GetScale());
                         }
-                            // scale the tensor
+                        // scale the tensor
                         else {
                             current = std::make_shared<ScaledTensor>(current, -1);
                         }

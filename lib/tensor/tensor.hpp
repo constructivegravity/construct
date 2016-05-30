@@ -13,6 +13,8 @@
 
 #include <common/task_pool.hpp>
 #include <tensor/permutation.hpp>
+#include <tensor/fraction.hpp>
+#include <tensor/symmetry.hpp>
 
 namespace Construction {
 	namespace Tensor {
@@ -93,11 +95,11 @@ namespace Construction {
 
 			// Copy constructor
 			Tensor(const Tensor& other)
-				: name(other.name), Printable(other.printed_text), indices(other.indices), type(other.type) { }
+				: name(other.name), Printable(other.printed_text), indices(other.indices), type(other.type), symmetries(other.symmetries) { }
 
 			// Move constructor
 			Tensor(Tensor&& other)
-				: name(std::move(other.name)), Printable(std::move(other.printed_text)), indices(std::move(other.indices)), type(std::move(other.type)) { }
+				: name(std::move(other.name)), Printable(std::move(other.printed_text)), indices(std::move(other.indices)), type(std::move(other.type)), symmetries(std::move(other.symmetries)) { }
 		public:
 			// Copy assignment
 			Tensor& operator=(const Tensor& other) {
@@ -105,6 +107,7 @@ namespace Construction {
 				printed_text = other.printed_text;
 				indices = other.indices;
 				type = other.type;
+				symmetries = other.symmetries;
 				return *this;
 			}
 
@@ -114,6 +117,7 @@ namespace Construction {
 				printed_text = std::move(other.printed_text);
 				indices = std::move(other.indices);
 				type = std::move(other.type);
+				symmetries = std::move(other.symmetries);
 				return *this;
 			}
 		public:
@@ -171,6 +175,8 @@ namespace Construction {
 			void PermuteIndices(const Permutation& permutation) {
 				indices = permutation(indices);
 			}
+
+
 		public:
 			/**
 				\brief LaTeX output of a tensor
@@ -399,6 +405,10 @@ namespace Construction {
 				return result;
 			}
 
+			virtual std::vector<std::vector<unsigned>> GetAllInterestingIndexCombinations() const {
+				return GetAllIndexCombinations();
+			}
+
 			/**
 				\brief Checks if the tensor is identical to zero
 
@@ -418,6 +428,11 @@ namespace Construction {
 				}
 
 				return true;
+			}
+
+			bool IsIndexEqual(const Tensor& other) const {
+				if (other.type != type) return false;
+				return symmetries.IsEqual(indices, other.indices);
 			}
 
 			/*bool IsEqual(const Tensor& tensor) const {
@@ -445,6 +460,7 @@ namespace Construction {
 			Indices indices;
 
 			TensorType type;
+			Symmetry symmetries;
 
 			//EvaluationFunction evaluator;
 		};
@@ -880,6 +896,13 @@ namespace Construction {
 				indices = newIndices;
 				A->SetIndices(permutationA(newIndices));
 			}
+
+			/**
+				Get the indices of the substituted tensor
+			 */
+			Indices GetPermutedIndices() const {
+				return A->GetIndices();
+			}
 		public:
 			static void DoSerialize(std::ostream& os, const SubstituteTensor& tensor) {
 				tensor.A->Serialize(os);
@@ -965,6 +988,7 @@ namespace Construction {
 
 				assert(indices[0].GetRange().GetTo()+1 -indices[0].GetRange().GetFrom() == indices.Size());
 				type = TensorType::EPSILON;
+				symmetries.Add({ {0,1,2} , false});
 			}
 		public:
 			virtual TensorPointer Clone() const override {
@@ -1047,6 +1071,7 @@ namespace Construction {
 				: Tensor("gamma", "\\gamma", Indices::GetRomanSeries(2, {1,3})), signature({0,3}) {
 
                 type = TensorType::GAMMA;
+				symmetries.Add({ {0,1} });
             }
 
 			GammaTensor(const Indices& indices, int p, int q)
@@ -1054,6 +1079,7 @@ namespace Construction {
 				assert(indices.Size() == 2);
 
                 type = TensorType::GAMMA;
+				symmetries.Add({ {0,1} });
 			}
 
 			GammaTensor(const Indices& indices)
@@ -1061,6 +1087,7 @@ namespace Construction {
 				assert(indices.Size() == 2);
 
                 type = TensorType::GAMMA;
+				symmetries.Add({ {0,1} });
 			}
 		public:
 			virtual TensorPointer Clone() const override {
@@ -1158,6 +1185,23 @@ namespace Construction {
 				assert(numEpsilon * 3 + numGamma*2 == indices.Size());
 
 				type = TensorType::EPSILONGAMMA;
+
+				// Introduce all the symmetries
+				unsigned i=0;
+				std::vector<std::pair<unsigned, unsigned>> blocks;
+
+				if (numEpsilon == 1) {
+					symmetries.Add({{0, 1, 2}, false});
+					i = 3;
+				}
+				for (int j=0; j<numGamma; j++) {
+					symmetries.Add({{i, i+1} });
+					blocks.push_back({ i, i+1 });
+					i += 2;
+				}
+
+				// Do not forget the block symmetry of the gammas
+				symmetries.Add({ blocks });
 			}
 
 			EpsilonGammaTensor(const EpsilonGammaTensor& other)
@@ -1210,6 +1254,39 @@ namespace Construction {
 				}
 				return result;
 			}
+
+			/*std::vector<std::vector<unsigned>> GetAllInterestingIndexCombinations() const {
+				// Result
+				std::vector<std::vector<unsigned>> result;
+
+				// Helper method to recursively determine the index combinations
+				std::function<void(const std::vector<unsigned>&)> fn = [&](const std::vector<unsigned>& input) -> void {
+					// If all indices are fixed, add the combination to the list
+					if (input.size() == indices.Size()) {
+						result.push_back(input);
+						return;
+					}
+
+					// Get range of next unfixed index
+					auto range = indices[input.size()].GetRange();
+
+					// Iterate over the range
+					for (auto i : range) {
+						// Add the index to the list
+						std::vector<unsigned> newInput = input;
+						newInput.push_back(i);
+
+						// Recursive call to go to next index
+						fn(newInput);
+					}
+				};
+
+				// Start recursion
+				std::vector<unsigned> input;
+				fn({});
+
+				return result;
+			}*/
 
 			virtual double Evaluate(const std::vector<unsigned>& args) const override {
 				double result = 1.0;

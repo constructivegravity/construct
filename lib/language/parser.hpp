@@ -22,6 +22,7 @@ namespace Construction {
                 ASSIGNMENT,
                 COMMA,
                 STRING,
+                NUMERIC,
                 EOL
             };
         public:
@@ -42,6 +43,7 @@ namespace Construction {
             bool IsComma() const { return type == COMMA; }
             bool IsAssignment() const { return type == ASSIGNMENT; }
             bool IsString() const { return type == STRING; }
+            bool IsNumeric() const { return type == NUMERIC; }
             bool IsEndOfLine() const { return type == EOL; }
 
             std::string TypeToString() const {
@@ -53,6 +55,7 @@ namespace Construction {
                     case COMMA: return "Comma";
                     case ASSIGNMENT: return "Assignment";
                     case STRING: return "String";
+                    case NUMERIC: return "Numeric";
                     case EOL: return "EndOfLine";
                 }
                 return "Unknown";
@@ -79,6 +82,7 @@ namespace Construction {
                 ARGUMENTS,
                 ASSIGNMENT,
                 STRING,
+                NUMERIC,
                 PREVIOUS
             };
         public:
@@ -92,6 +96,7 @@ namespace Construction {
             bool IsAssignment() const { return type == Node::ASSIGNMENT; }
             bool IsPrevious() const { return type == Node::PREVIOUS; }
             bool IsString() const { return type == Node::STRING; }
+            bool IsNumeric() const { return type == Node::NUMERIC; }
         public:
             virtual std::string ToString() const {
                 return name;
@@ -110,6 +115,7 @@ namespace Construction {
         class LiteralNode;
         class ArgumentsNode;
         class StringNode;
+        class NumericNode;
         class PreviousNode;
 
         /**
@@ -202,6 +208,19 @@ namespace Construction {
             std::string text;
         };
 
+        class NumericNode : public Node {
+        public:
+            NumericNode(const std::string& text) : Node("Numeric", Node::NUMERIC), text(text) { }
+        public:
+            std::string GetText() const { return text; }
+        public:
+            virtual std::string ToString() const {
+                return text;
+            }
+        private:
+            std::string text;
+        };
+
         class PreviousNode : public Node {
         public:
             PreviousNode() : Node("Previous", Node::PREVIOUS) { }
@@ -247,6 +266,7 @@ namespace Construction {
                     | Literal
                     | PREVIOUS
                     | STRING
+                    | NUMERIC
                     | EMPTY
                     ;
 
@@ -258,8 +278,15 @@ namespace Construction {
 
                 ARGUMENT = 100,
                 STRING = 101,
+                NUMERIC = 102,
             };
         public:
+            bool IsNumeric(const std::string& d) const {
+                char c = d[0];
+                return c == '0' || c == '1' || c == '2' || c == '3' || c == '4' ||
+                       c == '5' || c == '6' || c == '7' || c == '8' || c == '9';
+            }
+
             /**
                 \brief Lexalize the input
 
@@ -269,6 +296,7 @@ namespace Construction {
              */
             void Lexalize(const std::string& code) {
                 bool inString = false;
+                bool inNumeric = false;
                 std::string current;
 
                 for (int i=0; i<code.length(); i++) {
@@ -287,11 +315,26 @@ namespace Construction {
                         continue;
                     }
 
+
                     // If a comment starts, stop parsing
                     if (c == "#") break;
 
                     // Ignore white spaces
                     if (c == " ") continue;
+
+                    if (inNumeric) {
+                        if (!IsNumeric(c)) {
+                            tokens.push_back(Token(Token::NUMERIC, i-current.length(), current));
+                            current = "";
+                            inNumeric = false;
+                        }
+                    }
+
+                    if (IsNumeric(c)) {
+                        inNumeric = true;
+                        current.append(c);
+                        continue;
+                    }
 
                     if (c == "=") {
                         if (current.length() > 0)
@@ -372,6 +415,12 @@ namespace Construction {
 
                 if (current.IsString()) {
                     auto result = std::make_shared<StringNode>(current.GetContent());
+                    GetNext();
+                    return result;
+                }
+
+                if (current.IsNumeric()) {
+                    auto result = std::make_shared<NumericNode>(current.GetContent());
                     GetNext();
                     return result;
                 }

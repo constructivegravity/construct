@@ -30,7 +30,7 @@ namespace Construction {
                     if (file) {
                         file.close();
                         try {
-                            database.LoadFromFile("tensors.db");
+                            //database.LoadFromFile("tensors.db");
                         } catch (...) {
                             database.Clear();
                         }
@@ -39,7 +39,7 @@ namespace Construction {
             }
 
             ~CLI() {
-                database.SaveToFile("tensors.db");
+                //database.SaveToFile("tensors.db");
             }
         public:
             void Error(const std::string& message) const {
@@ -246,6 +246,10 @@ namespace Construction {
                         else if (arg->IsString()) {
                             command->AddArgument(std::make_shared<IndexArgument>(
                                     std::dynamic_pointer_cast<StringNode>(arg)->GetText()
+                            ));
+                        } else if (arg->IsNumeric()) {
+                            command->AddArgument(std::make_shared<NumericArgument>(
+                                    std::dynamic_pointer_cast<NumericNode>(arg)->GetText()
                             ));
                         }
                     }

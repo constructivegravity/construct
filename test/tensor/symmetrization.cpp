@@ -4,6 +4,8 @@
 
 SCENARIO("Block symmetrization", "[block-symmetrization]") {
 
+
+
     GIVEN(" four indices") {
 
         // Generate abcd

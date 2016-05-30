@@ -54,6 +54,109 @@ namespace Construction {
         REGISTER_ARGUMENT(EpsilonGamma, 0, ArgumentType::INDEX);
 
         /**
+            \class Coefficient
+
+            std:string Help
+         */
+        CLI_COMMAND(Coefficient, true)
+                std::string Help() const {
+                    return "Coefficient(<Numeric>, <Numeric>, <Numeric>, <Numeric>)";
+                }
+
+                TensorContainer Execute() const {
+                    return API::Coefficient(GetNumeric(0), GetNumeric(1), GetNumeric(2), GetNumeric(3));
+                }
+        };
+
+        REGISTER_COMMAND(Coefficient);
+        REGISTER_ARGUMENT(Coefficient, 0, ArgumentType::NUMERIC);
+        REGISTER_ARGUMENT(Coefficient, 1, ArgumentType::NUMERIC);
+        REGISTER_ARGUMENT(Coefficient, 2, ArgumentType::NUMERIC);
+        REGISTER_ARGUMENT(Coefficient, 3, ArgumentType::NUMERIC);
+
+        /**
+            \class AddCommand
+
+            Command to add two tensors
+         */
+        CLI_COMMAND(Add, true)
+            std::string Help() const {
+                return "Add(<Tensor>, <Tensor>)";
+            }
+
+            static bool Cachable() {
+                return false;
+            }
+
+            TensorContainer Execute() const {
+                auto t = GetTensors(0);
+                if (t.Size() != 1) {
+                    std::cout << "  \033[31m" << "Not for tensor lists" << "\033[0m" << std::endl;
+                    return TensorContainer();
+                }
+
+                auto result = t.Get(0);
+
+                for (auto i=1; i<Size(); i++) {
+                    auto s = GetTensors(i);
+                    if (s.Size() != 1) {
+                        std::cout << "  \033[31m" << "Not for tensor lists" << "\033[0m" << std::endl;
+                        return TensorContainer();
+                    }
+
+                    result = API::Add(result, s.Get(0));
+                }
+
+                TensorContainer res;
+                res.Insert(std::move(result));
+                return res;
+            }
+        };
+
+        REGISTER_COMMAND(Add);
+        REGISTER_ARGUMENT(Add, 0, ArgumentType::TENSOR);
+        REGISTER_REPEATED_ARGUMENT(Add, 1, ArgumentType::TENSOR);
+
+        /**
+            \class AddCommand
+
+            Scale a tensor
+         */
+        CLI_COMMAND(Scale, true)
+            std::string Help() const {
+                return "Scale(<Tensor>, <Numeric>)";
+            }
+
+            static bool Cachable() {
+                return false;
+            }
+
+            TensorContainer Execute() const {
+                auto t = GetTensors(0);
+                if (t.Size() == 0) {
+                    return TensorContainer();
+                }
+
+                if (t.Size() != 1) {
+                    std::cout << "  \033[31m" << "Not for tensor lists" << "\033[0m" << std::endl;
+                    return TensorContainer();
+                }
+
+                auto result = t.Get(0);
+
+                result = API::Scale(result, GetNumeric(1));
+
+                TensorContainer res;
+                res.Insert(std::move(result));
+                return res;
+            }
+        };
+
+        REGISTER_COMMAND(Scale);
+        REGISTER_ARGUMENT(Scale, 0, ArgumentType::TENSOR);
+        REGISTER_ARGUMENT(Scale, 1, ArgumentType::NUMERIC);
+
+        /**
             \class AppendCommand
 
             Command to append a tensor list to another one. Uses the
@@ -98,6 +201,43 @@ namespace Construction {
 
         REGISTER_COMMAND(DegreesOfFreedom);
         REGISTER_ARGUMENT(DegreesOfFreedom, 0, ArgumentType::TENSOR);
+
+        CLI_COMMAND(IsZero, false)
+
+            std::string Help() const {
+                return "IsZero(<Tensor>)";
+            }
+
+            static bool Cachable() {
+                return false;
+            }
+
+            TensorContainer Execute() const {
+                auto t = GetTensors(0);
+                if (t.Size() == 0) {
+                    std::cout << "  \033[32m" << "Yes" << "\033[0m" << std::endl;
+                    return TensorContainer();
+                }
+
+                if (t.Size() != 1) {
+                    std::cout << "  \033[31m" << "Not for tensor lists" << "\033[0m" << std::endl;
+                    return TensorContainer();
+                }
+
+                auto result = t.Get(0);
+                if (result->IsZero()) {
+                    std::cout << "  \033[32m" << "Yes" << "\033[0m" << std::endl;
+                } else {
+                    std::cout << "  \033[32m" << "No" << "\033[0m" << std::endl;
+                }
+
+                return TensorContainer();
+            }
+
+        };
+
+        REGISTER_COMMAND(IsZero);
+        REGISTER_ARGUMENT(IsZero, 0, ArgumentType::TENSOR);
 
     }
 }

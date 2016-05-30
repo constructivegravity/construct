@@ -117,6 +117,12 @@ namespace Construction {
                 assert(arguments[pos]->IsTensorArgument());
                 return GetArgument<TensorArgument>(pos)->GetTensor();
             }
+
+            int GetNumeric(unsigned pos) const {
+                assert(pos < arguments.size());
+                assert(arguments[pos]->IsNumericArgument());
+                return GetArgument<NumericArgument>(pos)->GetValue();
+            }
         public:
             /**
                 \brief Validates the arguments

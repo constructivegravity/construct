@@ -40,6 +40,22 @@ namespace Construction {
             TensorContainer& operator[](const std::string& name) {
                 return data[name];
             }
+
+            std::map<std::string, TensorContainer>::iterator begin() {
+                return data.begin();
+            }
+
+            std::map<std::string, TensorContainer>::iterator end() {
+                return data.end();
+            }
+
+            std::map<std::string, TensorContainer>::const_iterator begin() const {
+                return data.begin();
+            }
+
+            std::map<std::string, TensorContainer>::const_iterator end() const {
+                return data.end();
+            }
         public:
             void SaveToFile(const std::string& filename) const {
                 std::stringstream os;

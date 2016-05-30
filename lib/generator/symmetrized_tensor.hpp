@@ -55,7 +55,7 @@ namespace Construction {
         public:
             SymmetrizedTensorGenerator(const Indices& symmetrization) : symmetrization(symmetrization) { }
         public:
-            TensorContainer operator()(const TensorContainer& tensors, bool scaledResult=false) const {
+            TensorContainer operator()(const TensorContainer& tensors, bool scaledResult=true) const {
                 TensorContainer result;
 
                 // Symmetrize everything in the list
@@ -97,7 +97,7 @@ namespace Construction {
         public:
             AntiSymmetrizedTensorGenerator(const Indices& symmetrization) : symmetrization(symmetrization) { }
         public:
-            TensorContainer operator()(const TensorContainer& tensors, bool scaledResult=false) const {
+            TensorContainer operator()(const TensorContainer& tensors, bool scaledResult=true) const {
                 TensorContainer result;
 
                 // Symmetrize everything in the list

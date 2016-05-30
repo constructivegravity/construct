@@ -30,6 +30,7 @@ namespace Construction {
             // Tensor generation
             TensorContainer Tensor(const Indices& indices);
             TensorContainer EpsilonGamma(const Indices& indices);
+            TensorContainer Coefficient(int, int, int, int);
             TensorContainer Append(const TensorContainer& first, const TensorContainer& second);
 
             size_t DegreesOfFreedom(const TensorContainer& tensors);
@@ -38,6 +39,9 @@ namespace Construction {
             TensorContainer Symmetrize(const TensorContainer& tensors, const Indices& indices);
             TensorContainer AntiSymmetrize(const TensorContainer& tensors, const Indices& indices);
             TensorContainer BlockSymmetrize(const TensorContainer& tensors, const std::vector<Indices>& indices);
+
+            TensorPointer Add(const TensorPointer& first, const TensorPointer& second);
+            TensorPointer Scale(const TensorPointer& first, double number);
 
             bool IsSymmetric(const TensorPointer& tensors, const Indices& indices);
             bool IsAntiSymmetric(const TensorPointer& tensors, const Indices& indices);
@@ -69,6 +73,14 @@ namespace Construction {
                 result.Insert(std::make_shared<Tensor::EpsilonGammaTensor>(numEpsilon, numGamma, indices));
 
                 return result;
+            }
+
+//#include <generator/coefficient.hpp
+
+            TensorContainer Coefficient(int l, int ld, int r, int rd) {
+                return TensorContainer();
+                /*Generator::CoefficientGenerator generator(nullptr);
+                return generator.Generate(l,ld,r,rd);*/
             }
 
             TensorContainer Append(const TensorContainer& first, const TensorContainer& second) {
@@ -180,6 +192,20 @@ namespace Construction {
 
                 // Compare if the symmetrized tensor is identical to the original
                 return result.Get(0)->IsEqual(*tensor);
+            }
+
+            TensorPointer Add(const TensorPointer& first, const TensorPointer& second) {
+                return std::make_shared<Construction::Tensor::AddedTensor> (
+                    std::move(first->Clone()),
+                    std::move(second->Clone())
+                );
+            }
+
+            TensorPointer Scale(const TensorPointer& first, double number) {
+                return std::make_shared<Construction::Tensor::ScaledTensor> (
+                    std::move(first->Clone()),
+                    number
+                );
             }
 
             TensorContainer LinearIndependent(const TensorContainer& tensors) {

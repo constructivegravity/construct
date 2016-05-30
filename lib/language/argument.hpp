@@ -9,6 +9,7 @@ namespace Construction {
         enum class ArgumentType {
             INDEX = 101,
             TENSOR = 102,
+            NUMERIC = 103,
 
             UNKNOWN = -1
         };
@@ -21,6 +22,7 @@ namespace Construction {
 
             bool IsIndexArgument() const { return type == ArgumentType::INDEX; }
             bool IsTensorArgument() const { return type == ArgumentType::TENSOR; }
+            bool IsNumericArgument() const { return type == ArgumentType::NUMERIC; }
         public:
             virtual void Parse(const std::string& code) = 0;
         private:
@@ -71,6 +73,7 @@ namespace Construction {
                 switch (type) {
                     case ArgumentType::INDEX: return "Indices";
                     case ArgumentType::TENSOR: return "Tensor";
+                    case ArgumentType::NUMERIC: return "Numeric";
 
                     default: return "Unknown";
                 }
@@ -176,6 +179,23 @@ namespace Construction {
             virtual void Parse(const std::string& code) { }
         private:
             Tensor::TensorContainer result;
+        };
+
+        class NumericArgument : public BaseArgument {
+        public:
+            NumericArgument(const std::string& text) : BaseArgument(ArgumentType::NUMERIC), value(std::atoi(text.c_str())) { }
+        public:
+            void SetValue(int v) {
+                value = v;
+            }
+
+            int GetValue() const {
+                return value;
+            }
+        public:
+            virtual void Parse(const std::string& code) { }
+        private:
+            int value;
         };
 
     }

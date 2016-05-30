@@ -103,14 +103,14 @@ SCENARIO("Tensor indices", "[indices]") {
             auto newIndices = Construction::Tensor::Indices::GetRomanSeries(8, {1,3});
             auto result = newIndices.GetAllPartitions({2,2,2,2});
 
-            for (auto& partition : result) {
+            /*for (auto& partition : result) {
                 for (auto& indices : partition) {
                     std::cout << indices << " ";
                 }
                 std::cout << std::endl;
-            }
+            }*/
 
-            //REQUIRE(result.size() == 8*7);
+            REQUIRE(result.size() == 8*7);
 
         }
 

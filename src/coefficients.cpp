@@ -2,6 +2,7 @@
 
 #include <common/task_pool.hpp>
 #include <common/time_measurement.hpp>
+#include <common/progressbar.hpp>
 
 #include <tensor/index.hpp>
 #include <tensor/tensor.hpp>
@@ -26,7 +27,7 @@ std::string ToString(const Coefficient& coeff) {
     return ss.str();
 }
 
-TensorContainer GenerateTensor(const Coefficient& coeff, Construction::Tensor::TensorDatabase& database, std::mutex& mutex, std::string& out) {
+TensorContainer GenerateTensor(const Coefficient& coeff, Construction::Tensor::TensorDatabase& database, std::mutex& mutex, std::string& out, bool printSteps=false) {
     auto indices = Construction::Tensor::Indices::GetRomanSeries(NumberOfIndices(coeff), {1,3});
 
     // If no indices, return scalar
@@ -38,13 +39,19 @@ TensorContainer GenerateTensor(const Coefficient& coeff, Construction::Tensor::T
 
     // Generate the tensor
     std::string previous = "Tensor(" + indices.ToCommand() + ")";
+    if (printSteps) std::cerr << previous << std::endl;
+
     Construction::Tensor::TensorContainer tensors;
 
     if (database.Contains(previous)) {
         std::unique_lock<std::mutex> lock(mutex);
         tensors = database[previous];
-    } else
+    } else {
         tensors = Construction::Language::API::Tensor(indices);
+
+        std::unique_lock<std::mutex> lock(mutex);
+        database[previous] = tensors;
+    }
 
     // Symmetrize in the blocks
     auto block1 = Construction::Tensor::Indices::GetRomanSeries(coeff.first.first, {1,3});
@@ -54,39 +61,61 @@ TensorContainer GenerateTensor(const Coefficient& coeff, Construction::Tensor::T
 
     if (block1.Size() > 0) {
         previous = "Symmetrize(" + previous + "," + block1.ToCommand() + ")";
+        if (printSteps) std::cerr << previous << std::endl;
 
         if (database.Contains(previous)) {
             std::unique_lock<std::mutex> lock(mutex);
             tensors = database[previous];
-        } else
+        } else {
             tensors = Construction::Language::API::Symmetrize(tensors, block1);
+
+            std::unique_lock<std::mutex> lock(mutex);
+            database[previous] = tensors;
+        }
     }
     if (block2.Size() > 0) {
         previous = "Symmetrize(" + previous + "," + block2.ToCommand() + ")";
+        if (printSteps) {
+            std::cerr << previous << std::endl;
+        }
 
         if (database.Contains(previous)) {
             std::unique_lock<std::mutex> lock(mutex);
             tensors = database[previous];
-        } else
+        } else {
             tensors = Construction::Language::API::Symmetrize(tensors, block2);
+
+            std::unique_lock<std::mutex> lock(mutex);
+            database[previous] = tensors;
+        }
     }
     if (block3.Size() > 0) {
         previous = "Symmetrize(" + previous + "," + block3.ToCommand() + ")";
+        if (printSteps) std::cerr << previous << std::endl;
 
         if (database.Contains(previous)) {
             std::unique_lock<std::mutex> lock(mutex);
             tensors = database[previous];
-        } else
+        } else {
             tensors = Construction::Language::API::Symmetrize(tensors, block3);
+
+            std::unique_lock<std::mutex> lock(mutex);
+            database[previous] = tensors;
+        }
     }
     if (block4.Size() > 0) {
         previous = "Symmetrize(" + previous + "," + block4.ToCommand() + ")";
+        if (printSteps) std::cerr << previous << std::endl;
 
         if (database.Contains(previous)) {
             std::unique_lock<std::mutex> lock(mutex);
             tensors = database[previous];
-        } else
+        } else {
             tensors = Construction::Language::API::Symmetrize(tensors, block4);
+
+            std::unique_lock<std::mutex> lock(mutex);
+            database[previous] = tensors;
+        }
     }
 
     // Implement the exchange symmetry
@@ -96,21 +125,31 @@ TensorContainer GenerateTensor(const Coefficient& coeff, Construction::Tensor::T
     newIndices.Append(block3);
 
     previous = "ExchangeSymmetrize(" + previous + "," + newIndices.ToCommand() + ")";
+    if (printSteps) std::cerr << previous << std::endl;
 
     if (database.Contains(previous)) {
         std::unique_lock<std::mutex> lock(mutex);
         tensors = database[previous];
-    } else
+    } else {
         tensors = Construction::Language::API::ExchangeSymmetrize(tensors, newIndices);
+
+        std::unique_lock<std::mutex> lock(mutex);
+        database[previous] = tensors;
+    }
 
     // Choose basis
     previous = "LinearIndependent(" + previous + ")";
+    if (printSteps) std::cerr << previous << std::endl;
 
     if (database.Contains(previous)) {
         std::unique_lock<std::mutex> lock(mutex);
         tensors = database[previous];
-    } else
+    } else {
         tensors = Construction::Language::API::LinearIndependent(tensors);
+
+        std::unique_lock<std::mutex> lock(mutex);
+        database[previous] = tensors;
+    }
 
     // Set the output
     out = previous;
@@ -188,47 +227,77 @@ int main(int argc, char** argv) {
     std::mutex mutex;
     std::mutex coutMutex;
 
-    // Load database if present
-    std::ifstream file("tensors.db");
-    if (file) {
-        file.close();
-        try {
-            database.LoadFromFile("tensors.db");
-        } catch (...) {
-            database.Clear();
+    if (argc < 5) {
+
+        // Load database if present
+        std::ifstream file("tensors.db");
+        if (file) {
+            file.close();
+            try {
+                database.LoadFromFile("tensors.db");
+            } catch (...) {
+                database.Clear();
+            }
+        } else file.close();
+
+        for (auto it = database.begin(); it != database.end(); it++) {
+            std::cout << it->first;
         }
-    } else file.close();
 
-    // Generate coefficient list
-    auto coefficients = GenerateCoefficientList(4,3);
+        // Generate coefficient list
+        auto coefficients = GenerateCoefficientList(4, 3);
 
-    std::vector<std::thread> threads;
-    Construction::Common::TaskPool pool (20);
+        std::vector<std::thread> threads;
+        Construction::Common::TaskPool pool(10);
 
-    for (auto& c : coefficients) {
+        Construction::Common::ProgressBar progress(coefficients.size(), 100);
+        progress.Start();
 
-        pool.Enqueue([&]() {
-            std::string cmd;
-            auto tensor = GenerateTensor(c, database, mutex, cmd);
+        for (auto &c : coefficients) {
 
-            coutMutex.lock();
-            std::cerr << "Finished " << ToString(c) << " ..." << std::endl;
-            coutMutex.unlock();
+            pool.Enqueue([&]() {
+                std::string cmd;
+                auto tensor = GenerateTensor(c, database, mutex, cmd);
 
-            coutMutex.lock();
-            std::cout << TensorToString("\\lambda", c, tensor) << std::endl;
-            coutMutex.unlock();
+                progress++;
 
-            mutex.lock();
-            database[cmd] = tensor;
+                coutMutex.lock();
+                std::cout << TensorToString("\\lambda", c, tensor) << std::endl;
+                coutMutex.unlock();
 
-            database.SaveToFile("tensors.db");
-            mutex.unlock();
-        });
+                mutex.lock();
+                database[cmd] = tensor;
 
+                database.SaveToFile("tensors.db");
+                mutex.unlock();
+            });
+
+        }
+
+        pool.Wait();
+
+    } else {
+        std::string cmd;
+        Coefficient c = { { atoi(argv[1]), atoi(argv[2]) }, { atoi(argv[3]) , atoi(argv[4]) } };
+
+        //std::cerr << "Started " << ToString(c) << " ..." << std::endl;
+
+        auto tensor = GenerateTensor(c, database, mutex, cmd, true);
+
+        coutMutex.lock();
+        //std::cerr << "Finished " << ToString(c) << " ..." << std::endl;
+        coutMutex.unlock();
+
+        coutMutex.lock();
+        std::cout << TensorToString("\\lambda", c, tensor) << std::endl;
+        coutMutex.unlock();
+
+        mutex.lock();
+        database[cmd] = tensor;
+
+        database.SaveToFile("tensors.db");
+        mutex.unlock();
     }
-
-    pool.Wait();
 
     // Wait for all tasks to finish
     //for (auto& thread : threads) thread.join();

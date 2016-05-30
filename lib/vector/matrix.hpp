@@ -300,14 +300,30 @@ namespace Construction {
             Matrix GetRowEchelonForm() const {
                 Matrix result = *this;
 
+                // Find rows that are completely zero
+                bool* zeroRow = new bool[result.GetNumberOfRows()];
+                for (unsigned r=0; r<result.GetNumberOfColumns(); r++) {
+                    bool isZero = true;
+                    for (unsigned c=0; c<result.GetNumberOfColumns(); c++) {
+                        if (result(r,c) != 0) {
+                            isZero = false;
+                            break;
+                        }
+                    }
+
+                    if (isZero) zeroRow[r] = true;
+                    else zeroRow[r] = false;
+                }
+
                 unsigned lead=0;
                 for (unsigned r=0; r<result.GetNumberOfRows(); r++) {
                     if (lead >= result.GetNumberOfColumns()) return result;
+                    if (zeroRow[r]) continue;
 
                     unsigned i = r;
                     while (result(i, lead) == 0) {
                         i++;
-                        if (result.GetNumberOfRows() <= i) {
+                        if (result.GetNumberOfRows() <= i && !zeroRow[i]) {
                             i = r;
                             lead++;
                             if (lead >= result.GetNumberOfColumns()) return result;
@@ -340,14 +356,53 @@ namespace Construction {
                 \brief Returns the row echelon form of the matrix
              */
             void ToRowEchelonForm() {
+                // Find rows that are completely zero
+                unsigned numRows = GetNumberOfRows();
+                for (unsigned r=0; r<numRows; r++) {
+                    bool isZero = true;
+                    for (unsigned c=0; c<GetNumberOfColumns(); c++) {
+                        if (At(r,c) != 0) {
+                            isZero = false;
+                            break;
+                        }
+                    }
+
+                    // If row is zero
+                    if (isZero) {
+                        // swap to the end of the matrix
+                        SwapRows(r,numRows-1);
+
+                        // decrease the effective number of rows
+                        numRows--;
+
+                        // check that entry again
+                        r--;
+                    }
+                }
+
+                /*bool* zeroRow = new bool[GetNumberOfRows()];
+                for (unsigned r=0; r<GetNumberOfColumns(); r++) {
+                    bool isZero = true;
+                    for (unsigned c=0; c<GetNumberOfColumns(); c++) {
+                        if (At(r,c) != 0) {
+                            isZero = false;
+                            break;
+                        }
+                    }
+
+                    if (isZero) zeroRow[r] = true;
+                    else zeroRow[r] = false;
+                }*/
+
+                // Do magic
                 unsigned lead=0;
-                for (unsigned r=0; r<GetNumberOfRows(); r++) {
+                for (unsigned r=0; r<numRows; r++) {
                     if (lead >= GetNumberOfColumns()) return;
 
                     unsigned i = r;
                     while (At(i, lead) == 0) {
                         i++;
-                        if (GetNumberOfRows() <= i) {
+                        if (numRows <= i) {
                             i = r;
                             lead++;
                             if (lead >= GetNumberOfColumns()) return;
@@ -361,7 +416,7 @@ namespace Construction {
                         for (int k=0; k<GetNumberOfColumns(); k++) At(r, k) /= x;
                     }
 
-                    for (unsigned i=0; i<GetNumberOfRows(); i++) {
+                    for (unsigned i=0; i<numRows; i++) {
                         if (i != r) {
                             float x = At(i, lead);
                             for (unsigned k=0; k<GetNumberOfColumns(); k++) {

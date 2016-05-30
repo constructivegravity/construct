@@ -8,14 +8,14 @@ message Index {
     required string name = 1;
     required string printed = 2;
     optional bool up = 3;
-};
+}
 
 /**
     A collection of indices.
  */
 message Indices {
     repeated Index indices = 1;
-};
+}
 
 message TensorInfo {
     enum Type {
@@ -36,17 +36,28 @@ message TensorInfo {
     required string printed = 2;
     required Type type = 3;
     required Indices indices = 4;
-};
+}
 
 message BaseTensor {
     required TensorInfo info = 1;
-};
+}
 
 message SymmetrizedTensor {
     optional TensorInfo info = 1;
     repeated BaseTensor tensors = 2;
-};
+}
 
 message Tensors {
     repeated SymmetrizedTensor tensors = 1;
-};
+}
+
+message Command {
+    required string command = 1;
+}
+
+service Construction {
+	rpc Execute (Command) returns (Tensors) {}
+	
+	rpc Tensor (Indices) returns (Tensors) {}
+	rpc EpsilonGamma (Indices) returns (Tensors) {}
+}

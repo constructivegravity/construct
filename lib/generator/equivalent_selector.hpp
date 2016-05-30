@@ -37,7 +37,7 @@ namespace Construction {
                 // Derive vector components of the tensors
                 //std::vector<std::thread> threads;
 
-                auto fn = [&](const TensorPointer& tensor) {
+                auto fn = [&](const Tensor::TensorPointer& tensor) {
                     // TODO: implement optimization for all indices that are trivially zero
                     Vector::Vector v (combinations.size());
                     for (int i=0; i<combinations.size(); i++) {
