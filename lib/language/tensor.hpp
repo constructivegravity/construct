@@ -239,5 +239,45 @@ namespace Construction {
         REGISTER_COMMAND(IsZero);
         REGISTER_ARGUMENT(IsZero, 0, ArgumentType::TENSOR);
 
+        /**
+            \class Evaluate
+
+            std:string Help
+         */
+        CLI_COMMAND(Evaluate, false)
+                std::string Help() const {
+                    return "Evaluate(<Tensors>, <Numeric>...)";
+                }
+
+                TensorContainer Execute() const {
+                    std::vector<unsigned> indices;
+
+                    for (auto i=1; i<Size(); i++) {
+                        unsigned j = static_cast<unsigned>(GetNumeric(i));
+                        indices.push_back(j);
+                    }
+
+                    // Evaluate
+                    auto result = API::Evaluate(GetTensors(0), indices);
+
+                    // Print result
+                    std::cout << "\033[32m";
+                    for (int i=0; i<result.size(); i++) {
+                        if (result[i] != 0) {
+                            std::cout << "   " << result[i] << " * " << "e_" << (i+1) << " ";
+                            if (i != result.size()-1) std::cout << "+ ";
+                            std::cout << std::endl;
+                        }
+                    }
+                    std::cout << "\033[0m";
+
+                    return TensorContainer();
+                }
+        };
+
+        REGISTER_COMMAND(Evaluate);
+        REGISTER_ARGUMENT(Evaluate, 0, ArgumentType::TENSOR);
+        REGISTER_REPEATED_ARGUMENT(Evaluate, 1, ArgumentType::NUMERIC);
+
     }
 }

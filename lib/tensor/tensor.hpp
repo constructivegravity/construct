@@ -1071,7 +1071,7 @@ namespace Construction {
 				: Tensor("gamma", "\\gamma", Indices::GetRomanSeries(2, {1,3})), signature({0,3}) {
 
                 type = TensorType::GAMMA;
-				symmetries.Add({ {0,1} });
+				symmetries.Add(ElementarySymmetry({0,1}));
             }
 
 			GammaTensor(const Indices& indices, int p, int q)
@@ -1079,7 +1079,7 @@ namespace Construction {
 				assert(indices.Size() == 2);
 
                 type = TensorType::GAMMA;
-				symmetries.Add({ {0,1} });
+				symmetries.Add(ElementarySymmetry({0,1}));
 			}
 
 			GammaTensor(const Indices& indices)
@@ -1087,7 +1087,7 @@ namespace Construction {
 				assert(indices.Size() == 2);
 
                 type = TensorType::GAMMA;
-				symmetries.Add({ {0,1} });
+				symmetries.Add(ElementarySymmetry({0,1}));
 			}
 		public:
 			virtual TensorPointer Clone() const override {
@@ -1191,11 +1191,11 @@ namespace Construction {
 				std::vector<std::pair<unsigned, unsigned>> blocks;
 
 				if (numEpsilon == 1) {
-					symmetries.Add({{0, 1, 2}, false});
+					symmetries.Add(ElementarySymmetry({0,1,2}, false));
 					i = 3;
 				}
 				for (int j=0; j<numGamma; j++) {
-					symmetries.Add({{i, i+1} });
+					symmetries.Add(ElementarySymmetry({i, i+1}));
 					blocks.push_back({ i, i+1 });
 					i += 2;
 				}

@@ -23,6 +23,7 @@ namespace Construction {
                 `Tensor`
                 `Symmetrize`
                 `Apppend`
+                `Evaluate`
                 `LinearIndependent`
                 `LinearDependent`
              */
@@ -50,7 +51,7 @@ namespace Construction {
             TensorContainer LinearIndependent(const TensorContainer& tensors);
             Generator::LinearDependentSelector::ResultType LinearDependent(const TensorContainer& tensors);
 
-
+            std::vector<double> Evaluate(const TensorContainer& tensors, const std::vector<unsigned>& indices);
 
             /**
                 Implementation
@@ -75,7 +76,7 @@ namespace Construction {
                 return result;
             }
 
-//#include <generator/coefficient.hpp
+            //#include <generator/coefficient.hpp
 
             TensorContainer Coefficient(int l, int ld, int r, int rd) {
                 return TensorContainer();
@@ -217,6 +218,16 @@ namespace Construction {
             Generator::LinearDependentSelector::ResultType LinearDependent(const TensorContainer& tensors) {
                 Construction::Generator::LinearDependentSelector selector;
                 auto result = selector(tensors);
+                return result;
+            }
+
+            std::vector<double> Evaluate(const TensorContainer& tensors, const std::vector<unsigned>& indices) {
+                std::vector<double> result;
+
+                for (auto& tensor : tensors) {
+                    result.push_back(tensor->Evaluate(indices));
+                }
+
                 return result;
             }
 
