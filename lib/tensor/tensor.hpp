@@ -1194,12 +1194,14 @@ namespace Construction {
 				std::vector<std::pair<unsigned, unsigned>> blocks;
 
 				if (numEpsilon == 1) {
-					symmetries.Add(ElementarySymmetry({0,1,2}, false));
+					std::vector<unsigned> _indices = {0,1,2};
+					symmetries.Add(ElementarySymmetry(_indices, false));
 					i = 3;
 				}
 				for (int j=0; j<numGamma; j++) {
-					symmetries.Add(ElementarySymmetry({i, i+1}));
-					blocks.push_back({ i, i+1 });
+					std::vector<unsigned> _indices = {i, i+1};
+					symmetries.Add(ElementarySymmetry(_indices));
+					blocks.push_back(_indices);
 					i += 2;
 				}
 
