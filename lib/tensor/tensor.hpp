@@ -1201,7 +1201,7 @@ namespace Construction {
 				for (int j=0; j<numGamma; j++) {
 					std::vector<unsigned> _indices = {i, i+1};
 					symmetries.Add(ElementarySymmetry(_indices));
-					blocks.push_back(_indices);
+					blocks.push_back({i, i+1});
 					i += 2;
 				}
 
