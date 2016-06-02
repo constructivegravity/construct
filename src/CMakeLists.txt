@@ -9,7 +9,7 @@ add_executable(construct main.cpp)
 
 #target_link_libraries(Construction )
 
-target_link_libraries(construct ${Boost_LIBRARIES})
+target_link_libraries(construct ${Boost_LIBRARIES} ${Readline_LIBRARY} ${CMAKE_THREAD_LIBS_INIT})
 
 
 add_executable(coefficients coefficients.cpp)
@@ -17,4 +17,4 @@ add_executable(coefficients coefficients.cpp)
 
 #target_link_libraries(Construction )
 
-target_link_libraries(coefficients ${Boost_LIBRARIES})
+target_link_libraries(coefficients ${Boost_LIBRARIES} ${Readline_LIBRARY} ${CMAKE_THREAD_LIBS_INIT})

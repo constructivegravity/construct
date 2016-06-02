@@ -29,6 +29,9 @@
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/serialization/export.hpp>
 
+#include <readline/readline.h>
+#include <readline/history.h>
+
 using namespace Construction::Tensor;
 
 /*BOOST_CLASS_EXPORT_GUID(Construction::Tensor::AddedTensor, "Construction::Tensor::AddedTensor")
@@ -81,17 +84,19 @@ int main(int argc, char** argv) {
 
 	// CLI mode
 
-	std::cout << "> ";
 	std::string input;
-	while (std::getline(std::cin, input)) {
+	while (true) {
+		input = std::string(readline("> "));
+
 		if (input == "Exit") {
 			std::cout << "Bye!" << std::endl;
 			break;
 		}
 
-		cli(input);
-		//std::cout << " => " << input << std::endl;
-		std::cout << "> ";//\033[34m";
+		if (input != "") {
+			add_history(input.c_str());
+			cli(input);
+		}
 	}
 
 	/*if (argc < 2) {
