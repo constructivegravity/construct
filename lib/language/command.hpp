@@ -112,13 +112,19 @@ namespace Construction {
                 return GetArgument<IndexArgument>(pos)->GetIndices();
             }
 
+            std::string GetString(unsigned pos) const {
+                assert(pos < arguments.size());
+                assert(arguments[pos]->IsStringArgument());
+                return GetArgument<StringArgument>(pos)->GetValue();
+            }
+
             TensorContainer GetTensors(unsigned pos) const {
                 assert(pos < arguments.size());
                 assert(arguments[pos]->IsTensorArgument());
                 return GetArgument<TensorArgument>(pos)->GetTensor();
             }
 
-            int GetNumeric(unsigned pos) const {
+            double GetNumeric(unsigned pos) const {
                 assert(pos < arguments.size());
                 assert(arguments[pos]->IsNumericArgument());
                 return GetArgument<NumericArgument>(pos)->GetValue();
@@ -146,7 +152,7 @@ namespace Construction {
                         throw WrongNumberOfArgumentsException();
                     }
                 }
-                
+
                 for (int i=0; i<arguments.size(); i++) {
                     if (!ArgumentDictionary::Instance()->IsA(name, i, arguments[i]->GetType())) {
                         throw WrongArgumentTypeException();
@@ -218,9 +224,18 @@ namespace Construction {
              */
             void RegisterCommand(const std::string& name, const std::function<Command*(void)>& fn) {
                 factory[name] = fn;
+                names.push_back(name);
+            }
+
+            /**
+                Returns a list of all the commands
+             */
+            std::vector<std::string>& GetCommandList() {
+                return names;
             }
         private:
             std::map<std::string, std::function<Command*(void)>> factory;
+            std::vector<std::string> names;
         };
 
         /**

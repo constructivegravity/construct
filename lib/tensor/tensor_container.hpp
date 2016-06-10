@@ -56,6 +56,8 @@ namespace Construction {
 
             void Pop() { data.pop_back(); }
             void Remove(unsigned i) { data.erase(data.begin() + i); }
+
+            void Clear() { data.clear(); }
         public:
             size_t Size() const { return data.size(); }
 

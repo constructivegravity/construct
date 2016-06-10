@@ -21,6 +21,7 @@ namespace Construction {
                 RBRACKET,
                 ASSIGNMENT,
                 COMMA,
+                INDICES,
                 STRING,
                 NUMERIC,
                 EOL
@@ -42,6 +43,7 @@ namespace Construction {
             bool IsRightBracket() const { return type == RBRACKET; }
             bool IsComma() const { return type == COMMA; }
             bool IsAssignment() const { return type == ASSIGNMENT; }
+            bool IsIndices() const { return type == INDICES; }
             bool IsString() const { return type == STRING; }
             bool IsNumeric() const { return type == NUMERIC; }
             bool IsEndOfLine() const { return type == EOL; }
@@ -54,6 +56,7 @@ namespace Construction {
                     case RBRACKET: return "RBracket";
                     case COMMA: return "Comma";
                     case ASSIGNMENT: return "Assignment";
+                    case INDICES: return "Indices";
                     case STRING: return "String";
                     case NUMERIC: return "Numeric";
                     case EOL: return "EndOfLine";
@@ -81,6 +84,7 @@ namespace Construction {
                 COMMAND,
                 ARGUMENTS,
                 ASSIGNMENT,
+                INDICES,
                 STRING,
                 NUMERIC,
                 PREVIOUS
@@ -95,6 +99,7 @@ namespace Construction {
             bool IsArguments() const { return type == Node::ARGUMENTS; }
             bool IsAssignment() const { return type == Node::ASSIGNMENT; }
             bool IsPrevious() const { return type == Node::PREVIOUS; }
+            bool IsIndices() const { return type == Node::INDICES; }
             bool IsString() const { return type == Node::STRING; }
             bool IsNumeric() const { return type == Node::NUMERIC; }
         public:
@@ -114,6 +119,7 @@ namespace Construction {
         // Forward declaration
         class LiteralNode;
         class ArgumentsNode;
+        class IndicesNode;
         class StringNode;
         class NumericNode;
         class PreviousNode;
@@ -201,6 +207,21 @@ namespace Construction {
         public:
             virtual std::string ToString() const {
                 std::stringstream ss;
+                ss << "\'" << text << "\'";
+                return ss.str();
+            }
+        private:
+            std::string text;
+        };
+
+        class IndicesNode : public Node {
+        public:
+            IndicesNode(const std::string& text) : Node("Indices", Node::INDICES), text(text) { }
+        public:
+            std::string GetText() const { return text; }
+        public:
+            virtual std::string ToString() const {
+                std::stringstream ss;
                 ss << "\"" << text << "\"";
                 return ss.str();
             }
@@ -244,7 +265,7 @@ namespace Construction {
                     ;
 
                 ASSIGNMENT
-                    = LITERAL := RHS_EXPRESSION
+                    = LITERAL = RHS_EXPRESSION
                     ;
 
                 RHS_EXPRESSION
@@ -266,6 +287,7 @@ namespace Construction {
                     | Literal
                     | PREVIOUS
                     | STRING
+                    | INDICES
                     | NUMERIC
                     | EMPTY
                     ;
@@ -296,15 +318,29 @@ namespace Construction {
              */
             void Lexalize(const std::string& code) {
                 bool inString = false;
+                bool inIndices = false;
                 bool inNumeric = false;
                 std::string current;
 
                 for (int i=0; i<code.length(); i++) {
                     std::string c = std::string(1,code[i]);
 
+                    // If index, then append everything
+                    if (inIndices) {
+                        if (c == "\"") {
+                            tokens.push_back(Token(Token::INDICES, i-current.length(), current));
+                            current = "";
+                            inIndices = false;
+                            continue;
+                        }
+
+                        current.append(c);
+                        continue;
+                    }
+
                     // If string, then append everything
                     if (inString) {
-                        if (c == "\"") {
+                        if (c == "\'") {
                             tokens.push_back(Token(Token::STRING, i-current.length(), current));
                             current = "";
                             inString = false;
@@ -323,11 +359,15 @@ namespace Construction {
                     if (c == " ") continue;
 
                     if (inNumeric) {
-                        if (!IsNumeric(c)) {
+                        if (!IsNumeric(c) && c != ".") {
                             tokens.push_back(Token(Token::NUMERIC, i-current.length(), current));
                             current = "";
                             inNumeric = false;
                         }
+                    }
+
+                    if (c == "." && inNumeric) {
+                        current.append(c);
                     }
 
                     if (IsNumeric(c)) {
@@ -379,6 +419,14 @@ namespace Construction {
                     if (c == "\"") {
                         if (current.length() > 0)
                             tokens.push_back(Token(Token::LITERAL, i-current.length(),current));
+                        inIndices = true;
+                        current = "";
+                        continue;
+                    }
+
+                    if (c == "\'") {
+                        if (current.length() > 0)
+                            tokens.push_back(Token(Token::LITERAL, i-current.length(),current));
                         inString = true;
                         current = "";
                         continue;
@@ -411,6 +459,12 @@ namespace Construction {
                     }
 
                     return ParseCommand();
+                }
+
+                if (current.IsIndices()) {
+                    auto result = std::make_shared<IndicesNode>(current.GetContent());
+                    GetNext();
+                    return result;
                 }
 
                 if (current.IsString()) {

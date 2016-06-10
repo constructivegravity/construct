@@ -8,6 +8,7 @@
 #include <tensor/index_parser.hpp>
 
 #include <language/cli.hpp>
+#include <language/command.hpp>
 
 #include <vector/matrix.hpp>
 //#include <vector/linear_system.hpp>
@@ -71,9 +72,40 @@ std::ostream& operator<<(std::ostream& os, const std::vector<TensorPointer>& vec
 	return os;
 }
 
+char* command_iterator(const char* text, int state) {
+	static std::vector<std::string>::iterator it;
+	auto cmds = Construction::Language::CommandManagement::Instance()->GetCommandList();
+
+	if (state == 0) it = begin(cmds);
+
+	while (it != end(cmds)) {
+		auto& cmd = *it;
+		++it;
+
+		if (cmd.find(text) != std::string::npos) {
+			char* completion = new char[cmd.size()];
+			strcpy(completion, cmd.c_str());
+			return completion;
+		}
+	}
+	return nullptr;
+}
+
+char** getCommandCompletions(const char* text, int start, int) {
+	char** completionList = nullptr;
+
+	if (start == 0)
+		completionList = rl_completion_matches(text, &command_iterator);
+
+	return completionList;
+}
+
 int main(int argc, char** argv) {
 
 	Construction::Language::CLI cli;
+
+	// Hook readline completion
+	rl_attempted_completion_function = &getCommandCompletions;
 
 	// If there is a filename given, execute this
 	if (argc >= 2) {

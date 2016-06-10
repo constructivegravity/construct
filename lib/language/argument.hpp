@@ -10,6 +10,7 @@ namespace Construction {
             INDEX = 101,
             TENSOR = 102,
             NUMERIC = 103,
+            STRING = 104,
 
             UNKNOWN = -1
         };
@@ -23,6 +24,7 @@ namespace Construction {
             bool IsIndexArgument() const { return type == ArgumentType::INDEX; }
             bool IsTensorArgument() const { return type == ArgumentType::TENSOR; }
             bool IsNumericArgument() const { return type == ArgumentType::NUMERIC; }
+            bool IsStringArgument() const { return type == ArgumentType::STRING; }
         public:
             virtual void Parse(const std::string& code) = 0;
         private:
@@ -74,6 +76,7 @@ namespace Construction {
                     case ArgumentType::INDEX: return "Indices";
                     case ArgumentType::TENSOR: return "Tensor";
                     case ArgumentType::NUMERIC: return "Numeric";
+                    case ArgumentType::STRING: return "String";
 
                     default: return "Unknown";
                 }
@@ -124,7 +127,7 @@ namespace Construction {
                 Parse(code);
             }
         public:
-            Tensor::Indices GetIndices() const { return indices; }
+            inline Tensor::Indices GetIndices() const { return indices; }
         public:
             virtual void Parse(const std::string& code) {
                 indices.Clear();
@@ -168,11 +171,11 @@ namespace Construction {
         public:
             TensorArgument() : BaseArgument(ArgumentType::TENSOR) { }
         public:
-            void SetTensor(Tensor::TensorContainer container) {
+            inline void SetTensor(Tensor::TensorContainer container) {
                 result = container;
             }
 
-            Tensor::TensorContainer GetTensor() const {
+            inline Tensor::TensorContainer GetTensor() const {
                 return result;
             }
         public:
@@ -183,19 +186,31 @@ namespace Construction {
 
         class NumericArgument : public BaseArgument {
         public:
-            NumericArgument(const std::string& text) : BaseArgument(ArgumentType::NUMERIC), value(std::atoi(text.c_str())) { }
+            NumericArgument(const std::string& text) : BaseArgument(ArgumentType::NUMERIC), value(std::atof(text.c_str())) { }
         public:
-            void SetValue(int v) {
+            inline void SetValue(int v) {
                 value = v;
             }
 
-            int GetValue() const {
+            inline double GetValue() const {
                 return value;
             }
         public:
             virtual void Parse(const std::string& code) { }
         private:
-            int value;
+            double value;
+        };
+
+        class StringArgument : public BaseArgument {
+        public:
+            StringArgument(const std::string& text) : BaseArgument(ArgumentType::STRING), value(text) { }
+        public:
+            inline void SetValue(const std::string& v) { value = v; }
+            inline std::string GetValue() const { return value; }
+        public:
+            virtual void Parse(const std::string& code) { }
+        public:
+            std::string value;
         };
 
     }

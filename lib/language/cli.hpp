@@ -1,6 +1,8 @@
 #pragma once
 
 #include <language/parser.hpp>
+#include <language/session.hpp>
+#include <language/notebook.hpp>
 
 #include <language/argument.hpp>
 #include <language/command.hpp>
@@ -46,87 +48,6 @@ namespace Construction {
                 std::cout << "\033[31m" << "Error: " << "\033[0m" << message << std::endl;
             }
         public:
-            /*
-            void ExecuteLinearIndependent(const std::shared_ptr<Node>& document, bool silent=false) {
-
-                auto args = std::dynamic_pointer_cast<CommandNode>(document)->GetArguments();
-
-                if (args->Size() != 1) {
-                    Error("`LinearIndependent` takes one argument");
-                    return;
-                }
-
-                auto arg = *args->begin();
-
-                // In case it is a command, execute
-                if (arg->IsCommand()) {
-                    auto command = std::dynamic_pointer_cast<CommandNode>(arg);
-                    Execute(command, true);
-                }
-
-                Construction::Generator::BasisSelector selector;
-                lastResult = selector(lastResult);
-
-                if (!silent) PrintTensor();
-            }
-
-            void ExecuteLinearDependent(const std::shared_ptr<Node>& document, bool silent=false) {
-
-                auto args = std::dynamic_pointer_cast<CommandNode>(document)->GetArguments();
-
-                if (args->Size() != 1) {
-                    Error("`LinearDependent` takes one argument");
-                    return;
-                }
-
-                auto arg = *args->begin();
-
-                // In case it is a command, execute
-                if (arg->IsCommand()) {
-                    auto command = std::dynamic_pointer_cast<CommandNode>(arg);
-                    Execute(command, true);
-                }
-
-                // Do magic
-                if (lastResult.Size() == 0) return;
-
-                // Initialize
-                Construction::Generator::LinearDependentSelector selector;
-                auto result = selector(lastResult);
-
-                if (!silent) {
-                    for (auto& dependent : result) {
-                        std::cout << "   \033[94m" << dependent.first->ToString() << " = ";
-                        for (int i=0; i<dependent.second.size(); i++) {
-                            auto coeff = dependent.second[i];
-
-                            // Write sign
-                            if (i != 0) {
-                                if (coeff.first > 0) std::cout << "+ ";
-                                else if (coeff.first < 0) std::cout << "- ";
-                            }
-
-                            // Only for numbers unequal to one and minus one, print the multiplication factor
-                            if (fabs(coeff.first) != 1) {
-                                std::cout << coeff.first << " * ";
-                                if (coeff.second->IsAddedTensor()) std::cout << "(" <<  coeff.second->ToString() << ") ";
-                                else std::cout << "(" <<  coeff.second->ToString() << ") ";
-                            } else {
-                                if (coeff.second->IsAddedTensor()) std::cout << "(" <<  coeff.second->ToString() << ") ";
-                                else std::cout << "(" <<  coeff.second->ToString() << ") ";
-                            }
-                        }
-                        std::cout << std::endl << std::endl;
-                    }
-
-                    std::cout << "\033[0m";
-                }
-
-                lastResult = selector.SwapDependencyInformation(result);
-            }
-
-            */
-
             std::string GetExpandedCommandString(const std::shared_ptr<Node>& document) const {
                 if (document->IsPrevious()) {
                     return lastCmd;
@@ -152,12 +73,12 @@ namespace Construction {
                             // Note that Execute has overwritten lastCmd
                             result.append(GetExpandedCommandString(arg));
                         }
-                            // If pointer to previous, add this
+                        // If pointer to previous, add this
                         else if (arg->IsPrevious()) {
                             // Update newLastCmd string
                             result.append(lastCmd);
                         }
-                            // If is a literal, load the name from memory
+                        // If is a literal, load the name from memory
                         else if (arg->IsLiteral()) {
                             auto id = arg->ToString();
                             auto it = definition.find(id);
@@ -165,11 +86,18 @@ namespace Construction {
                             result.append(it->second);
                         }
                         // If indices, add this
-                        else if (arg->IsString()) {
+                        else if (arg->IsIndices()) {
                             // Update command
                             result.append("\"");
-                            result.append(std::dynamic_pointer_cast<StringNode>(arg)->GetText());
+                            result.append(std::dynamic_pointer_cast<IndicesNode>(arg)->GetText());
                             result.append("\"");
+                        }
+                        // If string, add this
+                        else if (arg->IsString()) {
+                            // Update command
+                            result.append("\'");
+                            result.append(std::dynamic_pointer_cast<StringNode>(arg)->GetText());
+                            result.append("\'");
                         }
                     }
 
@@ -187,22 +115,29 @@ namespace Construction {
             }
 
             void Execute(const std::shared_ptr<Node>& document, bool silent=false) {
+                // Copy the most recent tensor;
+                TensorContainer lastResult = Session::Instance()->GetCurrent();
+
                 if (document->IsPrevious()) {
                     PrintTensor();
                     return;
                 } else if (document->IsCommand()) {
-
                     auto commandName = std::dynamic_pointer_cast<CommandNode>(document)->GetIdentifier()->GetText();
+
                     std::string expandedCmd = GetExpandedCommandString(document);
 
                     // if the expandedCmd is in the database, do not evaluate
-                    if (database.Contains(expandedCmd)) {
+                    // 
+                    // TODO: if the algorithms are out of the experimental stage, 
+                    //       add the caching again
+                    //
+                    /*if (database.Contains(expandedCmd)) {
                         lastResult = database[expandedCmd];
                         lastCmd = expandedCmd;
 
                         if (!silent) PrintTensor();
                         return;
-                    }
+                    }*/
 
                     CommandPointer command;
 
@@ -236,15 +171,21 @@ namespace Construction {
                         // If is a literal, load the name from memory
                         else if (arg->IsLiteral()) {
                             auto id = arg->ToString();
-                            lastResult = memory[id];
+                            lastResult = Session::Instance()->Get(id);
 
                             auto newArg = std::make_shared<TensorArgument>();
                             newArg->SetTensor(lastResult);
                             command->AddArgument(std::move(newArg));
                         }
                         // If indices, add this
-                        else if (arg->IsString()) {
+                        else if (arg->IsIndices()) {
                             command->AddArgument(std::make_shared<IndexArgument>(
+                                    std::dynamic_pointer_cast<IndicesNode>(arg)->GetText()
+                            ));
+                        }
+                        // If string, add this
+                        else if (arg->IsString()) {
+                            command->AddArgument(std::make_shared<StringArgument>(
                                     std::dynamic_pointer_cast<StringNode>(arg)->GetText()
                             ));
                         } else if (arg->IsNumeric()) {
@@ -267,56 +208,19 @@ namespace Construction {
                         Error("Wrong argument type");
                     }
 
-                    // Update lastCmd
-                    lastCmd = expandedCmd;
+                    // Update the session
+                    Session::Instance()->SetCurrent(expandedCmd, lastResult);
 
                     // Update database
-                    if (command->Cachable()) {
+                    /*if (command->Cachable()) {
                         database[lastCmd] = lastResult;
-                    }
+                    }*/
 
+                    // Print tensors unless in silent mode
                     if (command->ReturnsTensors() && !silent) {
                         PrintTensor();
                     }
 
-                    /*auto command = std::dynamic_pointer_cast<CommandNode>(document)->GetIdentifier()->GetText();
-
-                    // Do the tensor command
-                    if (command == "Tensor") {
-                        ExecuteTensor(document, silent);
-                        return;
-                    }
-                    if (command == "EpsilonGamma") {
-                        ExecuteEpsilonGamma(document, silent);
-                        return;
-                    }
-                    if (command == "Append") {
-                        ExecuteAppend(document, silent);
-                        return;
-                    }
-                    // do symmetrization
-                    if (command == "Symmetrize") {
-                        ExecuteSymmetrize(document, silent);
-                        return;
-                    }
-                    // do basis selection
-                    if (command == "LinearIndependent") {
-                        ExecuteLinearIndependent(document, silent);
-                        return;
-                    }
-                    // do basis selection
-                    if (command == "LinearDependent") {
-                        ExecuteLinearDependent(document, silent);
-                        return;
-                    }
-                    // do degrees of freedom
-                    if (command == "DegreesOfFreedom") {
-                        ExecuteDegreesOfFreedom(document, silent);
-                        return;
-                    }*/
-
-                    /*Error("I do not know this command");
-*/
                     return;
                 } else if (document->IsAssignment()) {
                     auto id = std::dynamic_pointer_cast<AssignmentNode>(document)->GetIdentifier()->GetText();
@@ -324,13 +228,15 @@ namespace Construction {
 
                     Execute(expression, true);
 
-                    memory[id] = lastResult;
+                    // Store the variable in memory
+                    Session::Instance()->Get(id) = lastResult;
+
                     definition[id] = lastCmd;
-                    database[lastCmd] = lastResult;
+                    //database[lastCmd] = lastResult;
                     return;
                 } else if (document->IsLiteral()) {
                     auto id = std::dynamic_pointer_cast<LiteralNode>(document)->GetText();
-                    lastResult = memory[id];
+                    Session::Instance()->SetCurrent(definition[id], Session::Instance()->Get(id));
 
                     if (!silent) PrintTensor();
                     return;
@@ -359,6 +265,7 @@ namespace Construction {
 
                 try {
                     Execute(document, silent);
+                    Session::Instance()->GetNotebook().Append(code);
                 } catch (...) {
                     Error("Something went terribly wrong. :(");
                 }
@@ -391,6 +298,8 @@ namespace Construction {
             }
         public:
             void PrintTensor() {
+                TensorContainer lastResult = Session::Instance()->GetCurrent();
+
                 /**
                     DEFAULT = 39,
                     BLACK = 30,
@@ -429,8 +338,6 @@ namespace Construction {
         private:
             Parser parser;
 
-            TensorContainer lastResult;
-            std::map<std::string, TensorContainer> memory;
             TensorDatabase database;
 
             // Store the command to that was executed to create %
