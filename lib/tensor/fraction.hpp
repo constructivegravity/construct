@@ -3,14 +3,16 @@
 #include <sstream>
 #include <string>
 
+#include <tensor/scalar.hpp>
+
 namespace Construction {
     namespace Tensor {
 
-        class Fraction {
+        class Fraction : public Scalar {
         public:
-            Fraction() : numerator(0), denominator(1) { }
-            Fraction(int number) : numerator(number), denominator(1) { }
-            Fraction(int numerator, unsigned int denominator) : numerator(numerator), denominator(denominator) { }
+            Fraction() : numerator(0), denominator(1), Scalar(Scalar::FRACTION) { }
+            Fraction(int number) :  Scalar(Scalar::FRACTION), numerator(number), denominator(1) { }
+            Fraction(int numerator, unsigned int denominator) :  Scalar(Scalar::FRACTION), numerator(numerator), denominator(denominator) { }
         public:
             int gcd(int num1, int num2) {
                 int tmp;
@@ -126,12 +128,20 @@ namespace Construction {
                 return static_cast<double>(numerator) / denominator;
             }
 
-            std::string ToString() const {
+            virtual double ToDouble() const override {
+                return static_cast<double>(numerator) / denominator;
+            }
+
+            virtual std::string ToString() const override {
                 Fraction c = *this;
                 c.Reduce();
                 std::stringstream ss;
                 ss << c.numerator << "/" << c.denominator;
                 return ss.str();
+            }
+
+            virtual std::shared_ptr<Scalar> Clone() const override {
+                return std::shared_ptr<Scalar>(new Fraction(numerator, denominator));
             }
         private:
             int numerator;
