@@ -102,6 +102,10 @@ std::shared_ptr<Scalar> Scalar::Negate(const Scalar& one) {
     return std::shared_ptr<Scalar>(new MultipliedScalar(std::make_shared<Fraction>(-1), std::move(one.Clone())));
 }
 
+std::shared_ptr<Scalar> Scalar::Subtract(const Scalar& one, const Scalar& other) {
+    return std::move(Add(one, *Negate(other)));
+}
+
 std::vector<std::shared_ptr<Scalar>> Scalar::GetVariables() const {
     std::vector<std::shared_ptr<Scalar>> result;
 
