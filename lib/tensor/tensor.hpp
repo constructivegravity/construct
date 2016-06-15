@@ -211,8 +211,8 @@ namespace Construction {
 			 	\param indices	Vector with the index assigment, i.e unsigned ints
 			 	\returns		The tensor component at this index assignment
 			 */
-			virtual double Evaluate(const std::vector<unsigned>& indices) const {
-				return 0;
+			virtual ScalarPointer Evaluate(const std::vector<unsigned>& indices) const {
+				return ScalarPointer(new Fraction(0));
 			}
 
 			/**
@@ -227,7 +227,7 @@ namespace Construction {
 			 	tensor.
 			 */
 			template<typename T, typename... Args>
-			double operator()(T t, Args... args) const {
+			ScalarPointer operator()(T t, Args... args) const {
 				auto indices = CheckIndices(t, args...);
 				return Evaluate(indices);
 			}
@@ -240,7 +240,7 @@ namespace Construction {
 			 	given as a std::map which allows the assignment to
 			 	permutations, added and multiplied tensors.
 			 */
-			inline double operator()(const IndexAssignments& assignment) const {
+			inline ScalarPointer operator()(const IndexAssignments& assignment) const {
 				auto result = assignment(indices);
 				return Evaluate(result);
 			}
@@ -254,7 +254,7 @@ namespace Construction {
 			 	\param indices	Vector with the index assigment, i.e unsigned ints
 			 	\returns		The tensor component at this index assignment
 			 */
-			inline double operator()(const std::vector<unsigned>& indices) const {
+			inline ScalarPointer operator()(const std::vector<unsigned>& indices) const {
 				return Evaluate(indices);
 			}
 		public:
@@ -313,8 +313,8 @@ namespace Construction {
 			 	pointer to the tensor and the number and when evaluating uses
 			 	them to calculate the result.
 			 */
-			ScaledTensor operator*(double c) const;
-			friend inline ScaledTensor operator*(double c, const Tensor& other);
+			ScaledTensor operator*(const Scalar& c) const;
+			friend inline ScaledTensor operator*(const Scalar& c, const Tensor& other);
 
 			/**
 				\brief Negation of a tensor
@@ -423,7 +423,8 @@ namespace Construction {
 
 				// Iterate over all combinations
 				for (auto& combination : combinations) {
-					if (Evaluate(combination) != 0) return false;
+					auto r = Evaluate(combination);
+					if (r->HasVariables() || r->ToDouble() != 0) return false;
 					//if (Evaluate(combination) != 0) return false;
 				}
 
@@ -541,7 +542,7 @@ namespace Construction {
 
             	\throws IncompleteIndexAssignmentException
              */
-			virtual double Evaluate(const std::vector<unsigned>& args) const override {
+			virtual ScalarPointer Evaluate(const std::vector<unsigned>& args) const override {
 				// If number of args and indices differ return
 				if (args.size() != indices.Size()) {
 					throw IncompleteIndexAssignmentException();
@@ -553,7 +554,7 @@ namespace Construction {
 					assignment[indices[i].GetName()] = args[i];
 				}
 
-				return (*A)(assignment) + (*B)(assignment);
+				return Scalar::Add(*(*A)(assignment), *(*B)(assignment));
 			}
 
 			/**
@@ -625,7 +626,7 @@ namespace Construction {
 
             	\throws IncompleteIndexAssignmentException
          	 */
-			virtual double Evaluate(const std::vector<unsigned>& args) const override {
+			virtual ScalarPointer Evaluate(const std::vector<unsigned>& args) const override {
 				// If number of args and indices differ return
 				if (args.size() != indices.Size()) {
 					throw IncompleteIndexAssignmentException();
@@ -645,7 +646,7 @@ namespace Construction {
 					assignment2[indices[i].GetName()] = args[i];
 				}
 
-				return (*A)(assignment1) * (*B)(assignment2);
+				return Scalar::Multiply(*(*A)(assignment1), *(*B)(assignment2));
 			}
 		public:
 			static void DoSerialize(std::ostream& os, const MultipliedTensor& tensor) {
@@ -681,7 +682,7 @@ namespace Construction {
 		 */
 		class ScaledTensor : public Tensor {
 		public:
-			ScaledTensor(ConstTensorPointer A, double c)
+			ScaledTensor(ConstTensorPointer A, const Scalar& c)
 				: Tensor("", "", A->GetIndices()), A(A), c(c) {
 
 				type = TensorType::SCALED;

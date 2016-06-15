@@ -26,6 +26,10 @@ std::shared_ptr<Scalar> Scalar::Add(const Scalar& one, const Scalar& other) {
         ));
     }
 
+    // Do not add zero
+    if (one.IsNumeric() && one.ToDouble() == 0) return std::move(second);
+    if (other.IsNumeric() && other.ToDouble() == 0) return std::move(first);
+
     // If the second one is a sum, try to simplify
     if ((other.IsAdded() && one.IsNumeric())) {
         return std::shared_ptr<Scalar>(new AddedScalar(
@@ -58,6 +62,15 @@ std::shared_ptr<Scalar> Scalar::Multiply(const Scalar& one, const Scalar& other)
     if (other.IsFloatingPoint() || one.IsFloatingPoint()) {
         return std::shared_ptr<Scalar>(new FloatingPointScalar(one.ToDouble() * other.ToDouble()));
     }
+
+    // If one is 0, just return zero. Good for killing variables...
+    if ((one.IsNumeric() && one.ToDouble() == 0) || (other.IsNumeric() && other.ToDouble() == 0)) {
+        return std::shared_ptr<Scalar>(new Fraction());
+    }
+
+    // If one of the components is 1, just return the other
+    if (one.IsNumeric() && one.ToDouble() == 1) return std::move(second);
+    if (other.IsNumeric() && other.ToDouble() == 1) return std::move(first);
 
     // If the first one is a sum, try to simplify
     if ((one.IsMultiplied() && other.IsNumeric())) {
