@@ -2,6 +2,7 @@
 
 #include <string>
 #include <sstream>
+#include <vector>
 
 namespace Construction {
     namespace Tensor {
@@ -34,6 +35,7 @@ namespace Construction {
             bool IsVariable() const { return type == VARIABLE; }
             bool IsFraction() const { return type == FRACTION; }
             bool IsFloatingPoint() const { return type == FLOATING_POINT; }
+            bool IsNumeric() const { return type == FLOATING_POINT || type == FRACTION; }
 
             bool IsAdded() const { return type == ADDED; }
             bool IsMultiplied() const { return type == MULTIPLIED; }
@@ -62,10 +64,10 @@ namespace Construction {
 				return std::make_shared<Scalar>(*this);
 			}
         public:
-            friend std::shared_ptr<Scalar> Add(const Scalar& one, const Scalar& other);
-            friend std::shared_ptr<Scalar> Subtract(const Scalar& one, const Scalar& other);
-            friend std::shared_ptr<Scalar> Multiply(const Scalar& one, const Scalar& other);
-            friend std::shared_ptr<Scalar> Negate(const Scalar& one);
+            static std::shared_ptr<Scalar> Add(const Scalar& one, const Scalar& other);
+            static std::shared_ptr<Scalar> Subtract(const Scalar& one, const Scalar& other);
+            static std::shared_ptr<Scalar> Multiply(const Scalar& one, const Scalar& other);
+            static std::shared_ptr<Scalar> Negate(const Scalar& one);
 
             /*Scalar& operator+(const Scalar& other) const;
             Scalar& operator*(const Scalar& other) const;
@@ -78,7 +80,14 @@ namespace Construction {
             Scalar& operator-() const;*/
         public:
             /**
-                Replace a variable by another scalar
+                Extract pointers to all the free variables in
+                this scalar expression
+             */
+            std::vector<std::shared_ptr<Scalar>> GetVariables() const;
+            bool HasVariables() const;
+        public:
+            /**
+                Take the expression and replace the given variable by a numeric
              */
             virtual void Replace() {
 
@@ -148,6 +157,9 @@ namespace Construction {
                 ss << A->ToString() << " * " << B->ToString();
                 return ss.str();
             }
+        public:
+            inline ScalarPointer GetFirst() const { return A; }
+            inline ScalarPointer GetSecond() const { return B; }
         private:
             ScalarPointer A;
             ScalarPointer B;
