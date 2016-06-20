@@ -4,18 +4,26 @@
 #include <sstream>
 #include <vector>
 
+#include <common/printable.hpp>
+#include <common/serializable.hpp>
+
 namespace Construction {
     namespace Tensor {
 
 		class AddedScalar;
 		class MultipliedScalar;
 
+        using Common::Printable;
+        using Common::Serializable;
+
         /**
             \class Scalar
 
+            \brief Class for general scalars
+
 
          */
-        class Scalar {
+        class AbstractScalar : public Serializable<AbstractScalar> {
         public:
             enum Type {
                 // Fundamentals
@@ -23,15 +31,31 @@ namespace Construction {
                 FRACTION = 2,
                 FLOATING_POINT = 3,
 
+                // Arithmetic types
                 ADDED = 101,
                 MULTIPLIED = 102
             };
         public:
-            Scalar() : type(FLOATING_POINT) { }
-            Scalar(Type type) : type(type) { }
+            /**
+                Constructor of a scalar
+             */
+            AbstractScalar() : type(FLOATING_POINT) { }
+
+            /**
+                Constructor of a scalar
+
+                \param type     The type of the scalar
+             */
+            AbstractScalar(Type type) : type(type) { }
         public:
+            /**
+             *  Return the type of the scalar
+             */
             Type GetType() const { return type; }
 
+            /**
+                Return if the scalar is a variable
+             */
             bool IsVariable() const { return type == VARIABLE; }
             bool IsFraction() const { return type == FRACTION; }
             bool IsFloatingPoint() const { return type == FLOATING_POINT; }
@@ -60,51 +84,56 @@ namespace Construction {
                 return 0;
             }
         public:
-            virtual std::shared_ptr<Scalar> Clone() const {
-				return std::make_shared<Scalar>(*this);
-			}
+            virtual std::unique_ptr<AbstractScalar> Clone() const = 0;
         public:
-            static std::shared_ptr<Scalar> Add(const Scalar& one, const Scalar& other);
-            static std::shared_ptr<Scalar> Subtract(const Scalar& one, const Scalar& other);
-            static std::shared_ptr<Scalar> Multiply(const Scalar& one, const Scalar& other);
-            static std::shared_ptr<Scalar> Negate(const Scalar& one);
+            /**
+                \brief Simplify the scalar expression
 
-            /*Scalar& operator+(const Scalar& other) const;
-            Scalar& operator*(const Scalar& other) const;
 
-            Scalar& operator*(double c) const;
-            friend inline Scalar& operator*(double c, const Scalar& other);
+             */
+            virtual std::unique_ptr<AbstractScalar> Simplify() {
+                // do nothing
+            }
+        public:
+            /** Arithmetics **/
 
-            inline Scalar& operator-(const Scalar& other) const;
-
-            Scalar& operator-() const;*/
+            static std::unique_ptr<AbstractScalar> Add(const AbstractScalar& one, const AbstractScalar& other);
+            static std::unique_ptr<AbstractScalar> Subtract(const AbstractScalar& one, const AbstractScalar& other);
+            static std::unique_ptr<AbstractScalar> Multiply(const AbstractScalar& one, const AbstractScalar& other);
+            static std::unique_ptr<AbstractScalar> Negate(const AbstractScalar& one);
         public:
             /**
                 Extract pointers to all the free variables in
                 this scalar expression
              */
-            std::vector<std::shared_ptr<Scalar>> GetVariables() const;
+            std::vector<std::unique_ptr<AbstractScalar>> GetVariables() const;
             bool HasVariables() const;
         public:
             /**
                 Take the expression and replace the given variable by a numeric
              */
-            virtual void Replace() {
-
-            }
+            //virtual void Replace(const Variable& variable, const Scalar& scalar);
+        public:
+            void Serialize(std::ostream& os) const override;
+            static std::unique_ptr<AbstractScalar> Deserialize(std::istream& is);
         protected:
             Type type;
         };
 
-        typedef std::shared_ptr<Scalar> ScalarPointer;
+        typedef std::unique_ptr<AbstractScalar> ScalarPointer;
+        typedef const std::unique_ptr<AbstractScalar> ConstScalarPointer;
 
-        class FloatingPointScalar : public Scalar {
+        class FloatingPointScalar : public AbstractScalar {
         public:
-            FloatingPointScalar() : Scalar(FLOATING_POINT), c(0) { }
-            FloatingPointScalar(double c) : Scalar(FLOATING_POINT), c(c) { }
+            FloatingPointScalar() : AbstractScalar(FLOATING_POINT), c(0) { }
+            FloatingPointScalar(double c) : AbstractScalar(FLOATING_POINT), c(c) { }
         public:
             virtual ScalarPointer Clone() const override {
-                return std::make_shared<FloatingPointScalar>(c);
+                return std::move(ScalarPointer(new FloatingPointScalar(c)));
+            }
+        public:
+            virtual ScalarPointer Simplify() override {
+                return nullptr;
             }
         public:
             virtual std::string ToString() const override {
@@ -116,22 +145,28 @@ namespace Construction {
             operator double() const { return c; }
 
             virtual double ToDouble() const override { return c; }
+        public:
+            friend class AbstractScalar;
         private:
             double c;
         };
 
-        class AddedScalar : public Scalar {
+        class AddedScalar : public AbstractScalar {
         public:
-            AddedScalar(ScalarPointer A, ScalarPointer B) : A(A), B(B) {
+            AddedScalar(ScalarPointer A, ScalarPointer B) : A(std::move(A)), B(std::move(B)) {
                 type = ADDED;
             }
         public:
             virtual ScalarPointer Clone() const override {
-				return std::make_shared<AddedScalar>(
-					std::move(A->Clone()),
-					std::move(B->Clone())
-				);
+                return std::move(ScalarPointer(new AddedScalar(
+                    std::move(A->Clone()),
+                    std::move(B->Clone())
+                )));
 			}
+        public:
+            virtual ScalarPointer Simplify() override {
+
+            }
         public:
             virtual std::string ToString() const override {
                 std::stringstream ss;
@@ -139,16 +174,18 @@ namespace Construction {
                 return ss.str();
             }
         public:
-            inline ScalarPointer GetFirst() const { return A; }
-            inline ScalarPointer GetSecond() const { return B; }
+            /*inline ConstScalarPointer GetFirst() const { return A; }
+            inline ConstScalarPointer GetSecond() const { return B; }*/
+        public:
+            friend class AbstractScalar;
         private:
             ScalarPointer A;
             ScalarPointer B;
         };
 
-        class MultipliedScalar : public Scalar {
+        class MultipliedScalar : public AbstractScalar {
         public:
-            MultipliedScalar(ScalarPointer A, ScalarPointer B) : A(A), B(B) {
+            MultipliedScalar(ScalarPointer A, ScalarPointer B) : A(std::move(A)), B(std::move(B)) {
                 type = MULTIPLIED;
             }
         public:
@@ -158,11 +195,152 @@ namespace Construction {
                 return ss.str();
             }
         public:
-            inline ScalarPointer GetFirst() const { return A; }
-            inline ScalarPointer GetSecond() const { return B; }
+            /*inline ConstScalarPointer GetFirst() const { return A; }
+            inline ConstScalarPointer GetSecond() const { return B; }*/
+        public:
+            virtual ScalarPointer Clone() const override {
+                return std::move(ScalarPointer(new MultipliedScalar(
+                    std::move(A->Clone()),
+                    std::move(A->Clone())
+                )));
+            }
+        public:
+            friend class AbstractScalar;
         private:
             ScalarPointer A;
             ScalarPointer B;
+        };
+
+        /** 
+            \class Scalar
+
+            Syntactic sugar class for scalars. This allows to really just add, multiply etc.
+            them without having to use the pointers and worrying about what happens under
+            the surface. This will greatly simplify the work with the scalars!
+         */
+        class Scalar : public Printable, Serializable<Scalar> {
+        public:
+            Scalar();
+            Scalar(double v);
+
+            Scalar(int v);
+            Scalar(int numerator, unsigned denominator);
+
+            Scalar(const std::string& name);
+            Scalar(const std::string& name, const std::string& printed_text);
+
+            Scalar(const Scalar& other) : pointer(std::move(other.pointer->Clone())) { }
+            Scalar(Scalar&& other) : pointer(std::move(other.pointer)) { }
+        private:
+            Scalar(std::unique_ptr<AbstractScalar> pointer) : pointer(std::move(pointer)) { }
+        public:
+            Scalar& operator=(const Scalar& other) {
+                pointer = other.pointer->Clone();
+                return *this;
+            }
+
+            Scalar& operator=(Scalar&& other) {
+                pointer = std::move(other.pointer);
+                return *this;
+            }
+
+            Scalar& operator=(double d);
+        public:
+            inline AbstractScalar::Type GetType() const { return pointer->GetType(); }
+            inline std::string TypeToString() const { return pointer->TypeToString(); }
+
+            inline bool IsVariable() const { return pointer->IsVariable(); }
+            inline bool IsFraction() const { return pointer->IsFraction(); }
+            inline bool IsFloatingPoint() const { return pointer->IsFloatingPoint(); }
+            inline bool IsNumeric() const { return pointer->IsNumeric(); }
+
+            inline bool IsAdded() const { return pointer->IsAdded(); }
+            inline bool IsMultiplied() const { return pointer->IsNumeric(); }
+        public:
+            inline bool HasVariables() const { return pointer->HasVariables(); }
+            inline std::vector<Scalar> GetVariables() const {
+                std::vector<Scalar> result;
+                auto variables = pointer->GetVariables();
+                for (auto& variable : variables) {
+                    result.push_back(Scalar(std::move(variable)));
+                }
+                return result;
+            }
+        public:
+            Scalar& operator+=(const Scalar& other) {
+                ScalarPointer old = std::move(pointer);
+                pointer = std::move(AbstractScalar::Add(*old, *other.pointer));
+                return *this;
+            }
+
+            Scalar operator+(const Scalar& other) const {
+                return Scalar(std::move(AbstractScalar::Add(*pointer, *other.pointer)));
+            }
+
+            Scalar& operator*=(const Scalar& other) {
+                ScalarPointer old = std::move(pointer);
+                pointer = std::move(AbstractScalar::Multiply(*old, *other.pointer));
+                return *this;
+            }
+
+            Scalar operator*(const Scalar& other) const {
+                return Scalar(std::move(AbstractScalar::Multiply(*pointer, *other.pointer)));
+            }
+
+            Scalar operator-() const {
+                return Scalar(std::move(AbstractScalar::Negate(*pointer)));
+            }
+
+            Scalar& operator-=(const Scalar& other) {
+                ScalarPointer old = std::move(pointer);
+                pointer = std::move(AbstractScalar::Add(*old, *AbstractScalar::Negate(*other.pointer)));
+                return *this;
+            }
+
+            inline Scalar operator-(const Scalar& other) const {
+                return (*this) + (-other);
+            }
+        public:
+            bool operator==(const Scalar& other) const {
+                return ToDouble() == other.ToDouble();
+            }
+
+            bool operator!=(const Scalar& other) const {
+                return ToDouble() != other.ToDouble();
+            }
+
+            bool operator<(const Scalar& other) const {
+                return ToDouble() < other.ToDouble();
+            }
+
+            bool operator<=(const Scalar& other) const {
+                return ToDouble() <= other.ToDouble();
+            }
+
+            bool operator>(const Scalar& other) const {
+                return ToDouble() > other.ToDouble();
+            }
+
+            bool operator>=(const Scalar& other) const {
+                return ToDouble() >= other.ToDouble();
+            }
+        public:
+            virtual std::string ToString() const override {
+                return pointer->ToString();
+            }
+
+            inline double ToDouble() const {
+                return pointer->ToDouble();
+            }
+
+            inline operator double() const {
+                return pointer->ToDouble();
+            }
+        public:
+            void Serialize(std::ostream& os) const override;
+            static std::shared_ptr<Scalar> Deserialize(std::istream& is);
+        private:
+            ScalarPointer pointer;
         };
 
     }

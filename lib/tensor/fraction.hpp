@@ -8,11 +8,11 @@
 namespace Construction {
     namespace Tensor {
 
-        class Fraction : public Scalar {
+        class Fraction : public AbstractScalar {
         public:
-            Fraction() : numerator(0), denominator(1), Scalar(Scalar::FRACTION) { }
-            Fraction(int number) :  Scalar(Scalar::FRACTION), numerator(number), denominator(1) { }
-            Fraction(int numerator, unsigned int denominator) :  Scalar(Scalar::FRACTION), numerator(numerator), denominator(denominator) { }
+            Fraction() : numerator(0), denominator(1), AbstractScalar(AbstractScalar::FRACTION) { }
+            Fraction(int number) :  AbstractScalar(AbstractScalar::FRACTION), numerator(number), denominator(1) { }
+            Fraction(int numerator, unsigned int denominator) :  AbstractScalar(AbstractScalar::FRACTION), numerator(numerator), denominator(denominator) { }
         public:
             int gcd(int num1, int num2) {
                 int tmp;
@@ -140,8 +140,8 @@ namespace Construction {
                 return ss.str();
             }
 
-            virtual std::shared_ptr<Scalar> Clone() const override {
-                return std::shared_ptr<Scalar>(new Fraction(numerator, denominator));
+            virtual ScalarPointer Clone() const override {
+                return std::move(ScalarPointer(new Fraction(numerator, denominator)));
             }
         private:
             int numerator;

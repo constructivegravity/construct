@@ -4,25 +4,50 @@
 
 using namespace Construction::Tensor;
 
-std::shared_ptr<Scalar> Scalar::Add(const Scalar& one, const Scalar& other) {
+Scalar::Scalar() : pointer(ScalarPointer(new Fraction(0))) { }
+Scalar::Scalar(double v) : pointer(ScalarPointer(new FloatingPointScalar(v))) { }
+Scalar::Scalar(int v) : pointer(ScalarPointer(new Fraction(v))) { }
+Scalar::Scalar(int numerator, unsigned denominator) : pointer(ScalarPointer(new Fraction(numerator, denominator))) { }
+Scalar::Scalar(const std::string& name) : pointer(ScalarPointer(new Variable(name))) { }
+Scalar::Scalar(const std::string& name, const std::string& printed_text) : pointer(ScalarPointer(new Variable(name, printed_text))) { }
+
+Scalar& Scalar::operator=(double d) {
+    // Pointer _was_ allocated
+    pointer.release();
+    pointer = ScalarPointer(new FloatingPointScalar(d));
+    return *this;
+}
+
+ScalarPointer AbstractScalar::Add(const AbstractScalar& one, const AbstractScalar& other) {
     // Clone the pointers
-    std::shared_ptr<Scalar> first = one.Clone();
-    std::shared_ptr<Scalar> second = other.Clone();
+    ScalarPointer first = one.Clone();
+    ScalarPointer second = other.Clone();
 
     // Do some simplification black magic
     if (one.IsFraction() && other.IsFraction()) {
-        return std::move(((*std::dynamic_pointer_cast<Fraction>(first)) + (*std::dynamic_pointer_cast<Fraction>(second))).Clone());
+        std::unique_ptr<Fraction> a(&dynamic_cast<Fraction&>(*first.get()));
+        std::unique_ptr<Fraction> b(&dynamic_cast<Fraction&>(*second.get()));
+
+        // Release the old memory
+        first.release();
+        second.release();
+        
+        ScalarPointer result (new Fraction(*a + *b));
+        return std::move(result);
     }
 
     if (other.IsFloatingPoint() || one.IsFloatingPoint()) {
-        return std::shared_ptr<Scalar>(new FloatingPointScalar(one.ToDouble() + other.ToDouble()));
+        return ScalarPointer(new FloatingPointScalar(one.ToDouble() + other.ToDouble()));
     }
 
     // If the first one is a sum, try to simplify
     if ((one.IsAdded() && other.IsNumeric())) {
-        return std::shared_ptr<Scalar>(new AddedScalar(
-            std::move(Add(*second, *std::dynamic_pointer_cast<AddedScalar>(first)->GetFirst()->Clone())),
-            std::move(std::dynamic_pointer_cast<AddedScalar>(first)->GetSecond()->Clone())
+        std::unique_ptr<AddedScalar> added(&dynamic_cast<AddedScalar&>(*first.get()));
+        first.release();
+
+        return ScalarPointer(new AddedScalar(
+            std::move(Add(*second, *added->A->Clone())),
+            std::move(added->B->Clone())
         ));
     }
 
@@ -32,9 +57,12 @@ std::shared_ptr<Scalar> Scalar::Add(const Scalar& one, const Scalar& other) {
 
     // If the second one is a sum, try to simplify
     if ((other.IsAdded() && one.IsNumeric())) {
-        return std::shared_ptr<Scalar>(new AddedScalar(
-            std::move(Add(*first, *std::dynamic_pointer_cast<AddedScalar>(second)->GetFirst()->Clone())),
-            std::move(std::dynamic_pointer_cast<AddedScalar>(second)->GetSecond()->Clone())
+        std::unique_ptr<AddedScalar> added(&dynamic_cast<AddedScalar&>(*second.get()));
+        second.release();
+
+        return ScalarPointer(new AddedScalar(
+            std::move(Add(*first, *added->A->Clone())),
+            std::move(added->B->Clone())
         ));
     }
 
@@ -43,48 +71,62 @@ std::shared_ptr<Scalar> Scalar::Add(const Scalar& one, const Scalar& other) {
     // As a result, we can always assume that numbers are on the left and use this
     // to simplify a tree in the expression
     if (other.IsFraction() || other.IsFloatingPoint()) {
-        return std::shared_ptr<Scalar>(new AddedScalar(std::move(first), std::move(second)));
+        return ScalarPointer(new AddedScalar(std::move(first), std::move(second)));
     }
 
-    return std::shared_ptr<Scalar>(new AddedScalar(std::move(first), std::move(second)));
+    return ScalarPointer(new AddedScalar(std::move(first), std::move(second)));
 }
 
-std::shared_ptr<Scalar> Scalar::Multiply(const Scalar& one, const Scalar& other) {
+ScalarPointer AbstractScalar::Multiply(const AbstractScalar& one, const AbstractScalar& other) {
     // Clone the pointers
-    std::shared_ptr<Scalar> first = one.Clone();
-    std::shared_ptr<Scalar> second = other.Clone();
+    ScalarPointer first = one.Clone();
+    ScalarPointer second = other.Clone();
 
     // Do some simplification black magic
     if (one.IsFraction() && other.IsFraction()) {
-        return std::move(((*std::dynamic_pointer_cast<Fraction>(first)) * (*std::dynamic_pointer_cast<Fraction>(second))).Clone());
+        std::unique_ptr<Fraction> a(&dynamic_cast<Fraction&>(*first.get()));
+        std::unique_ptr<Fraction> b(&dynamic_cast<Fraction&>(*second.get()));
+
+        // Release the old memory
+        first.release();
+        second.release();
+        
+        ScalarPointer result (new Fraction((*a) * (*b)));
+        return std::move(result);
     }
 
     if (other.IsFloatingPoint() || one.IsFloatingPoint()) {
-        return std::shared_ptr<Scalar>(new FloatingPointScalar(one.ToDouble() * other.ToDouble()));
+        return ScalarPointer(new FloatingPointScalar(one.ToDouble() * other.ToDouble()));
     }
 
     // If one is 0, just return zero. Good for killing variables...
     if ((one.IsNumeric() && one.ToDouble() == 0) || (other.IsNumeric() && other.ToDouble() == 0)) {
-        return std::shared_ptr<Scalar>(new Fraction());
+        return ScalarPointer(new Fraction());
     }
 
     // If one of the components is 1, just return the other
     if (one.IsNumeric() && one.ToDouble() == 1) return std::move(second);
     if (other.IsNumeric() && other.ToDouble() == 1) return std::move(first);
 
-    // If the first one is a sum, try to simplify
+    // If the first one is a product, try to simplify
     if ((one.IsMultiplied() && other.IsNumeric())) {
-        return std::shared_ptr<Scalar>(new MultipliedScalar(
-            std::move(Multiply(*second, *std::dynamic_pointer_cast<MultipliedScalar>(first)->GetFirst()->Clone())),
-            std::move(std::dynamic_pointer_cast<MultipliedScalar>(first)->GetSecond()->Clone())
+        std::unique_ptr<MultipliedScalar> multiplied(&dynamic_cast<MultipliedScalar&>(*first.get()));
+        first.release();
+
+        return ScalarPointer(new MultipliedScalar(
+            std::move(Multiply(*second, *multiplied->A->Clone())),
+            std::move(multiplied->B->Clone())
         ));
     }
 
-    // If the second one is a sum, try to simplify
+    // If the second one is a product, try to simplify
     if ((other.IsAdded() && one.IsNumeric())) {
-        return std::shared_ptr<Scalar>(new MultipliedScalar(
-            std::move(Multiply(*first, *std::dynamic_pointer_cast<MultipliedScalar>(second)->GetFirst()->Clone())),
-            std::move(std::dynamic_pointer_cast<MultipliedScalar>(second)->GetSecond()->Clone())
+        std::unique_ptr<MultipliedScalar> multiplied(&dynamic_cast<MultipliedScalar&>(*second.get()));
+        second.release();
+
+        return ScalarPointer(new MultipliedScalar(
+            std::move(Multiply(*first, *multiplied->A->Clone())),
+            std::move(multiplied->B->Clone())
         ));
     }
 
@@ -93,47 +135,50 @@ std::shared_ptr<Scalar> Scalar::Multiply(const Scalar& one, const Scalar& other)
     // As a result, we can always assume that numbers are on the left and use this
     // to simplify a tree in the expression
     if (other.IsFraction() || other.IsFloatingPoint()) {
-        return std::shared_ptr<Scalar>(new MultipliedScalar(std::move(first), std::move(second)));
+        return ScalarPointer(new MultipliedScalar(std::move(first), std::move(second)));
     }
 
-    return std::shared_ptr<Scalar>(new MultipliedScalar(std::move(first), std::move(second)));
+    return ScalarPointer(new MultipliedScalar(std::move(first), std::move(second)));
 }
 
-std::shared_ptr<Scalar> Scalar::Negate(const Scalar& one) {
-    std::shared_ptr<Scalar> first = one.Clone();
+ScalarPointer AbstractScalar::Negate(const AbstractScalar& one) {
+    ScalarPointer first = one.Clone();
 
     // Do some simplification black magic
     if (one.IsFraction()) {
-        return std::shared_ptr<Scalar>(new Fraction(-(*std::dynamic_pointer_cast<Fraction>(first))));
+        std::unique_ptr<Fraction> a(&dynamic_cast<Fraction&>(*first.get()));
+        first.release();
+
+        return ScalarPointer(new Fraction(-(*a)));
     }
 
     if (one.IsFloatingPoint()) {
-        return std::shared_ptr<Scalar>(new FloatingPointScalar(-
+        return ScalarPointer(new FloatingPointScalar(-
             one.ToDouble()));
     }
 
-    return std::shared_ptr<Scalar>(new MultipliedScalar(std::make_shared<Fraction>(-1), std::move(one.Clone())));
+    return ScalarPointer(new MultipliedScalar(ScalarPointer(new Fraction(-1)), std::move(one.Clone())));
 }
 
-std::shared_ptr<Scalar> Scalar::Subtract(const Scalar& one, const Scalar& other) {
+ScalarPointer AbstractScalar::Subtract(const AbstractScalar& one, const AbstractScalar& other) {
     return std::move(Add(one, *Negate(other)));
 }
 
-std::vector<std::shared_ptr<Scalar>> Scalar::GetVariables() const {
-    std::vector<std::shared_ptr<Scalar>> result;
+std::vector<ScalarPointer> AbstractScalar::GetVariables() const {
+    std::vector<ScalarPointer> result;
 
-    std::function<void(const Scalar*)> fn = [&](const Scalar* scalar) {
+    std::function<void(const AbstractScalar*)> fn = [&](const AbstractScalar* scalar) {
         switch (scalar->GetType()) {
             case VARIABLE:
                 result.push_back(scalar->Clone());
                 break;
             case ADDED:
-                fn(static_cast<const AddedScalar*>(scalar)->GetFirst().get());
-                fn(static_cast<const AddedScalar*>(scalar)->GetSecond().get());
+                fn(static_cast<const AddedScalar*>(scalar)->A.get());
+                fn(static_cast<const AddedScalar*>(scalar)->B.get());
                 break;
             case MULTIPLIED:
-                fn(static_cast<const MultipliedScalar*>(scalar)->GetFirst().get());
-                fn(static_cast<const MultipliedScalar*>(scalar)->GetSecond().get());
+                fn(static_cast<const MultipliedScalar*>(scalar)->A.get());
+                fn(static_cast<const MultipliedScalar*>(scalar)->B.get());
                 break;
             default:
                 ;
@@ -145,19 +190,20 @@ std::vector<std::shared_ptr<Scalar>> Scalar::GetVariables() const {
     return result;
 }
 
-bool Scalar::HasVariables() const {
-    std::function<void(const Scalar*)> fn = [&](const Scalar* scalar) {
+bool AbstractScalar::HasVariables() const {
+    bool hasVariables = false;
+    std::function<void(const AbstractScalar*)> fn = [&](const AbstractScalar* scalar) -> void {
         switch (scalar->GetType()) {
             case VARIABLE:
-                return true;
+                hasVariables = true;
                 break;
             case ADDED:
-                fn(static_cast<const AddedScalar*>(scalar)->GetFirst().get());
-                fn(static_cast<const AddedScalar*>(scalar)->GetSecond().get());
+                fn(static_cast<const AddedScalar*>(scalar)->A.get());
+                fn(static_cast<const AddedScalar*>(scalar)->B.get());
                 break;
             case MULTIPLIED:
-                fn(static_cast<const MultipliedScalar*>(scalar)->GetFirst().get());
-                fn(static_cast<const MultipliedScalar*>(scalar)->GetSecond().get());
+                fn(static_cast<const MultipliedScalar*>(scalar)->A.get());
+                fn(static_cast<const MultipliedScalar*>(scalar)->B.get());
                 break;
             default:
                 ;
@@ -165,69 +211,38 @@ bool Scalar::HasVariables() const {
     };
 
     fn(this);
-    return false;
+    return hasVariables;
 }
 
-/*Scalar& Scalar::operator+(const Scalar& other) const {
-    // Do some simplification black magic
-    if (type == FRACTION && other.type == FRACTION) {
-        return (reinterpret_cast<const Fraction>(*this) + reinterpret_cast<const Fraction>(other));
-    }
+void AbstractScalar::Serialize(std::ostream& os) const {
 
-    if (other.type == FLOATING_POINT || type == FLOATING_POINT) {
-        return FloatingPointScalar(ToDouble() + other.ToDouble());
-    }
-
-    // If this is a variable then potentially the other scalar is a
-    // number, thus invert the order since addition commutes anyway
-    if (type == VARIABLE) {
-        return AddedScalar(std::move(other.Clone()), std::move(Clone()));
-    }
-
-    return AddedScalar(std::move(Clone()), std::move(other.Clone()));
 }
 
-Scalar& Scalar::operator*(const Scalar& other) const {
-    // Do some simplification black magic
-    if (type == FRACTION && other.type == FRACTION) {
-        return (reinterpret_cast<const Fraction>(*this) * reinterpret_cast<const Fraction>(other));
-    }
+void Scalar::Serialize(std::ostream& os) const {
 
-    if (other.type == FLOATING_POINT || type == FLOATING_POINT) {
-        return FloatingPointScalar(ToDouble() * other.ToDouble());
-    }
-
-    return MultipliedScalar(std::move(Clone()), std::move(other.Clone()));
 }
 
-Scalar& Scalar::operator*(double c) const {
-    // Do some simplification black magic
-    if (type == FRACTION || type == FLOATING_POINT) {
-        return FloatingPointScalar(ToDouble() * other.ToDouble());
+//virtual void Scalar::Replace(const Variable& variable, const Scalar& scalar) {
+    // Recursive helper function to go through all the scalars
+    /*std::function<void()> fn = [&](const Scalar* sc) {
+        switch (sc->GetType()) {
+            case VARIABLE:
+                if (*sc == variable) {
+
+                }
+                break;
+            case ADDED:
+                fn(static_cast<const AddedScalar*>(sc)->GetFirst().get());
+                fn(static_cast<const AddedScalar*>(sc)->GetSecond().get());
+                break;
+            case MULTIPLIED:
+                fn(static_cast<const MultipliedScalar*>(sc)->GetFirst().get());
+                fn(static_cast<const MultipliedScalar*>(sc)->GetSecond().get());
+                break;
+            default:
+                ;
+        }
     }
 
-    return MultipliedScalar(std::move(Clone()), std::move(other.Clone()));
-}
-
-friend inline Scalar& Scalar::operator*(double c, const Tensor& other) {
-    return other*c;
-}
-
-Scalar& Scalar::operator-() const {
-    // Do some simplification black magic
-    if (type == FRACTION) {
-        return (-reinterpret_cast<Fraction>(*this));
-    }
-
-    if (type == FLOATING_POINT) {
-        return FloatingPointScalar(-static_cast<double>(*this));
-    }
-
-    return MultipliedScalar(std::make_shared<Fraction>(-1), std::move(Clone()));
-}
-
-// Let the compiler do the nasty stuff
-inline Scalar& Scalar::operator-(const Scalar& other) const {
-    return (*this) + (-other);
-}
-*/
+    fn(this);*/
+//}

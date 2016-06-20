@@ -5,7 +5,7 @@ include_directories(${CATCH_INCLUDE_DIRS})
 enable_testing(true)
 
 add_executable(testing main.cpp)
-target_link_libraries(testing ${Boost_LIBRARIES})
+target_link_libraries(testing tensor ${Boost_LIBRARIES})
 
 add_test(NAME runtesting
     COMMAND ${CMAKE_COMMAND}

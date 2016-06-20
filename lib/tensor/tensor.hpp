@@ -206,13 +206,11 @@ namespace Construction {
 			/**
 				Virtual method for tensor evaluation. Standard result is zero.
 
-			 	@DEPRECEATED! Replace with evaluator
-
 			 	\param indices	Vector with the index assigment, i.e unsigned ints
 			 	\returns		The tensor component at this index assignment
 			 */
-			virtual ScalarPointer Evaluate(const std::vector<unsigned>& indices) const {
-				return ScalarPointer(new Fraction(0));
+			virtual Scalar Evaluate(const std::vector<unsigned>& indices) const {
+				return Scalar();
 			}
 
 			/**
@@ -227,7 +225,7 @@ namespace Construction {
 			 	tensor.
 			 */
 			template<typename T, typename... Args>
-			ScalarPointer operator()(T t, Args... args) const {
+			Scalar operator()(T t, Args... args) const {
 				auto indices = CheckIndices(t, args...);
 				return Evaluate(indices);
 			}
@@ -240,7 +238,7 @@ namespace Construction {
 			 	given as a std::map which allows the assignment to
 			 	permutations, added and multiplied tensors.
 			 */
-			inline ScalarPointer operator()(const IndexAssignments& assignment) const {
+			inline Scalar operator()(const IndexAssignments& assignment) const {
 				auto result = assignment(indices);
 				return Evaluate(result);
 			}
@@ -254,7 +252,7 @@ namespace Construction {
 			 	\param indices	Vector with the index assigment, i.e unsigned ints
 			 	\returns		The tensor component at this index assignment
 			 */
-			inline ScalarPointer operator()(const std::vector<unsigned>& indices) const {
+			inline Scalar operator()(const std::vector<unsigned>& indices) const {
 				return Evaluate(indices);
 			}
 		public:
@@ -424,7 +422,7 @@ namespace Construction {
 				// Iterate over all combinations
 				for (auto& combination : combinations) {
 					auto r = Evaluate(combination);
-					if (r->HasVariables() || r->ToDouble() != 0) return false;
+					if (r.HasVariables() || r.ToDouble() != 0) return false;
 					//if (Evaluate(combination) != 0) return false;
 				}
 
@@ -542,7 +540,7 @@ namespace Construction {
 
             	\throws IncompleteIndexAssignmentException
              */
-			virtual ScalarPointer Evaluate(const std::vector<unsigned>& args) const override {
+			virtual Scalar Evaluate(const std::vector<unsigned>& args) const override {
 				// If number of args and indices differ return
 				if (args.size() != indices.Size()) {
 					throw IncompleteIndexAssignmentException();
@@ -554,7 +552,7 @@ namespace Construction {
 					assignment[indices[i].GetName()] = args[i];
 				}
 
-				return Scalar::Add(*(*A)(assignment), *(*B)(assignment));
+				return (*A)(assignment) + (*B)(assignment);
 			}
 
 			/**
@@ -626,7 +624,7 @@ namespace Construction {
 
             	\throws IncompleteIndexAssignmentException
          	 */
-			virtual ScalarPointer Evaluate(const std::vector<unsigned>& args) const override {
+			virtual Scalar Evaluate(const std::vector<unsigned>& args) const override {
 				// If number of args and indices differ return
 				if (args.size() != indices.Size()) {
 					throw IncompleteIndexAssignmentException();
@@ -646,7 +644,7 @@ namespace Construction {
 					assignment2[indices[i].GetName()] = args[i];
 				}
 
-				return Scalar::Multiply(*(*A)(assignment1), *(*B)(assignment2));
+				return (*A)(assignment1) * (*B)(assignment2);
 			}
 		public:
 			static void DoSerialize(std::ostream& os, const MultipliedTensor& tensor) {
@@ -705,8 +703,8 @@ namespace Construction {
 
 				\throws IncompleteIndexAssignmentException
 			 */
-			virtual double Evaluate(const std::vector<unsigned>& args) const override {
-				return c * A->Evaluate(args);
+			virtual Scalar Evaluate(const std::vector<unsigned>& args) const override {
+				return A->Evaluate(args) * c;
 			}
 
 			TensorPointer Canonicalize() const override {
@@ -723,9 +721,9 @@ namespace Construction {
 			virtual std::string ToString() const override {
 				std::stringstream ss;
 
-				if (c == 1) {
+				if (c.IsNumeric() && c.ToDouble() == 1) {
 					// do nothing
-				} else if (c == -1) {
+				} else if (c.IsNumeric() && c.ToDouble() == -1) {
 					ss << "-";
 				} else {
 					ss << c << "*";
@@ -739,17 +737,17 @@ namespace Construction {
 				return ss.str();
 			}
 		public:
-			ScaledTensor operator*(double c) const {
+			ScaledTensor operator*(const Scalar& c) const {
 				return ScaledTensor(
 						A,
 						c*this->c
 				);
 			}
 
-			friend inline ScaledTensor operator*(double c, const ScaledTensor& other) {
+			friend inline ScaledTensor operator*(const Scalar& c, const ScaledTensor& other) {
 				return ScaledTensor(
 						other.A,
-						c*other.c
+						c * other.c
 				);
 			}
 
@@ -764,8 +762,8 @@ namespace Construction {
 				return A;
 			}
 
-			double GetScale() const { return c; }
-			void SetScale(double c) { this->c = c; }
+			Scalar GetScale() const { return c; }
+			void SetScale(const Scalar& c) { this->c = c; }
 		public:
 			static void DoSerialize(std::ostream& os, const ScaledTensor& tensor) {
 				os.write(reinterpret_cast<const char*>(&tensor.c), sizeof(&tensor.c));
@@ -775,8 +773,11 @@ namespace Construction {
 			static TensorPointer DoDeserialize(std::istream& is, const Indices& indices) {
 				auto A = Tensor::Deserialize(is);
 
-				double c;
-				is.read(reinterpret_cast<char*>(&c), sizeof(c));
+				Scalar c;
+				// TODO: implement serialization
+
+				//double c;
+				//is.read(reinterpret_cast<char*>(&c), sizeof(c));
 
 				return std::make_shared<ScaledTensor>(std::move(A), c);
 			}
@@ -785,11 +786,11 @@ namespace Construction {
 			void serialize(Archive& ar, const unsigned version) {
 				ar & boost::serialization::base_object<Tensor>(*this);
 				ar & A;
-				ar & c;
+				//ar & c;
 			}
 		private:
 			ConstTensorPointer A;
-			double c;
+			Scalar c;
 		};
 
 		MultipliedTensor Tensor::operator*(const Tensor &other) const {
@@ -806,19 +807,19 @@ namespace Construction {
 			);
 		}
 
-		ScaledTensor Tensor::operator*(double c) const {
+		ScaledTensor Tensor::operator*(const Scalar& c) const {
 			return ScaledTensor(
 				std::move(ConstTensorPointer(ConstTensorPointer(), this)),
 				c
 			);
 		}
 
-		ScaledTensor operator*(double c, const Tensor& other) {
+		ScaledTensor operator*(const Scalar& c, const Tensor& other) {
 			return other*c;
 		}
 
 		inline ScaledTensor Tensor::operator-() const {
-			return -1 * (*this);
+			return Scalar(-1) * (*this);
 		}
 
 		AddedTensor Tensor::operator+(const Tensor& other) const {
@@ -833,7 +834,7 @@ namespace Construction {
 		std::string AddedTensor::ToString() const {
 			std::stringstream ss;
 
-			if (B->IsScaledTensor() && static_cast<const ScaledTensor*>(B.get())->GetScale() == -1) {
+			if (B->IsScaledTensor() && static_cast<const ScaledTensor*>(B.get())->GetScale() == Scalar(-1)) {
 				ss << A->ToString() << " - " << static_cast<const ScaledTensor*>(B.get())->GetTensor()->ToString();
 			} else {
 				ss << A->ToString() << " + " << B->ToString();
@@ -872,7 +873,7 @@ namespace Construction {
 				return A->ToString();
 			}
 
-			virtual double Evaluate(const std::vector<unsigned>& args) const override {
+			virtual Scalar Evaluate(const std::vector<unsigned>& args) const override {
 				// If number of args and indices differ return
 				if (args.size() != indices.Size()) {
 					throw IncompleteIndexAssignmentException();
@@ -924,7 +925,7 @@ namespace Construction {
 		public:
 			ScalarTensor(double value) : value(value) { }
 
-			ScalarTensor(const std::string& name, const std::string& printed_text, double value)
+			ScalarTensor(const std::string& name, const std::string& printed_text, Scalar value)
 				: Tensor(name, printed_text, Indices()), value(value) {
 
 				type = TensorType::SCALAR;
@@ -938,7 +939,7 @@ namespace Construction {
 				return printed_text;
 			}
         public:
-			virtual double Evaluate(const std::vector<unsigned>& args) const override {
+			virtual Scalar Evaluate(const std::vector<unsigned>& args) const override {
 				return value;
 			}
 		public:
@@ -947,12 +948,13 @@ namespace Construction {
 			}
 		public:
 			static void DoSerialize(std::ostream& os, const ScalarTensor& tensor) {
-				os.write(reinterpret_cast<const char*>(&tensor.value), sizeof(tensor.value));
+				//os.write(reinterpret_cast<const char*>(&tensor.value), sizeof(tensor.value));
 			}
 
 			static TensorPointer DoDeserialize(std::istream& is, const Indices& indices) {
-				double value;
-				is.read(reinterpret_cast<char*>(&value), sizeof(value));
+				Scalar value;
+				/*double value;
+				is.read(reinterpret_cast<char*>(&value), sizeof(value));*/
 
 				return std::make_shared<ScalarTensor>(value);
 			}
@@ -963,7 +965,7 @@ namespace Construction {
 				ar & value;*/
 			}
 		private:
-			double value;
+			Scalar value;
 		};
 
 		inline ScalarTensor One() {
@@ -1018,7 +1020,7 @@ namespace Construction {
 			}
 
 
-			virtual double Evaluate(const std::vector<unsigned>& args) const override {
+			virtual Scalar Evaluate(const std::vector<unsigned>& args) const override {
 				return GetEpsilonComponents(args);
             }
 
@@ -1126,7 +1128,7 @@ namespace Construction {
 				Evaluate the tensor components. It returns 0 if evaluated
 			 	off diagonal, -1 for all indices < p and 1 else.
 			 */
-			virtual double Evaluate(const std::vector<unsigned>& vec) const override {
+			virtual Scalar Evaluate(const std::vector<unsigned>& vec) const override {
 				if (vec.size() != 2) {
 					throw IncompleteIndexAssignmentException();
 				}
@@ -1294,7 +1296,7 @@ namespace Construction {
 				return result;
 			}*/
 
-			virtual double Evaluate(const std::vector<unsigned>& args) const override {
+			virtual Scalar Evaluate(const std::vector<unsigned>& args) const override {
 				double result = 1.0;
 				unsigned pos = 0;
 
