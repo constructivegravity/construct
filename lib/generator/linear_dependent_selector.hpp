@@ -19,7 +19,7 @@ namespace Construction {
         /**
             \class BasisSelector
          */
-        class LinearDependentSelector {
+        /*class LinearDependentSelector {
         public:
             typedef std::pair<double, TensorPointer>            BasisReferenceType;
             typedef std::vector<BasisReferenceType>             DependenceType;
@@ -29,7 +29,7 @@ namespace Construction {
             /**
 
              */
-            TensorContainer SwapDependencyInformation(const ResultType& deps) {
+         /*   TensorContainer SwapDependencyInformation(const ResultType& deps) {
                 TensorContainer result;
 
                 for (auto& dependency: deps) {
@@ -79,7 +79,7 @@ namespace Construction {
             /**
                 \brief Select all the linear dependent tensors from the given tensors
              */
-            ResultType operator()(const TensorContainer& tensors) const {
+            /*ResultType operator()(const TensorContainer& tensors) const {
                 if (tensors.Size() == 0) return ResultType();
 
                 // Initialize
@@ -171,9 +171,9 @@ namespace Construction {
                     }
                 }*/
 
-                return result;
+                /*return result;
             }
-        };
+        };*/
 
     }
 }

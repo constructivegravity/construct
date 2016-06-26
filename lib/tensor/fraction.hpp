@@ -143,6 +143,26 @@ namespace Construction {
             virtual ScalarPointer Clone() const override {
                 return std::move(ScalarPointer(new Fraction(numerator, denominator)));
             }
+        public:
+            virtual void Serialize(std::ostream& os) const {
+                // Call parent
+                AbstractScalar::Serialize(os);
+
+                os.write(reinterpret_cast<const char*>(&numerator), sizeof(numerator));
+                os.write(reinterpret_cast<const char*>(&denominator), sizeof(denominator));
+            }
+
+            static std::unique_ptr<AbstractScalar> Deserialize(std::istream& is) {
+                // Call parent
+                AbstractScalar::Deserialize(is);
+
+                int numerator;
+                unsigned int denominator;
+                is.read(reinterpret_cast<char*>(&numerator), sizeof(numerator));
+                is.read(reinterpret_cast<char*>(&denominator), sizeof(denominator));
+
+                return std::move(std::unique_ptr<AbstractScalar>(new Fraction(numerator, denominator)));
+            }
         private:
             int numerator;
             unsigned int denominator;

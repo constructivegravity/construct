@@ -7,7 +7,7 @@
 
 #include <common/singleton.hpp>
 
-#include <tensor/tensor_container.hpp>
+#include <tensor/expression.hpp>
 #include <language/notebook.hpp>
 
 #include <language/command.hpp>
@@ -19,6 +19,7 @@
 #include <boost/iostreams/filter/gzip.hpp>
 
 using Construction::Tensor::TensorContainer;
+using Construction::Tensor::Expression;
 
 namespace Construction {
     namespace Language {
@@ -27,7 +28,7 @@ namespace Construction {
         public:
             Session() { }
         public:
-            TensorContainer GetCurrent() const {
+            Expression GetCurrent() const {
                 return current;
             }
 
@@ -37,22 +38,23 @@ namespace Construction {
 
             Notebook& GetNotebook() { return notebook; }
 
-            void SetCurrent(const std::string& cmd, const TensorContainer& tensors) {
+            void SetCurrent(const std::string& cmd, const Expression& tensors) {
                 lastCmd = cmd;
                 current = tensors;
             }
 
-            TensorContainer& Get(const std::string& name) {
+            Expression& Get(const std::string& name) {
                 return memory[name];
             }
 
-            TensorContainer& operator[](const std::string& name) {
+            Expression& operator[](const std::string& name) {
                 return memory[name];
             }
 
             size_t Size() const { return memory.size(); }
         public:
             void SaveToFile(const std::string& filename) const {
+                /*
                 std::stringstream os;
 
                 // Store the notebook
@@ -125,16 +127,17 @@ namespace Construction {
                     boost::iostreams::copy(out, file);
                 }
 
-                file.close();
+                file.close();*/
             }
 
             void LoadFromFile(const std::string& filename) {
+                /*
                 std::ifstream file (filename);
                 std::stringstream is;
 
                 // Clear
                 notebook.Clear();
-                current.Clear();
+                current = Tensor::Tensor::Zero();
                 memory.clear();
 
                 // Decompress
@@ -189,10 +192,10 @@ namespace Construction {
 
                     // Deserialize
                     {
-                        std::shared_ptr<TensorContainer> container;
+                        std::shared_ptr<Tensor::Tensor> container;
             
                         std::stringstream ss (containerString);
-                        container = TensorContainer::Deserialize(ss);
+                        container = Tensor::Tensor::Deserialize(ss);
 
                         current = *container;
                     }
@@ -230,23 +233,23 @@ namespace Construction {
                         }
 
                         // Deserialize
-                        std::shared_ptr<TensorContainer> container;
+                        std::shared_ptr<Tensor::Tensor> container;
                         {
                             std::stringstream ss (containerString);
-                            container = TensorContainer::Deserialize(ss);
+                            container = Tensor::Tensor::Deserialize(ss);
                         }
 
                         // Insert into memory
                         memory.insert({name, *container});
                     }
-                }
+                }*/
             }
         private:
             Notebook notebook;
 
             std::string lastCmd;
-            TensorContainer current;
-            std::map<std::string, TensorContainer> memory;
+            Expression current;
+            std::map<std::string, Expression> memory;
         };
 
         /**
@@ -259,11 +262,11 @@ namespace Construction {
                 return "Save(<String>)";
             }
 
-            TensorContainer Execute() const {
+            Expression Execute() const {
                 auto filename = GetString(0);
                 Session::Instance()->SaveToFile(filename);
 
-                return TensorContainer();
+                return Tensor::Tensor();
             }
         };
 
@@ -283,11 +286,11 @@ namespace Construction {
                 return "Load(<String>)";
             }
 
-            TensorContainer Execute() const {
+            Expression Execute() const {
                 auto filename = GetString(0);
                 Session::Instance()->LoadFromFile(filename);
 
-                return TensorContainer();
+                return Tensor::Tensor();
             }
         };
 

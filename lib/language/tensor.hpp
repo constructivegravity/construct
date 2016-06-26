@@ -10,6 +10,7 @@
 #include <generator/base_tensor.hpp>
 
 using Construction::Tensor::Tensor;
+using Construction::Tensor::Expression;
 
 namespace Construction {
     namespace Language {
@@ -20,19 +21,57 @@ namespace Construction {
             Command that generates tensors for given indices out of
             epsilons and gammas. It uses the API function.
          */
-        CLI_COMMAND(Tensor, true)
+        CLI_COMMAND(Arbitrary, true)
             std::string Help() const {
-                return "Tensor(<Indices>)";
+                return "Arbitrary(<Indices>)";
             }
 
-            TensorContainer Execute() const {
+            Expression Execute() const {
                 auto indices = GetArgument<IndexArgument>(0)->GetIndices();
-                return API::Tensor(indices);
+                return API::Arbitrary(indices);
             }
         };
 
-        REGISTER_COMMAND(Tensor);
-        REGISTER_ARGUMENT(Tensor, 0, ArgumentType::INDEX);
+        REGISTER_COMMAND(Arbitrary);
+        REGISTER_ARGUMENT(Arbitrary, 0, ArgumentType::INDEX);
+
+        /**
+            \class EpsilonCommand
+
+            Command that generates one tensor for given indices out of
+            epsilons. It uses the API function.
+         */
+        CLI_COMMAND(Epsilon, true)
+            std::string Help() const {
+                return "Epsilon(<Indices>)";
+            }
+
+            Expression Execute() const {
+                return API::Epsilon(GetIndices(0));
+            }
+        };
+
+        REGISTER_COMMAND(Epsilon);
+        REGISTER_ARGUMENT(Epsilon, 0, ArgumentType::INDEX);
+
+        /**
+            \class GammaCommand
+
+            Command that generates one tensor for given indices out of
+            epsilons. It uses the API function.
+         */
+        CLI_COMMAND(Gamma, true)
+            std::string Help() const {
+                return "Gamma(<Indices>)";
+            }
+
+            Expression Execute() const {
+                return API::Gamma(GetIndices(0));
+            }
+        };
+
+        REGISTER_COMMAND(Gamma);
+        REGISTER_ARGUMENT(Gamma, 0, ArgumentType::INDEX);
 
         /**
             \class EpsilonGammaCommand
@@ -45,7 +84,7 @@ namespace Construction {
                 return "EpsilonGamma(<Indices>)";
             }
 
-            TensorContainer Execute() const {
+            Expression Execute() const {
                 return API::EpsilonGamma(GetIndices(0));
             }
         };
@@ -63,7 +102,7 @@ namespace Construction {
                     return "Coefficient(<Numeric>, <Numeric>, <Numeric>, <Numeric>)";
                 }
 
-                TensorContainer Execute() const {
+                Expression Execute() const {
                     return API::Coefficient(GetNumeric(0), GetNumeric(1), GetNumeric(2), GetNumeric(3));
                 }
         };
@@ -81,35 +120,24 @@ namespace Construction {
          */
         CLI_COMMAND(Add, true)
             std::string Help() const {
-                return "Add(<Tensor>, <Tensor>)";
+                return "Add(<Tensor>, <Tensor>...)";
             }
 
             static bool Cachable() {
                 return false;
             }
 
-            TensorContainer Execute() const {
+            Expression Execute() const {
                 auto t = GetTensors(0);
-                if (t.Size() != 1) {
-                    std::cout << "  \033[31m" << "Not for tensor lists" << "\033[0m" << std::endl;
-                    return TensorContainer();
-                }
+                
+                auto result = Tensor::Tensor::Zero();
 
-                auto result = t.Get(0);
-
-                for (auto i=1; i<Size(); i++) {
+                for (auto i=0; i<Size(); i++) {
                     auto s = GetTensors(i);
-                    if (s.Size() != 1) {
-                        std::cout << "  \033[31m" << "Not for tensor lists" << "\033[0m" << std::endl;
-                        return TensorContainer();
-                    }
-
-                    result = API::Add(result, s.Get(0));
+                    result = API::Add(result, s);
                 }
 
-                TensorContainer res;
-                res.Insert(std::move(result));
-                return res;
+                return result;
             }
         };
 
@@ -131,24 +159,8 @@ namespace Construction {
                 return false;
             }
 
-            TensorContainer Execute() const {
-                auto t = GetTensors(0);
-                if (t.Size() == 0) {
-                    return TensorContainer();
-                }
-
-                if (t.Size() != 1) {
-                    std::cout << "  \033[31m" << "Not for tensor lists" << "\033[0m" << std::endl;
-                    return TensorContainer();
-                }
-
-                auto result = t.Get(0);
-
-                result = API::Scale(result, GetNumeric(1));
-
-                TensorContainer res;
-                res.Insert(std::move(result));
-                return res;
+            Expression Execute() const {
+                return API::Scale(GetTensors(0), GetNumeric(1));
             }
         };
 
@@ -162,7 +174,7 @@ namespace Construction {
             Command to append a tensor list to another one. Uses the
             API method internally.
          */
-        CLI_COMMAND(Append, true)
+        /*CLI_COMMAND(Append, true)
             std::string Help() const {
                 return "Append(<Tensors>, <Tensors>)";
             }
@@ -174,7 +186,7 @@ namespace Construction {
 
         REGISTER_COMMAND(Append);
         REGISTER_ARGUMENT(Append, 0, ArgumentType::TENSOR);
-        REGISTER_ARGUMENT(Append, 1, ArgumentType::TENSOR);
+        REGISTER_ARGUMENT(Append, 1, ArgumentType::TENSOR);*/
 
         /**
             \class DegreesOfFreedomCommand
@@ -192,9 +204,10 @@ namespace Construction {
                 return false;
             }
 
-            TensorContainer Execute() const {
-                std::cout << "  \033[32m" << API::DegreesOfFreedom(GetTensors(0)) << "\033[0m" << std::endl;
-                return TensorContainer();
+            Expression Execute() const {
+                // TODO: 
+                //std::cout << "  \033[32m" << API::DegreesOfFreedom(GetTensors(0)) << "\033[0m" << std::endl;
+                return Tensor::Scalar(static_cast<int>(API::DegreesOfFreedom(GetTensors(0))));
             }
 
         };
@@ -212,26 +225,8 @@ namespace Construction {
                 return false;
             }
 
-            TensorContainer Execute() const {
-                auto t = GetTensors(0);
-                if (t.Size() == 0) {
-                    std::cout << "  \033[32m" << "Yes" << "\033[0m" << std::endl;
-                    return TensorContainer();
-                }
-
-                if (t.Size() != 1) {
-                    std::cout << "  \033[31m" << "Not for tensor lists" << "\033[0m" << std::endl;
-                    return TensorContainer();
-                }
-
-                auto result = t.Get(0);
-                if (result->IsZero()) {
-                    std::cout << "  \033[32m" << "Yes" << "\033[0m" << std::endl;
-                } else {
-                    std::cout << "  \033[32m" << "No" << "\033[0m" << std::endl;
-                }
-
-                return TensorContainer();
+            Expression Execute() const {
+                return Expression::Boolean(GetTensors(0).IsZero());
             }
 
         };
@@ -249,7 +244,7 @@ namespace Construction {
                     return "Evaluate(<Tensors>, <Numeric>...)";
                 }
 
-                TensorContainer Execute() const {
+                Expression Execute() const {
                     std::vector<unsigned> indices;
 
                     for (auto i=1; i<Size(); i++) {
@@ -258,20 +253,7 @@ namespace Construction {
                     }
 
                     // Evaluate
-                    auto result = API::Evaluate(GetTensors(0), indices);
-
-                    // Print result
-                    std::cout << "\033[32m";
-                    for (int i=0; i<result.size(); i++) {
-                        if (result[i] != 0) {
-                            std::cout << "   " << result[i] << " * " << "e_" << (i+1) << " ";
-                            if (i != result.size()-1) std::cout << "+ ";
-                            std::cout << std::endl;
-                        }
-                    }
-                    std::cout << "\033[0m";
-
-                    return TensorContainer();
+                    return API::Evaluate(GetTensors(0), indices);
                 }
         };
 

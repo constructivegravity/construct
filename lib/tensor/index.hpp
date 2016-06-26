@@ -315,7 +315,7 @@ namespace Construction {
 				range.Serialize(os);
 			}
 
-			static std::shared_ptr<Index> Deserialize(std::istream& is) {
+			static std::unique_ptr<Index> Deserialize(std::istream& is) {
 				// read name
 				std::string name;
 				std::getline(is, name, ';');
@@ -327,7 +327,7 @@ namespace Construction {
 				// read range
 				auto rangePtr = Range::Deserialize(is);
 
-				return std::make_shared<Index>(name, printed_text, *rangePtr);
+				return std::move(std::unique_ptr<Index>(new Index(name, printed_text, *rangePtr)));
 			}
 		private:
 			std::string name;
@@ -898,13 +898,13 @@ namespace Construction {
 				}
 			}
 
-			static std::shared_ptr<Indices> Deserialize(std::istream& is) {
+			static std::unique_ptr<Indices> Deserialize(std::istream& is) {
 				// Read size
 				unsigned size;
 				is.read(reinterpret_cast<char*>(&size), sizeof(unsigned));
 
 				// Create result
-				auto result = std::make_shared<Indices>();
+				auto result = std::unique_ptr<Indices>(new Indices());
 
 				// Read indices
 				for (int i=0; i<size; i++) {

@@ -6,7 +6,6 @@
 #include <iostream>
 
 #include <tensor/tensor.hpp>
-#include <tensor/tensor_container.hpp>
 
 using Construction::Tensor::Tensor;
 using Construction::Tensor::TensorContainer;
@@ -24,8 +23,8 @@ namespace Construction {
             /**
                 \brief Select all the linear dependent tensors from the given tensors
              */
-            TensorContainer operator()(const TensorContainer& tensors) const {
-                if (tensors.Size() == 0) return TensorContainer();
+            std::vector<Tensor::Tensor> operator()(const std::vector<Tensor::Tensor>& tensors) const {
+                if (tensors.size() == 0) return tensors;
 
                 // Initialize
                 std::vector<Vector::Vector> vectors;
@@ -37,7 +36,7 @@ namespace Construction {
                 // Derive vector components of the tensors
                 //std::vector<std::thread> threads;
 
-                auto fn = [&](const Tensor::TensorPointer& tensor) {
+                auto fn = [&](const Tensor::Tensor& tensor) {
                     // TODO: implement optimization for all indices that are trivially zero
                     Vector::Vector v (combinations.size());
                     for (int i=0; i<combinations.size(); i++) {
@@ -50,7 +49,7 @@ namespace Construction {
                             j++;
                         }
 
-                        v[i] = (*tensor)(assignment);
+                        v[i] = tensor(assignment);
                     }
 
                     vectors.push_back(v);
@@ -58,8 +57,14 @@ namespace Construction {
 
                 // Emplace the threads into the vector
                 for (auto& tensor : tensors) {
-                    fn(tensor);
-                    // threads.emplace_back(std::thread(fn, tensor));
+                    // If the tensor is multiplied by a free variable, I can always redefine 
+                    // it to be the whole expression in front of the tensor and thus
+                    // it does not play a role when looking for equivalent structure
+                    if (tensor.IsScaled() && tensor.HasVariables()) {
+                        fn(tensor.SeparateScalefactor().second);
+                    } else {
+                        fn(tensor);
+                    }
                 }
 
                 // Join
@@ -68,13 +73,13 @@ namespace Construction {
                 }*/
 
                 // Create matrix
-                Matrix M (vectors);
+                Vector::Matrix M (vectors);
 
                 // Reduce to matrix echelon form
                 M.ToRowEchelonForm();
 
                 // Select all the linear independent tensors from M and put into a new container
-                TensorContainer result;
+                std::vector<Tensor::Tensor> result;
                 std::mutex mutex;
                 std::vector<Vector::Vector> previous;
                 //std::vector<std::thread> threads2;
@@ -102,13 +107,13 @@ namespace Construction {
                         // If this tensor is not in the list already, add it
                         if (std::find(previous.begin(), previous.end(), vec) == previous.end()) {
                             previous.push_back(vec);
-                            result.Insert(tensors.Get(i));
+                            result.push_back(tensors[i]);
                         }
                     } else if (!isUnitVector) {
                         std::unique_lock<std::mutex> lock(mutex);
 
                         previous.push_back(vec);
-                        result.Insert(tensors.Get(i));
+                        result.push_back(tensors[i]);
                     }
                 };
 

@@ -12,7 +12,7 @@
 #include <tensor/index_parser.hpp>
 
 #include <language/api.hpp>
-#include <lib/tensor/tensor_database.hpp>
+//#include <lib/tensor/tensor_database.hpp>
 
 typedef std::pair<unsigned, unsigned>               OneCoefficient;
 typedef std::pair<OneCoefficient, OneCoefficient>   Coefficient;
@@ -27,31 +27,22 @@ std::string ToString(const Coefficient& coeff) {
     return ss.str();
 }
 
-TensorContainer GenerateTensor(const Coefficient& coeff, Construction::Tensor::TensorDatabase& database, std::mutex& mutex, std::string& out, bool printSteps=false) {
+Tensor GenerateTensor(const Coefficient& coeff, std::mutex& mutex, std::string& out, bool printSteps=false) {
     auto indices = Construction::Tensor::Indices::GetRomanSeries(NumberOfIndices(coeff), {1,3});
 
     // If no indices, return scalar
     if (indices.Size() == 0) {
-        TensorContainer result;
-        result.Insert(std::make_shared<Construction::Tensor::ScalarTensor>(1));
-        return result;
+        return Construction::Tensor::Tensor::Scalar(1);
     }
 
     // Generate the tensor
     std::string previous = "Tensor(" + indices.ToCommand() + ")";
     if (printSteps) std::cerr << previous << std::endl;
 
-    Construction::Tensor::TensorContainer tensors;
-
-    if (database.Contains(previous)) {
-        std::unique_lock<std::mutex> lock(mutex);
-        tensors = database[previous];
-    } else {
-        tensors = Construction::Language::API::Tensor(indices);
-
-        std::unique_lock<std::mutex> lock(mutex);
-        database[previous] = tensors;
-    }
+    Construction::Tensor::Tensor tensors = Construction::Language::API::Arbitrary(indices);
+    // Simplify the expression
+    tensors.Simplify();
+    tensors.RedefineVariables("e");
 
     // Symmetrize in the blocks
     auto block1 = Construction::Tensor::Indices::GetRomanSeries(coeff.first.first, {1,3});
@@ -63,15 +54,11 @@ TensorContainer GenerateTensor(const Coefficient& coeff, Construction::Tensor::T
         previous = "Symmetrize(" + previous + "," + block1.ToCommand() + ")";
         if (printSteps) std::cerr << previous << std::endl;
 
-        if (database.Contains(previous)) {
-            std::unique_lock<std::mutex> lock(mutex);
-            tensors = database[previous];
-        } else {
-            tensors = Construction::Language::API::Symmetrize(tensors, block1);
+        tensors = Construction::Language::API::Symmetrize(tensors, block1);
 
-            std::unique_lock<std::mutex> lock(mutex);
-            database[previous] = tensors;
-        }
+        // Simplify the expression
+        tensors.Simplify();
+        tensors.RedefineVariables("e");
     }
     if (block2.Size() > 0) {
         previous = "Symmetrize(" + previous + "," + block2.ToCommand() + ")";
@@ -79,43 +66,31 @@ TensorContainer GenerateTensor(const Coefficient& coeff, Construction::Tensor::T
             std::cerr << previous << std::endl;
         }
 
-        if (database.Contains(previous)) {
-            std::unique_lock<std::mutex> lock(mutex);
-            tensors = database[previous];
-        } else {
-            tensors = Construction::Language::API::Symmetrize(tensors, block2);
+        tensors = Construction::Language::API::Symmetrize(tensors, block2);
 
-            std::unique_lock<std::mutex> lock(mutex);
-            database[previous] = tensors;
-        }
+        // Simplify the expression
+        tensors.Simplify();
+        tensors.RedefineVariables("e");
     }
     if (block3.Size() > 0) {
         previous = "Symmetrize(" + previous + "," + block3.ToCommand() + ")";
         if (printSteps) std::cerr << previous << std::endl;
 
-        if (database.Contains(previous)) {
-            std::unique_lock<std::mutex> lock(mutex);
-            tensors = database[previous];
-        } else {
-            tensors = Construction::Language::API::Symmetrize(tensors, block3);
-
-            std::unique_lock<std::mutex> lock(mutex);
-            database[previous] = tensors;
-        }
+        tensors = Construction::Language::API::Symmetrize(tensors, block3);
+        
+        // Simplify the expression
+        tensors.Simplify();
+        tensors.RedefineVariables("e");
     }
     if (block4.Size() > 0) {
         previous = "Symmetrize(" + previous + "," + block4.ToCommand() + ")";
         if (printSteps) std::cerr << previous << std::endl;
 
-        if (database.Contains(previous)) {
-            std::unique_lock<std::mutex> lock(mutex);
-            tensors = database[previous];
-        } else {
-            tensors = Construction::Language::API::Symmetrize(tensors, block4);
-
-            std::unique_lock<std::mutex> lock(mutex);
-            database[previous] = tensors;
-        }
+        tensors = Construction::Language::API::Symmetrize(tensors, block4);
+        
+        // Simplify the expression
+        tensors.Simplify();
+        tensors.RedefineVariables("e");
     }
 
     // Implement the exchange symmetry
@@ -127,29 +102,13 @@ TensorContainer GenerateTensor(const Coefficient& coeff, Construction::Tensor::T
     previous = "ExchangeSymmetrize(" + previous + "," + newIndices.ToCommand() + ")";
     if (printSteps) std::cerr << previous << std::endl;
 
-    if (database.Contains(previous)) {
-        std::unique_lock<std::mutex> lock(mutex);
-        tensors = database[previous];
-    } else {
-        tensors = Construction::Language::API::ExchangeSymmetrize(tensors, newIndices);
+    tensors = Construction::Language::API::ExchangeSymmetrize(tensors, newIndices);
 
-        std::unique_lock<std::mutex> lock(mutex);
-        database[previous] = tensors;
-    }
+    // Simplify the expression
+    tensors.Simplify();
+    tensors.RedefineVariables("e");
 
-    // Choose basis
-    previous = "LinearIndependent(" + previous + ")";
-    if (printSteps) std::cerr << previous << std::endl;
-
-    if (database.Contains(previous)) {
-        std::unique_lock<std::mutex> lock(mutex);
-        tensors = database[previous];
-    } else {
-        tensors = Construction::Language::API::LinearIndependent(tensors);
-
-        std::unique_lock<std::mutex> lock(mutex);
-        database[previous] = tensors;
-    }
+    return tensors;
 
     // Set the output
     out = previous;
@@ -183,7 +142,7 @@ std::vector<Coefficient> GenerateCoefficientList(int order, int maxDerivatives=3
     return result;
 }
 
-std::string TensorToString(const std::string& prefix, const Coefficient& coeff, const TensorContainer& container) {
+std::string TensorToString(const std::string& prefix, const Coefficient& coeff, const Tensor& container) {
     std::stringstream ss;
 
     // Print coefficient name
@@ -206,31 +165,33 @@ std::string TensorToString(const std::string& prefix, const Coefficient& coeff, 
     ss << " : " << std::endl;
 
     // Print tensors
-    if (container.Size() == 0) ss << "   0" << std::endl;
+    //if (container.Size() == 0) ss << "   0" << std::endl;
 
-    int i=1;
+    ss << container.ToString() << std::endl;
+
+    /*int i=1;
     for (auto& tensor : container) {
-        if (tensor->IsAddedTensor())
+        if (tensor->IsAdded())
             ss << "   " << "e_" << i << " * (" << tensor->ToString() << ") ";
         else
             ss << "   " << "e_" << i << " * " << tensor->ToString() << " ";
         if (i != container.Size()) ss << " + " << std::endl;
         i++;
-    }
+    }*/
 
     return ss.str();
 }
 
 int main(int argc, char** argv) {
 
-    Construction::Tensor::TensorDatabase database;
+    //Construction::Tensor::TensorDatabase database;
     std::mutex mutex;
     std::mutex coutMutex;
 
     if (argc < 5) {
 
         // Load database if present
-        std::ifstream file("tensors.db");
+        /*std::ifstream file("tensors.db");
         if (file) {
             file.close();
             try {
@@ -243,6 +204,7 @@ int main(int argc, char** argv) {
         for (auto it = database.begin(); it != database.end(); it++) {
             std::cout << it->first;
         }
+        */
 
         // Generate coefficient list
         auto coefficients = GenerateCoefficientList(4, 3);
@@ -257,7 +219,7 @@ int main(int argc, char** argv) {
 
             pool.Enqueue([&]() {
                 std::string cmd;
-                auto tensor = GenerateTensor(c, database, mutex, cmd);
+                auto tensor = GenerateTensor(c, mutex, cmd);
 
                 progress++;
 
@@ -266,9 +228,9 @@ int main(int argc, char** argv) {
                 coutMutex.unlock();
 
                 mutex.lock();
-                database[cmd] = tensor;
+                //database[cmd] = tensor;
 
-                database.SaveToFile("tensors.db");
+                //database.SaveToFile("tensors.db");
                 mutex.unlock();
             });
 
@@ -282,21 +244,15 @@ int main(int argc, char** argv) {
 
         //std::cerr << "Started " << ToString(c) << " ..." << std::endl;
 
-        auto tensor = GenerateTensor(c, database, mutex, cmd, true);
+        auto tensor = GenerateTensor(c, mutex, cmd, true);
 
         coutMutex.lock();
-        //std::cerr << "Finished " << ToString(c) << " ..." << std::endl;
+        std::cerr << "Finished " << ToString(c) << " ..." << std::endl;
         coutMutex.unlock();
 
         coutMutex.lock();
         std::cout << TensorToString("\\lambda", c, tensor) << std::endl;
         coutMutex.unlock();
-
-        mutex.lock();
-        database[cmd] = tensor;
-
-        database.SaveToFile("tensors.db");
-        mutex.unlock();
     }
 
     // Wait for all tasks to finish

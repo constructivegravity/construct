@@ -2,14 +2,21 @@
 #include <tensor/fraction.hpp>
 #include <tensor/variable.hpp>
 
+#include <sstream>
+
 using namespace Construction::Tensor;
 
-Scalar::Scalar() : pointer(ScalarPointer(new Fraction(0))) { }
-Scalar::Scalar(double v) : pointer(ScalarPointer(new FloatingPointScalar(v))) { }
-Scalar::Scalar(int v) : pointer(ScalarPointer(new Fraction(v))) { }
-Scalar::Scalar(int numerator, unsigned denominator) : pointer(ScalarPointer(new Fraction(numerator, denominator))) { }
-Scalar::Scalar(const std::string& name) : pointer(ScalarPointer(new Variable(name))) { }
-Scalar::Scalar(const std::string& name, const std::string& printed_text) : pointer(ScalarPointer(new Variable(name, printed_text))) { }
+Scalar::Scalar() : AbstractExpression(SCALAR), pointer(ScalarPointer(new Fraction(0))) { }
+Scalar::Scalar(double v) : AbstractExpression(SCALAR), pointer(ScalarPointer(new FloatingPointScalar(v))) { }
+Scalar::Scalar(int v) : AbstractExpression(SCALAR), pointer(ScalarPointer(new Fraction(v))) { }
+Scalar::Scalar(int numerator, unsigned denominator) : AbstractExpression(SCALAR), pointer(ScalarPointer(new Fraction(numerator, denominator))) { }
+Scalar::Scalar(const std::string& name) : AbstractExpression(SCALAR), pointer(ScalarPointer(new Variable(name))) { }
+Scalar::Scalar(const std::string& name, const std::string& printed_text) : AbstractExpression(SCALAR), pointer(ScalarPointer(new Variable(name, printed_text))) { }
+Scalar::Scalar(const std::string& name, unsigned id) : AbstractExpression(SCALAR) {
+    std::stringstream ss;
+    ss << name << "_" << id;
+    pointer = ScalarPointer(new Variable(ss.str()));   
+}
 
 Scalar& Scalar::operator=(double d) {
     // Pointer _was_ allocated
@@ -29,8 +36,8 @@ ScalarPointer AbstractScalar::Add(const AbstractScalar& one, const AbstractScala
         std::unique_ptr<Fraction> b(&dynamic_cast<Fraction&>(*second.get()));
 
         // Release the old memory
-        first.release();
-        second.release();
+        first.reset(nullptr);
+        second.reset(nullptr);
         
         ScalarPointer result (new Fraction(*a + *b));
         return std::move(result);
@@ -43,7 +50,7 @@ ScalarPointer AbstractScalar::Add(const AbstractScalar& one, const AbstractScala
     // If the first one is a sum, try to simplify
     if ((one.IsAdded() && other.IsNumeric())) {
         std::unique_ptr<AddedScalar> added(&dynamic_cast<AddedScalar&>(*first.get()));
-        first.release();
+        first.reset(nullptr);
 
         return ScalarPointer(new AddedScalar(
             std::move(Add(*second, *added->A->Clone())),
@@ -58,7 +65,7 @@ ScalarPointer AbstractScalar::Add(const AbstractScalar& one, const AbstractScala
     // If the second one is a sum, try to simplify
     if ((other.IsAdded() && one.IsNumeric())) {
         std::unique_ptr<AddedScalar> added(&dynamic_cast<AddedScalar&>(*second.get()));
-        second.release();
+        second.reset(nullptr);
 
         return ScalarPointer(new AddedScalar(
             std::move(Add(*first, *added->A->Clone())),
@@ -88,8 +95,8 @@ ScalarPointer AbstractScalar::Multiply(const AbstractScalar& one, const Abstract
         std::unique_ptr<Fraction> b(&dynamic_cast<Fraction&>(*second.get()));
 
         // Release the old memory
-        first.release();
-        second.release();
+        first.reset(nullptr);
+        second.reset(nullptr);
         
         ScalarPointer result (new Fraction((*a) * (*b)));
         return std::move(result);
@@ -111,7 +118,7 @@ ScalarPointer AbstractScalar::Multiply(const AbstractScalar& one, const Abstract
     // If the first one is a product, try to simplify
     if ((one.IsMultiplied() && other.IsNumeric())) {
         std::unique_ptr<MultipliedScalar> multiplied(&dynamic_cast<MultipliedScalar&>(*first.get()));
-        first.release();
+        first.reset(nullptr);
 
         return ScalarPointer(new MultipliedScalar(
             std::move(Multiply(*second, *multiplied->A->Clone())),
@@ -122,7 +129,7 @@ ScalarPointer AbstractScalar::Multiply(const AbstractScalar& one, const Abstract
     // If the second one is a product, try to simplify
     if ((other.IsAdded() && one.IsNumeric())) {
         std::unique_ptr<MultipliedScalar> multiplied(&dynamic_cast<MultipliedScalar&>(*second.get()));
-        second.release();
+        second.reset(nullptr);
 
         return ScalarPointer(new MultipliedScalar(
             std::move(Multiply(*first, *multiplied->A->Clone())),
@@ -147,7 +154,7 @@ ScalarPointer AbstractScalar::Negate(const AbstractScalar& one) {
     // Do some simplification black magic
     if (one.IsFraction()) {
         std::unique_ptr<Fraction> a(&dynamic_cast<Fraction&>(*first.get()));
-        first.release();
+        first.reset(nullptr);
 
         return ScalarPointer(new Fraction(-(*a)));
     }

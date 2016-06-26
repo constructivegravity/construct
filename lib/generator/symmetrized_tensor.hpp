@@ -3,7 +3,6 @@
 #include <common/time_measurement.hpp>
 
 #include <tensor/tensor.hpp>
-#include <tensor/tensor_container.hpp>
 #include <tensor/symmetrization.hpp>
 
 #include <generator/equivalent_selector.hpp>
@@ -55,17 +54,20 @@ namespace Construction {
         public:
             SymmetrizedTensorGenerator(const Indices& symmetrization) : symmetrization(symmetrization) { }
         public:
-            TensorContainer operator()(const TensorContainer& tensors, bool scaledResult=true) const {
-                TensorContainer result;
+            Tensor::Tensor operator()(const Tensor::Tensor& tensor, bool scaledResult=true) const {
+                Tensor::Tensor result = Tensor::Tensor::Zero();
+
+                // Extract summands
+                std::vector<Tensor::Tensor> _tensors = tensor.GetSummands();
 
                 // Symmetrize everything in the list
-                for (auto& tensor : tensors) {
+                for (auto& tensor : _tensors) {
                     Common::TimeMeasurement time;
 
                     // Build symmetrization
                     std::vector<unsigned> s;
                     for (auto& index : symmetrization) {
-                        int pos = tensor->GetIndices().IndexOf(index) + 1;
+                        int pos = tensor.GetIndices().IndexOf(index) + 1;
                         s.push_back(pos);
                     }
 
@@ -75,19 +77,12 @@ namespace Construction {
                     auto newTensor = std::move(symm(tensor));
 
                     // Check if the tensor is zero
-                    if (!newTensor->IsZero()) {
-
-                    result.Insert(newTensor);
-
-                    //    result.Insert(newTensor->Clone());
-                    //    result.Insert(std::move(newTensor));
+                    if (!newTensor.IsZero()) {
+                        result += newTensor;
                     }
                 }
 
-                //Symmetrization symm(s, scaledResult);
-
-                EquivalentSelector selector;
-                return selector(result);
+                return result;
             }
         private:
             Indices symmetrization;
@@ -97,15 +92,18 @@ namespace Construction {
         public:
             AntiSymmetrizedTensorGenerator(const Indices& symmetrization) : symmetrization(symmetrization) { }
         public:
-            TensorContainer operator()(const TensorContainer& tensors, bool scaledResult=true) const {
-                TensorContainer result;
+            Tensor::Tensor operator()(const Tensor::Tensor& tensor, bool scaledResult=true) const {
+                Tensor::Tensor result = Tensor::Tensor::Zero();
+
+                // Extract summands
+                std::vector<Tensor::Tensor> tensors = tensor.GetSummands();
 
                 // Symmetrize everything in the list
                 for (auto& tensor : tensors) {
                     // Build symmetrization
                     std::vector<unsigned> s;
                     for (auto& index : symmetrization) {
-                        int pos = tensor->GetIndices().IndexOf(index) + 1;
+                        int pos = tensor.GetIndices().IndexOf(index) + 1;
                         s.push_back(pos);
                     }
                     AntiSymmetrization symm(s, scaledResult);
@@ -114,11 +112,10 @@ namespace Construction {
                     auto newTensor = symm(tensor);
 
                     // Check if the tensor is zero
-                    if (!newTensor->IsZero()) result.Insert(std::move(newTensor));
+                    if (!newTensor.IsZero()) result += newTensor;
                 }
 
-                EquivalentSelector selector;
-                return selector(result);
+                return result;
             }
         private:
             Indices symmetrization;
@@ -128,34 +125,37 @@ namespace Construction {
         public:
             ExchangeSymmetrizedTensorGenerator(const Indices& indices) : indices(indices) { }
         public:
-            TensorContainer operator()(const TensorContainer& tensors, bool scaledResult=false) const {
-                TensorContainer result;
+            Tensor::Tensor operator()(const Tensor::Tensor& tensor, bool scaledResult=false) const {
+                Tensor::Tensor result = Tensor::Tensor::Zero();
+
+                auto tensors = tensor.GetSummands();
 
                 for (auto& tensor : tensors) {
-                    auto copyTensor = tensor->Clone();
-                    copyTensor->SetIndices(indices);
+                    auto oldIndices = tensor.GetIndices();
+                    auto copyTensor = tensor;
+                    copyTensor.SetIndices(indices);
 
-                    auto added = std::make_shared<Tensor::AddedTensor>(tensor, std::move(copyTensor));
-                    auto scaled = std::make_shared<Tensor::ScaledTensor>(added, 0.5);
+                    auto added = tensor + Tensor::Tensor::Substitute(copyTensor, oldIndices);
+                    auto scaled = Tensor::Scalar(1,2) * added;
 
-                    if ((0.5*(*added)).IsEqual(*tensor)) {
-                        result.Insert(std::move(tensor->Clone()));
+                    if (scaled.IsEqual(tensor)) {
+                        result += tensor;
                         continue;
                     }
 
                     if (!scaledResult)
-                        result.Insert(std::move(added));
-                    else result.Insert(std::make_shared<Tensor::ScaledTensor>(std::move(added), 0.5));
+                        result += added;
+                    else
+                        result += scaled;
                 }
 
-                EquivalentSelector selector;
-                return selector(result);
+                return result;
             }
         private:
             Indices indices;
         };
 
-        class BlockSymmetrizedTensorGenerator {
+        /*class BlockSymmetrizedTensorGenerator {
         public:
             BlockSymmetrizedTensorGenerator(const std::vector<Indices>& blocks) : blocks(blocks) { Validate(); }
         public:
@@ -211,7 +211,7 @@ namespace Construction {
             }
         private:
             std::vector<Indices> blocks;
-        };
+        };*/
 
     }
 }

@@ -75,65 +75,49 @@ namespace Construction {
 
 
              */
-            std::vector<TensorPointer> Symmetrize(const ConstTensorPointer& tensor) const {
+            std::vector<Tensor> Symmetrize(const Tensor& tensor) const {
                 // Calculate all the required permutations of the indices
-                auto indices = tensor->GetIndices();
+                auto indices = tensor.GetIndices();
                 auto permutations = PermuteIndices(indices);
 
                 // Initialize result
-                std::vector<TensorPointer> tensors;
+                std::vector<Tensor> tensors;
 
                 // Helper function
                 auto fn = [&](const Indices& permutation) {
-                    auto clone = tensor->Clone();
-                    clone->SetIndices(permutation);
+                    Tensor clone = tensor;
+                    clone.SetIndices(permutation);
 
                     if (permutation == indices)
                         tensors.push_back(std::move(clone));
                     else
-                        tensors.push_back(std::make_shared<SubstituteTensor>(std::move(clone), indices));
+                        tensors.push_back(Tensor::Substitute(clone, indices));
                 };
 
-                // Generate threads
-                std::vector<std::thread> threads;
-                for (auto& permutation : permutations) {
+                // Execute
+                for (auto permutation : permutations) {
                     fn(permutation);
-                    //threads.emplace_back(std::thread(fn, permutation));
                 }
-
-                // Wait for all threads to finish
-                /*for (auto& thread : threads) {
-                    thread.join();
-                }*/
 
                 return tensors;
             }
         public:
-            virtual TensorPointer operator()(const Tensor& tensor) const {
-                return (*this)(ConstTensorPointer(ConstTensorPointer(), &tensor));
-            }
-
-            virtual TensorPointer operator()(const ConstTensorPointer& tensor) const {
+            virtual Tensor operator()(const Tensor& tensor) const {
                 auto tensors = Symmetrize(tensor);
 
-                // Construct the tensor sum
-                TensorPointer last = std::move(tensors[0]);
+                // Add all the tensors
+                Tensor last = std::move(tensors[0]);
                 for (int i=1; i<tensors.size(); i++) {
-                    last = std::move(std::make_shared<AddedTensor>(std::move(last), std::move(tensors[i])));
+                    last = std::move( last + tensors[i] );
                 }
 
-                //return std::move(last);
+                Tensor scaled = Scalar(1, tensors.size()) * last;
 
-                if (!std::make_shared<ScaledTensor>(last, 1.0/tensors.size())->IsEqual(*tensor)) {
-                    if (scaledResult)
-                        return std::move(std::make_shared<ScaledTensor>(std::move(last), 1.0/tensors.size()));
-                    else
-                        return last;
-                } else {
-                    return tensor->Clone(); //std::move(tensor->Clone());
-                }
-
-                return std::move(std::make_shared<ScaledTensor>(std::move(last), 1.0/tensors.size()));
+                // If the symmetrized tensor is different, scale
+                if (!scaled.IsEqual(tensor)) {
+                    if (scaledResult) return scaled;
+                    else return last;
+                } else return tensor;
             }
         public:
             std::vector<unsigned>::iterator begin() { return indices.begin(); }
@@ -161,52 +145,33 @@ namespace Construction {
         public:
             AntiSymmetrization(const std::vector<unsigned>& indices, bool scaledResult=false) : Symmetrization(indices, scaledResult) { }
         public:
-            virtual TensorPointer operator()(const Tensor& tensor) const override {
-                return (*this)(ConstTensorPointer(ConstTensorPointer(), &tensor));
-            }
-
-            virtual TensorPointer operator()(const ConstTensorPointer& tensor) const override {
+            virtual Tensor operator()(const Tensor& tensor) const override {
                 auto tensors = Symmetrize(tensor);
 
                 // Construct the tensor sum
-                TensorPointer last = std::move(tensors[0]);
+                Tensor last = std::move(tensors[0]);
                 for (int i=1; i<tensors.size(); i++) {
-                    auto _indices = (tensors[i]->IsSubstitute()) ? std::dynamic_pointer_cast<const SubstituteTensor>(tensors[i])->GetPermutedIndices() : tensors[i]->GetIndices();
+                    auto _indices = (tensors[i].IsSubstitute()) ? tensors[i].As<SubstituteTensor>()->GetPermutedIndices() : tensors[i].GetIndices();
 
                     // Find sign
-                    int sign = Permutation::From(_indices, tensor->GetIndices()).Sign();
+                    int sign = Permutation::From(_indices, tensor.GetIndices()).Sign();
 
+                    // Either add or subtract, depending on sign
                     if (sign > 0) {
-                        std::cout << sign << std::endl;
-                        last = std::move(std::make_shared<AddedTensor>(std::move(last), std::move(tensors[i])));
+                        last = std::move(last + tensors[i]);
                     } else {
-                        TensorPointer current = std::move(tensors[i]);
-
-                        // If the tensor is already scaled, simply rescale. Simplifies much especially printing
-                        if (current->IsScaledTensor()) {
-                            static_cast<ScaledTensor*>(current.get())->SetScale(-static_cast<ScaledTensor*>(current.get())->GetScale());
-                        }
-                        // scale the tensor
-                        else {
-                            current = std::make_shared<ScaledTensor>(current, -1);
-                        }
-
-                        last = std::move(std::make_shared<AddedTensor>(std::move(last), std::move(current)));
+                        last = std::move(last - tensors[i]);
                     }
                 }
 
-                //return std::move(last);
-
-                if (!std::make_shared<ScaledTensor>(last, 1.0/tensors.size())->IsEqual(*tensor)) {
+                Tensor scaled = Scalar(1, tensors.size()) * last;
+                if (!scaled.IsEqual(tensor)) {
                     if (scaledResult)
-                        return std::move(std::make_shared<ScaledTensor>(std::move(last), 1.0/tensors.size()));
-                    else
-                        return last;
+                        return scaled;
+                    else return last;
                 } else {
-                    return tensor->Clone(); //std::move(tensor->Clone());
+                    return tensor;
                 }
-
-                return std::move(std::make_shared<ScaledTensor>(std::move(last), 1.0/tensors.size()));
             }
         };
 

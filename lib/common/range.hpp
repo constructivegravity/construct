@@ -48,6 +48,8 @@ namespace Construction {
 		public:
 			unsigned GetFrom() const { return from; }
 			unsigned GetTo() const { return to; }
+
+			unsigned GetDimension() const { return to-from + 1; }
 		public:
 			bool operator==(const Range& other) const {
 				return from == other.from && to == other.to;
@@ -125,7 +127,7 @@ namespace Construction {
 				os << "{" << from << "," << to << "}";
 			}
 
-			static std::shared_ptr<Range> Deserialize(std::istream& is) {
+			static std::unique_ptr<Range> Deserialize(std::istream& is) {
 				// Read initial bracket
 				{
 					char c;
@@ -155,7 +157,7 @@ namespace Construction {
 					if (c != '}') throw WrongFormatException();
 				}
 
-				return std::make_shared<Range>(f,t);
+				return std::move(std::unique_ptr<Range>(new Range(f,t)));
 			}
 		private:
 			unsigned from;

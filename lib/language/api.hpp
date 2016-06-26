@@ -2,15 +2,15 @@
 
 #include <tensor/index.hpp>
 #include <tensor/tensor.hpp>
-#include <tensor/tensor_container.hpp>
 
 #include <common/time_measurement.hpp>
 
 #include <generator/base_tensor.hpp>
-#include <generator/equivalent_selector.hpp>
-#include <generator/basis_selector.hpp>
-#include <generator/linear_dependent_selector.hpp>
 #include <generator/symmetrized_tensor.hpp>
+
+using Construction::Tensor::Tensor;
+using Construction::Tensor::Scalar;
+using Construction::Tensor::Indices;
 
 namespace Construction {
     namespace Language {
@@ -20,7 +20,7 @@ namespace Construction {
             /**
                 API for the language
 
-                `Tensor`
+                `Arbitrary`
                 `Symmetrize`
                 `Apppend`
                 `Evaluate`
@@ -28,82 +28,93 @@ namespace Construction {
                 `LinearDependent`
              */
 
-            // Tensor generation
-            TensorContainer Tensor(const Indices& indices);
-            TensorContainer EpsilonGamma(const Indices& indices);
-            TensorContainer Coefficient(int, int, int, int);
-            TensorContainer Append(const TensorContainer& first, const TensorContainer& second);
+            // Tensor::Tensor generation
+            Tensor::Tensor Arbitrary(const Indices& indices);
+            Tensor::Tensor Epsilon(const Indices& indices);
+            Tensor::Tensor Gamma(const Indices& indices);
+            Tensor::Tensor EpsilonGamma(const Indices& indices);
+            Tensor::Tensor Coefficient(unsigned, unsigned, unsigned, unsigned);
 
-            size_t DegreesOfFreedom(const TensorContainer& tensors);
+            size_t DegreesOfFreedom(const Tensor::Tensor& tensor);
 
-            // Symmetrization
-            TensorContainer Symmetrize(const TensorContainer& tensors, const Indices& indices);
-            TensorContainer AntiSymmetrize(const TensorContainer& tensors, const Indices& indices);
-            TensorContainer BlockSymmetrize(const TensorContainer& tensors, const std::vector<Indices>& indices);
+            Tensor::Tensor Symmetrize(const Tensor::Tensor& tensor, const Indices& indices);
+            Tensor::Tensor AntiSymmetrize(const Tensor::Tensor& tensor, const Indices& indices);
+            Tensor::Tensor BlockSymmetrize(const Tensor::Tensor& tensor, const std::vector<Indices>& indices);
 
-            TensorPointer Add(const TensorPointer& first, const TensorPointer& second);
-            TensorPointer Scale(const TensorPointer& first, double number);
+            Tensor::Tensor Expand(const Tensor::Tensor& tensor);
+            Tensor::Tensor Simplify(const Tensor::Tensor& tensor);
+            Tensor::Tensor RedefineVariables(const Tensor::Tensor& tensor);
 
-            bool IsSymmetric(const TensorPointer& tensors, const Indices& indices);
-            bool IsAntiSymmetric(const TensorPointer& tensors, const Indices& indices);
-            bool IsBlockSymmetric(const TensorPointer& tensors, const std::vector<Indices>& indices);
+            Tensor::Tensor Add(const Tensor::Tensor& first, const Tensor::Tensor& second);
+            Tensor::Tensor Scale(const Tensor::Tensor& first, const Scalar& scalar);
+            Tensor::Tensor Multiply(const Tensor::Tensor& first, const Tensor::Tensor& second);
 
-            TensorContainer LinearIndependent(const TensorContainer& tensors);
-            Generator::LinearDependentSelector::ResultType LinearDependent(const TensorContainer& tensors);
+            bool IsSymmetric(const Tensor::Tensor& tensor, const Indices& indices);
+            bool IsAntiSymmetric(const Tensor::Tensor& tensor, const Indices& indices);
+            bool IsBlockSymmetric(const Tensor::Tensor& tensor, const std::vector<Indices>& indices);
 
-            std::vector<double> Evaluate(const TensorContainer& tensors, const std::vector<unsigned>& indices);
+            std::vector<Tensor::Tensor> LinearIndependent(const std::vector<Tensor::Tensor>& tensors);
+            std::vector<std::pair<Tensor::Tensor,Tensor::Tensor>> LinearDependent(const std::vector<Tensor::Tensor>& tensors);
+
+            Scalar Evaluate(const Tensor::TensorContainer& tensors, const std::vector<unsigned>& indices);
 
             /**
                 Implementation
              */
-            TensorContainer Tensor(const Indices& indices) {
+            Tensor::Tensor Arbitrary(const Indices& indices) {
                 Generator::BaseTensorGenerator generator;
-
-                // Construct tensor from the indices
                 return generator.Generate(indices);
             }
 
-            TensorContainer EpsilonGamma(const Indices& indices) {
+            Tensor::Tensor Epsilon(const Indices& indices) {
+                // Assert that we have as many indices as the dimension
+                assert(indices.Size() == indices[0].GetRange().GetDimension());
+                return Tensor::Tensor::Epsilon(indices);
+            }
+
+            Tensor::Tensor Gamma(const Indices& indices) {
+                return Tensor::Tensor::Gamma(indices);
+            }
+
+            Tensor::Tensor EpsilonGamma(const Indices& indices) {
                 // Calculate the numbers of epsilon and gammas
                 unsigned N = indices.Size();
                 unsigned numEpsilon = (N % 2 == 1) ? 1 : 0;
                 unsigned numGamma   = (N % 2 == 1) ? (N-3)/2 : N/2;
 
-                // Generate a epsilon gamma tensor and insert it into the container
-                TensorContainer result;
-                result.Insert(std::make_shared<Tensor::EpsilonGammaTensor>(numEpsilon, numGamma, indices));
-
-                return result;
+                // Generate a epsilon gamma Tensor::Tensor
+                return Tensor::Tensor::EpsilonGamma(numEpsilon, numGamma, indices);
             }
 
             //#include <generator/coefficient.hpp
 
-            TensorContainer Coefficient(int l, int ld, int r, int rd) {
-                return TensorContainer();
+            Tensor::Tensor Coefficient(unsigned l, unsigned ld, unsigned r, unsigned rd) {
+                return Tensor::Tensor::Zero();
                 /*Generator::CoefficientGenerator generator(nullptr);
                 return generator.Generate(l,ld,r,rd);*/
             }
 
-            TensorContainer Append(const TensorContainer& first, const TensorContainer& second) {
-                TensorContainer result = first;
+            /*Tensor::TensorContainer Append(const Tensor::TensorContainer& first, const Tensor::TensorContainer& second) {
+                Tensor::TensorContainer result = first;
 
                 for (auto& f : second) {
                     result.Insert(f);
                 }
 
                 return result;
+            }*/
+
+            size_t DegreesOfFreedom(const Tensor::Tensor& tensor) {
+                // TODO: really count the number of variables
+                return tensor.GetSummands().size();
             }
 
-            size_t DegreesOfFreedom(const TensorContainer& tensors) {
-                return tensors.Size();
-            }
-
-            TensorContainer Symmetrize(const TensorContainer& tensors, const Indices& indices) {
+            Tensor::Tensor Symmetrize(const Tensor::Tensor& tensor, const Indices& indices) {
                 Common::TimeMeasurement time;
 
-                // Get the original indices
+                // Do the symmetrization with the generator
                 Construction::Generator::SymmetrizedTensorGenerator symmetrizer(indices);
-                auto result = symmetrizer(tensors);
+                auto result = symmetrizer(tensor);
 
                 time.Stop();
                 //std::cout << "  \033[90m" << time << "\033[0m" << std::endl;
@@ -111,20 +122,20 @@ namespace Construction {
                 return result;
             }
 
-            TensorContainer AntiSymmetrize(const TensorContainer& tensors, const Indices& indices) {
+            Tensor::Tensor AntiSymmetrize(const Tensor::Tensor& tensor, const Indices& indices) {
                 // Get the original indices
                 Construction::Generator::AntiSymmetrizedTensorGenerator symmetrizer(indices);
-                auto result = symmetrizer(tensors);
+                auto result = symmetrizer(tensor);
 
                 return result;
             }
 
-            TensorContainer ExchangeSymmetrize(const TensorContainer& tensors, const Indices& indices) {
+            Tensor::Tensor ExchangeSymmetrize(const Tensor::Tensor& tensor, const Indices& indices) {
                 Common::TimeMeasurement time;
 
                 // Get the original indices
                 Construction::Generator::ExchangeSymmetrizedTensorGenerator symmetrizer(indices);
-                auto result = symmetrizer(tensors);
+                auto result = symmetrizer(tensor);
 
                 time.Stop();
                 //std::cout << "  \033[90m" << time << "\033[0m" << std::endl;
@@ -132,103 +143,77 @@ namespace Construction {
                 return result;
             }
 
-            TensorContainer BlockSymmetrize(const TensorContainer& tensors, const std::vector<Indices>& blocks) {
-                Construction::Generator::BlockSymmetrizedTensorGenerator symmetrizer(blocks);
-                auto result = symmetrizer(tensors);
-                return result;
+            Tensor::Tensor BlockSymmetrize(const Tensor::Tensor& tensors, const std::vector<Indices>& blocks) {
+                // TODO: implement
+                return tensors;
+
+                //Construction::Generator::BlockSymmetrizedTensorGenerator symmetrizer(blocks);
+                //auto result = symmetrizer(tensors);
+                //return result;
             }
 
-            bool IsSymmetric(const TensorPointer& tensor, const Indices& indices) {
-                // Get the original indices
+            Tensor::Tensor Expand(const Tensor::Tensor& tensor) {
+                return tensor.Expand();
+            }
+
+            Tensor::Tensor Simplify(const Tensor::Tensor& tensor) {
+                return tensor.Simplify();
+            }
+
+            Tensor::Tensor RedefineVariables(const Tensor::Tensor& tensor) {
+                return tensor.RedefineVariables("e");
+            }
+
+            bool IsSymmetric(const Tensor::Tensor& tensor, const Indices& indices) {
                 Construction::Generator::SymmetrizedTensorGenerator symmetrizer(indices);
-
-                // Insert into container
-                TensorContainer container;
-                container.Insert(tensor);
-
-                // Symmetrize
-                auto result = symmetrizer(container, true);
-
-                // If no tensor is returned, then the original one
-                // is antisymmetric in the given indices, so return false
-                if (result.Size() == 0) return false;
-
-                // Compare if the symmetrized tensor is identical to the original
-                return result.Get(0)->IsEqual(*tensor);
+                return symmetrizer(tensor, true).IsEqual(tensor);
             }
 
-            bool IsAntiSymmetric(const TensorPointer& tensor, const Indices& indices) {
-                // Get the original indices
+            bool IsAntiSymmetric(const Tensor::Tensor& tensor, const Indices& indices) {
                 Construction::Generator::AntiSymmetrizedTensorGenerator symmetrizer(indices);
-
-                // Insert into container
-                TensorContainer container;
-                container.Insert(tensor);
-
-                // Symmetrize
-                auto result = symmetrizer(container, true);
-
-                // If no tensor is returned, then the original one
-                // is antisymmetric in the given indices, so return false
-                if (result.Size() == 0) return false;
-
-                // Compare if the symmetrized tensor is identical to the original
-                return result.Get(0)->IsEqual(*tensor);
+                return symmetrizer(tensor, true).IsEqual(tensor);
             }
 
-            bool IsBlockSymmetric(const TensorPointer& tensor, const std::vector<Indices>& indices) {
-                // Get the original indices
-                Construction::Generator::BlockSymmetrizedTensorGenerator symmetrizer(indices);
-
-                // Insert into container
-                TensorContainer container;
-                container.Insert(tensor);
-
-                // Symmetrize
-                auto result = symmetrizer(container, true);
-
-                // If no tensor is returned, then the original one
-                // is antisymmetric in the given indices, so return false
-                if (result.Size() == 0) return false;
-
-                // Compare if the symmetrized tensor is identical to the original
-                return result.Get(0)->IsEqual(*tensor);
+            bool IsBlockSymmetric(const Tensor::Tensor& tensor, const Indices& indices) {
+                // TODO: implement this
+                return false;
+                //Construction::Generator::BlockSymmetrizedTensorGenerator symmetrizer(indices);
+                //return symmetrizer(tensor, true).IsEqual(tensor);
             }
 
-            TensorPointer Add(const TensorPointer& first, const TensorPointer& second) {
-                return std::make_shared<Construction::Tensor::AddedTensor> (
-                    std::move(first->Clone()),
-                    std::move(second->Clone())
-                );
+            Tensor::Tensor Add(const Tensor::Tensor& first, const Tensor::Tensor& second) {
+                return first + second;
             }
 
-            TensorPointer Scale(const TensorPointer& first, double number) {
-                return std::make_shared<Construction::Tensor::ScaledTensor> (
-                    std::move(first->Clone()),
-                    number
-                );
+            Tensor::Tensor Scale(const Tensor::Tensor& first, const Scalar& c) {
+                return first * c;
             }
 
-            TensorContainer LinearIndependent(const TensorContainer& tensors) {
-                Construction::Generator::BasisSelector selector;
-                auto result = selector(tensors);
+            Tensor::Tensor Multiply(const Tensor::Tensor& first, const Tensor::Tensor& second) {
+                return first * second;
+            }
+
+            std::vector<Tensor::Tensor> LinearIndependent(const std::vector<Tensor::Tensor>& tensors) {
+                // First sum all the Tensor::Tensors
+                Tensor::Tensor tensor = Tensor::Tensor::Zero();
+                for (auto& t : tensors) tensor += t;
+
+                // Simplify and thus get rid of all the linear dependent ones
+                // The linear independent ones are the remaining ones
+                // TODO: keep the original scale of the tensor
+                tensor = tensor.Simplify();
+
+                return tensor.GetSummands();
+            }
+
+            std::vector<std::pair<Tensor::Tensor,Tensor::Tensor>> LinearDependent(const std::vector<Tensor::Tensor>& tensors) {
+                // TODO: implement this
+                std::vector<std::pair<Tensor::Tensor,Tensor::Tensor>> result;
                 return result;
             }
 
-            Generator::LinearDependentSelector::ResultType LinearDependent(const TensorContainer& tensors) {
-                Construction::Generator::LinearDependentSelector selector;
-                auto result = selector(tensors);
-                return result;
-            }
-
-            std::vector<double> Evaluate(const TensorContainer& tensors, const std::vector<unsigned>& indices) {
-                std::vector<double> result;
-
-                for (auto& tensor : tensors) {
-                    result.push_back(tensor->Evaluate(indices));
-                }
-
-                return result;
+            Scalar Evaluate(const Tensor::Tensor& tensor, const std::vector<unsigned>& indices) {
+                return tensor(indices);
             }
 
         }

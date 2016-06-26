@@ -1,5 +1,7 @@
 #pragma once
 
+#include <common/error.hpp>
+
 #include <language/parser.hpp>
 #include <language/session.hpp>
 #include <language/notebook.hpp>
@@ -11,21 +13,23 @@
 #include <language/symmetrization.hpp>
 #include <language/linear_dependent.hpp>
 
-#include <tensor/tensor_container.hpp>
-#include <tensor/tensor_database.hpp>
+#include <tensor/expression.hpp>
 #include <generator/basis_selector.hpp>
 #include <generator/linear_dependent_selector.hpp>
 #include <generator/symmetrized_tensor.hpp>
 
-using Construction::Tensor::TensorDatabase;
-using Construction::Tensor::TensorContainer;
-
 namespace Construction {
     namespace Language {
 
+        class WrongTypeException : public Exception {
+        public:
+            WrongTypeException() : Exception("Unexpected type error") { }
+        };
+
         class CLI {
         public:
-            CLI(bool forceNewDatabase=false) {
+            CLI() { }
+            /*CLI(bool forceNewDatabase=false) {
                 if (!forceNewDatabase) {
                     // Check if file exists
                     std::ifstream file("tensors.db");
@@ -38,7 +42,7 @@ namespace Construction {
                         }
                     } else file.close();
                 }
-            }
+            }*/
 
             ~CLI() {
                 //database.SaveToFile("tensors.db");
@@ -116,10 +120,10 @@ namespace Construction {
 
             void Execute(const std::shared_ptr<Node>& document, bool silent=false) {
                 // Copy the most recent tensor;
-                TensorContainer lastResult = Session::Instance()->GetCurrent();
+                Expression lastResult = Session::Instance()->GetCurrent();
 
                 if (document->IsPrevious()) {
-                    PrintTensor();
+                    PrintExpression(lastResult);
                     return;
                 } else if (document->IsCommand()) {
                     auto commandName = std::dynamic_pointer_cast<CommandNode>(document)->GetIdentifier()->GetText();
@@ -158,14 +162,32 @@ namespace Construction {
                             Execute(cmd, true);
 
                             // Replace with a tensor argument reference to the previous result
-                            auto newArg = std::make_shared<TensorArgument>();
-                            newArg->SetTensor(lastResult);
-                            command->AddArgument(std::move(newArg));
+                            lastResult = Session::Instance()->GetCurrent();
+
+                            switch (lastResult.GetType()) {
+                                // Tensor
+                                {
+                                    case Tensor::AbstractExpression::TENSOR:
+                                        auto newArg = std::make_shared<TensorArgument>();
+                                        newArg->SetTensor(lastResult.As<Tensor::Tensor>());
+                                        command->AddArgument(std::move(newArg));
+                                        break;
+                                }
+
+                                case Tensor::AbstractExpression::SCALAR:
+                                    // TODO: implement scalar argument
+                                    throw WrongTypeException();
+                                    break;
+
+                                default:
+                                    throw WrongTypeException();
+                                    break;
+                            }
                         }
                         // If pointer to previous, add this
                         else if (arg->IsPrevious()) {
                             auto newArg = std::make_shared<TensorArgument>();
-                            newArg->SetTensor(lastResult);
+                            newArg->SetTensor(lastResult.As<Tensor::Tensor>());
                             command->AddArgument(std::move(newArg));
                         }
                         // If is a literal, load the name from memory
@@ -173,9 +195,24 @@ namespace Construction {
                             auto id = arg->ToString();
                             lastResult = Session::Instance()->Get(id);
 
-                            auto newArg = std::make_shared<TensorArgument>();
-                            newArg->SetTensor(lastResult);
-                            command->AddArgument(std::move(newArg));
+                            switch (lastResult.GetType()) {
+                                {
+                                    case Tensor::AbstractExpression::TENSOR:
+                                        auto newArg = std::make_shared<TensorArgument>();
+                                        newArg->SetTensor(lastResult.As<Tensor::Tensor>());
+                                        command->AddArgument(std::move(newArg));
+                                        break;
+                                }
+
+                                case Tensor::AbstractExpression::SCALAR:
+                                    // TODO: implement scalar argument
+                                    throw WrongTypeException();
+                                    break;
+
+                                default:
+                                    throw WrongTypeException();
+                                    break;
+                            }
                         }
                         // If indices, add this
                         else if (arg->IsIndices()) {
@@ -195,13 +232,15 @@ namespace Construction {
                         }
                     }
 
+                    Expression newResult;
+
                     // Execute
                     try {
+                        newResult = (*command)();
+
                         // Only overwrite last result if the command returns ones
-                        if (command->ReturnsTensors())
-                            lastResult = (*command)();
-                        else
-                            (*command)();
+                        if (command->ReturnsTensors()) lastResult = newResult;
+
                     } catch (WrongNumberOfArgumentsException err) {
                         Error("Wrong number of arguments");
                     } catch (WrongArgumentTypeException err) {
@@ -218,7 +257,7 @@ namespace Construction {
 
                     // Print tensors unless in silent mode
                     if (command->ReturnsTensors() && !silent) {
-                        PrintTensor();
+                        PrintExpression(newResult);
                     }
 
                     return;
@@ -238,7 +277,7 @@ namespace Construction {
                     auto id = std::dynamic_pointer_cast<LiteralNode>(document)->GetText();
                     Session::Instance()->SetCurrent(definition[id], Session::Instance()->Get(id));
 
-                    if (!silent) PrintTensor();
+                    if (!silent) PrintExpression(lastResult);
                     return;
                 } else {
                     Error("Cannot execute this :'(");
@@ -297,9 +336,7 @@ namespace Construction {
                 }
             }
         public:
-            void PrintTensor() {
-                TensorContainer lastResult = Session::Instance()->GetCurrent();
-
+            void PrintExpression(const Expression& expression) {
                 /**
                     DEFAULT = 39,
                     BLACK = 30,
@@ -319,26 +356,29 @@ namespace Construction {
                     LIGHTCYAN = 96,
                     WHITE = 97
                  */
-                std::stringstream ss;
-                lastResult.Serialize(ss);
+                //std::stringstream ss;
+                //lastResult.Serialize(ss);
 
+                // Get the output
+                std::stringstream ss;
+                ss << expression.ToString();
+                std::string line;
+
+                // Change the output color
                 std::cout << "\033[32m";
 
-                for (int i=0; i<lastResult.Size(); i++) {
-                    if (lastResult[i].IsAddedTensor())
-                        std::cout << "   " << "e_" << (i+1) << " * (" << lastResult[i].ToString() << ") ";
-                    else
-                        std::cout << "   " << "e_" << (i+1) << " * " << lastResult[i].ToString() << " ";
-                    if (i != lastResult.Size()-1) std::cout << " + ";
-                    std::cout << std::endl;
+                // Shift the output by three characters
+                while (std::getline(ss, line, '\n')) {
+                    std::cout << "   " << line;
                 }
-
+                
+                // Change the color back
                 std::cout << "\033[0m";
             }
         private:
             Parser parser;
 
-            TensorDatabase database;
+            //TensorDatabase database;
 
             // Store the command to that was executed to create %
             std::string lastCmd;

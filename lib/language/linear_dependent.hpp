@@ -6,10 +6,12 @@
 
 #include <tensor/index.hpp>
 #include <tensor/tensor.hpp>
+#include <tensor/expression.hpp>
 
 #include <generator/base_tensor.hpp>
 
 using Construction::Tensor::Tensor;
+using Construction::Tensor::Expression;
 
 namespace Construction {
     namespace Language {
@@ -25,8 +27,10 @@ namespace Construction {
                 return "LinearIndependent(<Tensors>)";
             }
 
-            TensorContainer Execute() const {
-                return API::LinearIndependent(GetTensors(0));
+            Expression Execute() const {
+                // TODO: implement
+                return Expression::Void();
+                //return API::LinearIndependent(GetTensors(0));
             }
         };
 

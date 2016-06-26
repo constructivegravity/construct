@@ -116,10 +116,8 @@ namespace Construction {
         public:
             /**
                 \brief Generate all possible canonical tensors of rank n
-
-
              */
-            TensorContainer Generate(unsigned order) const {
+            Tensor::Tensor Generate(unsigned order) const {
                 // Stuff
                 assert(order > 1);
 
@@ -129,7 +127,7 @@ namespace Construction {
                 return Generate(indices);
             }
 
-            TensorContainer Generate(const Indices& indices) const {
+            Tensor::Tensor Generate(const Indices& indices) const {
                 // Expect all the ranges to be in space
                 unsigned order = indices.Size();
                 for (auto& index : indices) {
@@ -138,7 +136,8 @@ namespace Construction {
                     }
                 }
 
-                TensorContainer result;
+                Tensor::Tensor result = Tensor::Tensor::Zero();
+                unsigned variableCounter = 0;
 
                 // Calculate
                 unsigned numEpsilon = (indices.Size() % 2 == 0) ? 0 : 1;
@@ -153,15 +152,13 @@ namespace Construction {
                 }
 
                 for (auto& newIndices : possibleIndices) {
+                    // Create variable
+                    Tensor::Scalar variable ("e", ++variableCounter);
+
                     if  (newIndices == indices)
-                        result.Insert(std::make_shared<Tensor::EpsilonGammaTensor>(numEpsilon, numGammas, newIndices));
+                        result += variable * Tensor::Tensor::EpsilonGamma(numEpsilon, numGammas, newIndices);
                     else {
-                        result.Insert(
-                                std::make_shared<Tensor::SubstituteTensor>(
-                                        std::make_shared<Tensor::EpsilonGammaTensor>(numEpsilon, numGammas, newIndices),
-                                        indices
-                                )
-                        );
+                        result += variable * Tensor::Tensor::Substitute(std::move(Tensor::Tensor::EpsilonGamma(numEpsilon, numGammas, newIndices)), indices);
                     }
                 }
 

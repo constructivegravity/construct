@@ -327,7 +327,7 @@ namespace Construction {
 
                     // If index, then append everything
                     if (inIndices) {
-                        if (c == "\"") {
+                        if (c == "}") {
                             tokens.push_back(Token(Token::INDICES, i-current.length(), current));
                             current = "";
                             inIndices = false;
@@ -340,7 +340,7 @@ namespace Construction {
 
                     // If string, then append everything
                     if (inString) {
-                        if (c == "\'") {
+                        if (c == "\"") {
                             tokens.push_back(Token(Token::STRING, i-current.length(), current));
                             current = "";
                             inString = false;
@@ -416,7 +416,7 @@ namespace Construction {
                         continue;
                     }
 
-                    if (c == "\"") {
+                    if (c == "{") {
                         if (current.length() > 0)
                             tokens.push_back(Token(Token::LITERAL, i-current.length(),current));
                         inIndices = true;
@@ -424,7 +424,7 @@ namespace Construction {
                         continue;
                     }
 
-                    if (c == "\'") {
+                    if (c == "\"") {
                         if (current.length() > 0)
                             tokens.push_back(Token(Token::LITERAL, i-current.length(),current));
                         inString = true;

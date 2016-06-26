@@ -7,9 +7,12 @@
 #include <common/error.hpp>
 #include <language/argument.hpp>
 
-#include <tensor/tensor_container.hpp>
+//#include <tensor/tensor_container.hpp>
+#include <tensor/expression.hpp>
+#include <tensor/tensor.hpp>
+#include <tensor/scalar.hpp>
 
-using Construction::Tensor::TensorContainer;
+using Construction::Tensor::Expression;
 
 namespace Construction {
 
@@ -118,7 +121,7 @@ namespace Construction {
                 return GetArgument<StringArgument>(pos)->GetValue();
             }
 
-            TensorContainer GetTensors(unsigned pos) const {
+            Tensor::Tensor GetTensors(unsigned pos) const {
                 assert(pos < arguments.size());
                 assert(arguments[pos]->IsTensorArgument());
                 return GetArgument<TensorArgument>(pos)->GetTensor();
@@ -167,7 +170,7 @@ namespace Construction {
                 \throws WrongNumberOfArgumentsException
                 \throws WrongArgumentTypeException
              */
-            TensorContainer operator()() const {
+            Expression operator()() const {
                 ValidateArguments();
                 return Execute();
             }
@@ -177,7 +180,7 @@ namespace Construction {
             static bool Cachable() { return true; }
         public:
             virtual std::string Help() const = 0;
-            virtual TensorContainer Execute() const = 0;
+            virtual Expression Execute() const = 0;
         protected:
             std::string name;
             bool returnsTensors=true;

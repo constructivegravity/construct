@@ -10,6 +10,7 @@
 #include <generator/base_tensor.hpp>
 
 using Construction::Tensor::Tensor;
+using Construction::Tensor::Expression;
 
 namespace Construction {
     namespace Language {
@@ -24,8 +25,8 @@ namespace Construction {
                 return false;
             }
 
-            TensorContainer Execute() const {
-                TensorContainer result = GetTensors(0);
+            Expression Execute() const {
+                auto result = GetTensors(0);
 
                 for (int i=1; i<Size(); i++) {
                     result = API::Symmetrize(result, GetIndices(i));
@@ -50,7 +51,7 @@ namespace Construction {
                 return false;
             }
 
-            TensorContainer Execute() const {
+            Expression Execute() const {
                 return API::AntiSymmetrize(GetTensors(0), GetIndices(1));
             }
 
@@ -70,7 +71,7 @@ namespace Construction {
                 return true;
             }
 
-            TensorContainer Execute() const {
+            Expression Execute() const {
                 return API::ExchangeSymmetrize(GetTensors(0), GetIndices(1));
             }
 
@@ -90,7 +91,7 @@ namespace Construction {
                 return true;
             }
 
-            TensorContainer Execute() const {
+            Expression Execute() const {
                 std::vector<Indices> indices;
                 for (int i=1; i<Size(); i++) {
                     indices.push_back(GetIndices(i));
@@ -115,20 +116,11 @@ namespace Construction {
                 return false;
             }
 
-            TensorContainer Execute() const {
-                auto tensors = GetTensors(0);
+            Expression Execute() const {
+                auto tensor = GetTensors(0);
                 auto indices = GetIndices(1);
 
-                for (auto& tensor : tensors) {
-                    if (!API::IsSymmetric(tensor, indices)) {
-                        std::cout << "   \033[32m" << "false" << "\033[0m" << std::endl;
-                        std::cout << "   \033[32m" << tensor->ToString() << " is not." << std::endl;
-                        return TensorContainer();
-                    }
-                }
-
-                std::cout << "  \033[32m" << "true" << "\033[0m" << std::endl;
-                return TensorContainer();
+                return Expression::Boolean(API::IsSymmetric(tensor, indices));
             }
 
         };

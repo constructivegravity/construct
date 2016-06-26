@@ -21,8 +21,8 @@ namespace Construction {
             /**
                 Deserialize
              */
-            static std::shared_ptr<T> Deserialize(std::istream& is) {
-                return std::make_shared<T>();
+            static std::unique_ptr<T> Deserialize(std::istream& is) {
+                return std::move(std::unique_ptr<T>(nullptr));
             }
         public:
             template<typename S>

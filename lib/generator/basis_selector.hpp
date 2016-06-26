@@ -22,10 +22,10 @@ namespace Construction {
         class BasisSelector {
         public:
             /**
-                \brief Select all the linear dependent tensors from the given tensors
+                \brief Select all the linear independent tensors from the given tensors
              */
-            TensorContainer operator()(const TensorContainer& tensors) const {
-                if (tensors.Size() == 0) return TensorContainer();
+            std::vector<Tensor::Tensor> operator()(const std::vector<Tensor::Tensor>& tensors) const {
+                if (tensors.size() == 0) return tensors;
 
                 // Initialize
                 std::vector<Vector::Vector> vectors;
@@ -37,7 +37,7 @@ namespace Construction {
 
                 // Derive vector components of the tensors
                 for (auto& tensor : tensors) {
-                    auto combinations = tensor->GetAllIndexCombinations();
+                    auto combinations = tensor.GetAllIndexCombinations();
 
                     // TODO: implement optimization for all indices that are trivially zero
                     Vector::Vector v (combinations.size());
@@ -51,14 +51,14 @@ namespace Construction {
                             j++;
                         }
 
-                        v[i] = (*tensor)(assignment);
+                        v[i] = tensor(assignment);
                     }
 
                     vectors.push_back(v);
                 }
 
                 // Create matrix
-                Matrix M (vectors);
+                Vector::Matrix M (vectors);
 
                 // Reduce to matrix echelon form
                 M.ToRowEchelonForm();
@@ -66,7 +66,7 @@ namespace Construction {
                 //std::cout << M << std::endl;
 
                 // Select all the linear independent tensors from M and put into a new container
-                TensorContainer result;
+                std::vector<Tensor::Tensor> result;
 
                 std::vector<Vector::Vector> columns;
                 for (int i=0; i<M.GetNumberOfColumns(); i++) {
@@ -84,7 +84,7 @@ namespace Construction {
                     // If found, add the corresponding tensor to the output
                     if (it != columns.end()) {
                         auto pos = std::distance(columns.begin(), it);
-                        result.Insert(tensors.Get(pos));
+                        result.push_back(tensors[pos]);
                     }
                 }
 

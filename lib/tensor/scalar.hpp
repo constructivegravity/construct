@@ -7,6 +7,8 @@
 #include <common/printable.hpp>
 #include <common/serializable.hpp>
 
+#include <tensor/expression.hpp>
+
 namespace Construction {
     namespace Tensor {
 
@@ -20,8 +22,6 @@ namespace Construction {
             \class Scalar
 
             \brief Class for general scalars
-
-
          */
         class AbstractScalar : public Serializable<AbstractScalar> {
         public:
@@ -146,6 +146,23 @@ namespace Construction {
 
             virtual double ToDouble() const override { return c; }
         public:
+            virtual void Serialize(std::ostream& os) const {
+                // Call parent
+                AbstractScalar::Serialize(os);
+
+                os.write(reinterpret_cast<const char*>(&c), sizeof(c));
+            }
+
+            static std::unique_ptr<AbstractScalar> Deserialize(std::istream& is) {
+                // Call parent
+                AbstractScalar::Deserialize(is);
+
+                double c;
+                is.read(reinterpret_cast<char*>(&c), sizeof(c));
+
+                return std::move(std::unique_ptr<AbstractScalar>(new FloatingPointScalar(c)));
+            }
+        public:
             friend class AbstractScalar;
         private:
             double c;
@@ -174,6 +191,26 @@ namespace Construction {
                 return ss.str();
             }
         public:
+            virtual void Serialize(std::ostream& os) const {
+                // Call parent
+                AbstractScalar::Serialize(os);
+
+                A->Serialize(os);
+                B->Serialize(os);
+            }
+
+            static std::unique_ptr<AbstractScalar> Deserialize(std::istream& is) {
+                // Call parent
+                AbstractScalar::Deserialize(is);
+
+                
+
+                double c;
+                is.read(reinterpret_cast<char*>(&c), sizeof(c));
+
+                return std::move(std::unique_ptr<AbstractScalar>(new FloatingPointScalar(c)));
+            }
+
             /*inline ConstScalarPointer GetFirst() const { return A; }
             inline ConstScalarPointer GetSecond() const { return B; }*/
         public:
@@ -218,7 +255,7 @@ namespace Construction {
             them without having to use the pointers and worrying about what happens under
             the surface. This will greatly simplify the work with the scalars!
          */
-        class Scalar : public Printable, Serializable<Scalar> {
+        class Scalar : public AbstractExpression, public Serializable<Scalar> {
         public:
             Scalar();
             Scalar(double v);
@@ -228,11 +265,12 @@ namespace Construction {
 
             Scalar(const std::string& name);
             Scalar(const std::string& name, const std::string& printed_text);
+            Scalar(const std::string& name, unsigned id);
 
-            Scalar(const Scalar& other) : pointer(std::move(other.pointer->Clone())) { }
-            Scalar(Scalar&& other) : pointer(std::move(other.pointer)) { }
+            Scalar(const Scalar& other) : AbstractExpression(SCALAR), pointer(std::move(other.pointer->Clone())) { }
+            Scalar(Scalar&& other) : AbstractExpression(SCALAR), pointer(std::move(other.pointer)) { }
         private:
-            Scalar(std::unique_ptr<AbstractScalar> pointer) : pointer(std::move(pointer)) { }
+            Scalar(std::unique_ptr<AbstractScalar> pointer) : AbstractExpression(SCALAR), pointer(std::move(pointer)) { }
         public:
             Scalar& operator=(const Scalar& other) {
                 pointer = other.pointer->Clone();
@@ -245,6 +283,8 @@ namespace Construction {
             }
 
             Scalar& operator=(double d);
+        public:
+            virtual ExpressionPointer Clone() const override { return std::move(ExpressionPointer(new Scalar(*this))); }
         public:
             inline AbstractScalar::Type GetType() const { return pointer->GetType(); }
             inline std::string TypeToString() const { return pointer->TypeToString(); }

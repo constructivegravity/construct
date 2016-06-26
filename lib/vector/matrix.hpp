@@ -295,7 +295,7 @@ namespace Construction {
             }
         public:
             /**
-                \brief Returns the row echelon form of the matrix
+                \brief Returns the reduced row echelon form of the matrix
              */
             Matrix GetRowEchelonForm() const {
                 Matrix result = *this;

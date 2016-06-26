@@ -171,17 +171,17 @@ namespace Construction {
         public:
             TensorArgument() : BaseArgument(ArgumentType::TENSOR) { }
         public:
-            inline void SetTensor(Tensor::TensorContainer container) {
+            inline void SetTensor(const Tensor::Tensor& container) {
                 result = container;
             }
 
-            inline Tensor::TensorContainer GetTensor() const {
+            inline Tensor::Tensor GetTensor() const {
                 return result;
             }
         public:
             virtual void Parse(const std::string& code) { }
         private:
-            Tensor::TensorContainer result;
+            Tensor::Tensor result;
         };
 
         class NumericArgument : public BaseArgument {
