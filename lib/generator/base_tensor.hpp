@@ -155,11 +155,13 @@ namespace Construction {
                     // Create variable
                     Tensor::Scalar variable ("e", ++variableCounter);
 
-                    if  (newIndices == indices)
+                    result += variable * Tensor::Tensor::EpsilonGamma(numEpsilon, numGammas, newIndices);
+
+                    /*if  (newIndices == indices)
                         result += variable * Tensor::Tensor::EpsilonGamma(numEpsilon, numGammas, newIndices);
                     else {
                         result += variable * Tensor::Tensor::Substitute(std::move(Tensor::Tensor::EpsilonGamma(numEpsilon, numGammas, newIndices)), indices);
-                    }
+                    }*/
                 }
 
                 return result;

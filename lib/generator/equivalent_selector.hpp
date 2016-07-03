@@ -49,7 +49,7 @@ namespace Construction {
                             j++;
                         }
 
-                        v[i] = tensor(assignment);
+                        v[i] = tensor(assignment).ToDouble();
                     }
 
                     vectors.push_back(v);

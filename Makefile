@@ -14,6 +14,6 @@ update:
 	make
 
 test:
-	bin/testing
+	make && bin/testing
 
 .PHONY: test

@@ -84,19 +84,11 @@ namespace Construction {
                 std::vector<Tensor> tensors;
 
                 // Helper function
-                auto fn = [&](const Indices& permutation) {
+                for (auto permutation : permutations) {
                     Tensor clone = tensor;
                     clone.SetIndices(permutation);
 
-                    if (permutation == indices)
-                        tensors.push_back(std::move(clone));
-                    else
-                        tensors.push_back(Tensor::Substitute(clone, indices));
-                };
-
-                // Execute
-                for (auto permutation : permutations) {
-                    fn(permutation);
+                    tensors.push_back(clone);
                 }
 
                 return tensors;
@@ -106,9 +98,9 @@ namespace Construction {
                 auto tensors = Symmetrize(tensor);
 
                 // Add all the tensors
-                Tensor last = std::move(tensors[0]);
-                for (int i=1; i<tensors.size(); i++) {
-                    last = std::move( last + tensors[i] );
+                Tensor last = Tensor::Zero();
+                for (auto& t : tensors) {
+                    last += t;
                 }
 
                 Tensor scaled = Scalar(1, tensors.size()) * last;

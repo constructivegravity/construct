@@ -151,7 +151,7 @@ namespace Construction {
 
                 Vector result(m);
                 for (int j=0; j<m; j++) {
-                    result[i] = At(i,j);
+                    result[j] = At(i,j);
                 }
                 return result;
             }
@@ -291,6 +291,18 @@ namespace Construction {
                 for (int i=0; i<m*n; i++) {
                     result.data[i] *= c;
                 }
+                return result;
+            }
+        public:
+            Matrix Resize(unsigned n, unsigned m) const {
+                Matrix result (n, m);
+
+                for (unsigned i=0; i<std::min(n, this->n); i++) {
+                    for (unsigned j=0; j<std::min(m, this->m); j++) {
+                        result(i,j) = At(i,j);
+                    }
+                }
+
                 return result;
             }
         public:

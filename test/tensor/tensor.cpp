@@ -27,7 +27,7 @@ SCENARIO("General tensors", "[tensor]") {
 
             for (unsigned i=1; i<=3; ++i) {
                 for (unsigned j=1; j<=3; ++j) {
-                    components[3*(i-1)+j-1] = T(i,j);
+                    components[3*(i-1)+j-1] = T(i,j).ToDouble();
                 }
             }
 
@@ -42,8 +42,8 @@ SCENARIO("General tensors", "[tensor]") {
         WHEN(" serializing the tensor") {
 
             std::stringstream ss;
-            Construction::Tensor::EpsilonGammaTensor tensor(1,2, Construction::Tensor::Indices::GetRomanSeries(7, {1,3}));
-            Construction::Tensor::GammaTensor gamma(Construction::Tensor::Indices::GetRomanSeries(2, {1,3}));
+            auto tensor = Construction::Tensor::Tensor::EpsilonGamma(1,2, Construction::Tensor::Indices::GetRomanSeries(7, {1,3}));
+            auto gamma = Construction::Tensor::Tensor::Gamma(Construction::Tensor::Indices::GetRomanSeries(2, {1,3}));
 
             tensor.Serialize(ss);
             //gamma.Serialize(ss);
@@ -79,8 +79,7 @@ SCENARIO("Epsilon tensor", "[epsilon-tensor]") {
 
     // Levi-Civita symbol in three dimensions, i.e. on a spatial slice
     GIVEN(" epsilon in three dimensions") {
-
-        auto epsilon = Construction::Tensor::EpsilonTensor::Space();
+        auto epsilon = Construction::Tensor::Tensor::Epsilon(Construction::Tensor::Indices::GetRomanSeries(3, {1,3}));
 
         // Look at the indices
         WHEN(" looking at the indices") {
@@ -97,30 +96,30 @@ SCENARIO("Epsilon tensor", "[epsilon-tensor]") {
         WHEN(" looking at the tensor components with two or more indices being equal") {
             THEN(" we get zero due to antisymmetry") {
                 // Same indices
-                REQUIRE(epsilon(1,1,1) == 0);
-                REQUIRE(epsilon(2,2,2) == 0);
-                REQUIRE(epsilon(3,3,3) == 0);
+                REQUIRE(epsilon(1,1,1) == 0.0);
+                REQUIRE(epsilon(2,2,2) == 0.0);
+                REQUIRE(epsilon(3,3,3) == 0.0);
 
-                REQUIRE(epsilon(1,1,2) == 0);
-                REQUIRE(epsilon(1,1,3) == 0);
-                REQUIRE(epsilon(1,2,1) == 0);
-                REQUIRE(epsilon(1,3,1) == 0);
-                REQUIRE(epsilon(2,1,1) == 0);
-                REQUIRE(epsilon(3,1,1) == 0);
+                REQUIRE(epsilon(1,1,2) == 0.0);
+                REQUIRE(epsilon(1,1,3) == 0.0);
+                REQUIRE(epsilon(1,2,1) == 0.0);
+                REQUIRE(epsilon(1,3,1) == 0.0);
+                REQUIRE(epsilon(2,1,1) == 0.0);
+                REQUIRE(epsilon(3,1,1) == 0.0);
 
-                REQUIRE(epsilon(2,2,1) == 0);
-                REQUIRE(epsilon(2,2,3) == 0);
-                REQUIRE(epsilon(2,1,2) == 0);
-                REQUIRE(epsilon(2,3,2) == 0);
-                REQUIRE(epsilon(1,2,2) == 0);
-                REQUIRE(epsilon(3,2,2) == 0);
+                REQUIRE(epsilon(2,2,1) == 0.0);
+                REQUIRE(epsilon(2,2,3) == 0.0);
+                REQUIRE(epsilon(2,1,2) == 0.0);
+                REQUIRE(epsilon(2,3,2) == 0.0);
+                REQUIRE(epsilon(1,2,2) == 0.0);
+                REQUIRE(epsilon(3,2,2) == 0.0);
 
-                REQUIRE(epsilon(3,3,1) == 0);
-                REQUIRE(epsilon(3,3,2) == 0);
-                REQUIRE(epsilon(3,1,3) == 0);
-                REQUIRE(epsilon(3,2,3) == 0);
-                REQUIRE(epsilon(1,3,3) == 0);
-                REQUIRE(epsilon(2,3,3) == 0);
+                REQUIRE(epsilon(3,3,1) == 0.0);
+                REQUIRE(epsilon(3,3,2) == 0.0);
+                REQUIRE(epsilon(3,1,3) == 0.0);
+                REQUIRE(epsilon(3,2,3) == 0.0);
+                REQUIRE(epsilon(1,3,3) == 0.0);
+                REQUIRE(epsilon(2,3,3) == 0.0);
             }
         }
 
@@ -142,19 +141,18 @@ SCENARIO("Epsilon tensor", "[epsilon-tensor]") {
 
         WHEN(" considering the type of the tensor") {
             THEN(" IsEpsilon returns true") {
-                REQUIRE(epsilon.IsEpsilonTensor());
+                REQUIRE(epsilon.IsEpsilon());
             }
 
             THEN(" IsEpsilon returns true even after cast") {
                 Construction::Tensor::Tensor t = epsilon;
-                REQUIRE(t.IsEpsilonTensor());
+                REQUIRE(t.IsEpsilon());
             }
         }
     }
 
     GIVEN(" epsilon in four dimensions") {
-
-        auto epsilon = Construction::Tensor::EpsilonTensor::SpaceTime();
+        auto epsilon = Construction::Tensor::Tensor::Epsilon(Construction::Tensor::Indices::GetRomanSeries(4,{0,3}));
 
         // Look at the indices
         WHEN(" looking at the indices") {
@@ -178,8 +176,7 @@ SCENARIO("Epsilon tensor", "[epsilon-tensor]") {
 SCENARIO("Metric tensor", "[gamma-tensor]") {
 
     GIVEN(" a spatial metric") {
-
-        auto gamma = Construction::Tensor::GammaTensor::SpatialMetric();
+        auto gamma = Construction::Tensor::Tensor::Gamma(Construction::Tensor::Indices::GetRomanSeries(2,{1,3}));
 
         WHEN(" considering the indices") {
             auto indices = gamma.GetIndices();
@@ -216,8 +213,7 @@ SCENARIO("Metric tensor", "[gamma-tensor]") {
 SCENARIO("Epsilon Gamma", "[epsilon-gamma]") {
 
     GIVEN(" a tensor with one epsilon and three gammas") {
-
-        Construction::Tensor::EpsilonGammaTensor T(1, 3, Construction::Tensor::Indices::GetRomanSeries(9, {1,3}));
+        auto T = Construction::Tensor::Tensor::EpsilonGamma(1,3, Construction::Tensor::Indices::GetRomanSeries(9, {1,3}));
 
         WHEN(" printing the TeX code") {
             REQUIRE(T.ToString() == "\\epsilon_{abc}\\gamma_{de}\\gamma_{fg}\\gamma_{hi}");
@@ -268,11 +264,11 @@ SCENARIO("Epsilon Gamma", "[epsilon-gamma]") {
             indices.Insert(Construction::Tensor::Index("e", {1,3}));
             indices.Insert(Construction::Tensor::Index("d", {1,3}));
 
-            Construction::Tensor::EpsilonGammaTensor S(1,2, indices);
+            auto S = Construction::Tensor::Tensor::EpsilonGamma(1,2, indices);
 
             THEN("We get the correct result") {
                 auto canon = S.Canonicalize();
-                REQUIRE(canon->ToString() == "-\\epsilon_{abc}\\gamma_{de}\\gamma_{fg}");
+                REQUIRE(canon.ToString() == "-\\epsilon_{abc}\\gamma_{de}\\gamma_{fg}");
             }
 
         }
@@ -288,12 +284,12 @@ SCENARIO("Epsilon Gamma", "[epsilon-gamma]") {
         indices.Insert(Construction::Tensor::Index("e", {1,3}));
         indices.Insert(Construction::Tensor::Index("d", {1,3}));
 
-        Construction::Tensor::EpsilonGammaTensor S(1,1, indices);
+        auto S = Construction::Tensor::Tensor::EpsilonGamma(1,1, indices);
 
         WHEN(" canonicalizing this tensor") {
             auto canon = S.Canonicalize();
 
-            REQUIRE(canon->ToString() == "-\\epsilon_{abc}\\gamma_{de}");
+            REQUIRE(canon.ToString() == "-\\epsilon_{abc}\\gamma_{de}");
         }
     }
 
@@ -302,8 +298,8 @@ SCENARIO("Epsilon Gamma", "[epsilon-gamma]") {
 
 SCENARIO("Addition", "[tensor-addition]") {
 
-    auto gamma = Construction::Tensor::GammaTensor::SpatialMetric();
-    auto gamma2 = Construction::Tensor::GammaTensor::SpatialMetric();
+    auto gamma = Construction::Tensor::Tensor::Gamma(Construction::Tensor::Indices::GetRomanSeries(2,{1,3}));
+    auto gamma2 = Construction::Tensor::Tensor::Gamma(Construction::Tensor::Indices::GetRomanSeries(2,{1,3}));
 
     GIVEN(" two tensors (twice the metric)") {
 
@@ -313,6 +309,40 @@ SCENARIO("Addition", "[tensor-addition]") {
 
             THEN(" get twice the metric \\gamma") {
                 REQUIRE(a.ToString() == "\\gamma_{ab} + \\gamma_{ab}");
+            }
+        }
+
+        WHEN(" simpliyifing") {
+            THEN(" we really get just twice the metric \\gamma") {
+                auto b = a.Simplify();
+                REQUIRE(b.ToString() == "2 * \\gamma_{ab}");
+
+                auto c = (Construction::Tensor::Scalar::Variable("x") * gamma + Construction::Tensor::Scalar::Variable("y") * gamma2);
+                REQUIRE(c.Simplify().ToString() == "(x + y) * \\gamma_{ab}");
+
+                auto d = c.Simplify().RedefineVariables("x");
+                REQUIRE(d.ToString() == "x_1 * \\gamma_{ab}");
+            }
+        }
+
+        WHEN(" symmetrizing (manually)") {
+            Construction::Tensor::Indices indices = { {"b", {1,3}}, {"a", {1,3}} };
+            auto permuted_gamma = Construction::Tensor::Tensor::Gamma({ { "b", {1,3} }, { "a", {1,3} } });
+
+            auto symmetrized = Construction::Tensor::Scalar(1,2) * ( gamma + permuted_gamma );
+            auto expanded = symmetrized.Expand();
+            auto simplified = expanded.Simplify();
+
+            THEN(" we get the symmetrized expression when not simpliyifing") {
+                REQUIRE(symmetrized.ToString() == "1/2 * (\\gamma_{ab} + \\gamma_{ba})");
+            }
+
+            THEN(" the expanded term looks correct") {
+                REQUIRE(expanded.ToString() == "1/2 * \\gamma_{ab} + 1/2 * \\gamma_{ba}");
+            }
+
+            THEN(" we get the metric again after simplification") {
+                REQUIRE(simplified.ToString() == "\\gamma_{ab}");
             }
         }
 

@@ -144,7 +144,7 @@ namespace Construction {
                 return std::move(ScalarPointer(new Fraction(numerator, denominator)));
             }
         public:
-            virtual void Serialize(std::ostream& os) const {
+            virtual void Serialize(std::ostream& os) const override {
                 // Call parent
                 AbstractScalar::Serialize(os);
 

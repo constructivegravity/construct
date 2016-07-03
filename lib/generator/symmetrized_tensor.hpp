@@ -5,8 +5,6 @@
 #include <tensor/tensor.hpp>
 #include <tensor/symmetrization.hpp>
 
-#include <generator/equivalent_selector.hpp>
-
 using Construction::Tensor::Symmetrization;
 using Construction::Tensor::AntiSymmetrization;
 using Construction::Tensor::BlockSymmetrization;
@@ -61,20 +59,22 @@ namespace Construction {
                 std::vector<Tensor::Tensor> _tensors = tensor.GetSummands();
 
                 // Symmetrize everything in the list
-                for (auto& tensor : _tensors) {
-                    Common::TimeMeasurement time;
+                for (auto& _tensor : _tensors) {
+                    // Separate the scale factor, if present
+                    auto scale = _tensor.SeparateScalefactor().first;
+                    auto tensor = _tensor.SeparateScalefactor().second;
 
                     // Build symmetrization
                     std::vector<unsigned> s;
                     for (auto& index : symmetrization) {
-                        int pos = tensor.GetIndices().IndexOf(index) + 1;
+                        int pos = _tensor.GetIndices().IndexOf(index) + 1;
                         s.push_back(pos);
                     }
 
                     Symmetrization symm(s, scaledResult);
 
                     // Symmetrize
-                    auto newTensor = std::move(symm(tensor));
+                    auto newTensor = scale * symm(tensor);
 
                     // Check if the tensor is zero
                     if (!newTensor.IsZero()) {
@@ -135,7 +135,8 @@ namespace Construction {
                     auto copyTensor = tensor;
                     copyTensor.SetIndices(indices);
 
-                    auto added = tensor + Tensor::Tensor::Substitute(copyTensor, oldIndices);
+                    auto added = tensor + copyTensor;
+                    //auto added = tensor + Tensor::Tensor::Substitute(copyTensor, oldIndices);
                     auto scaled = Tensor::Scalar(1,2) * added;
 
                     if (scaled.IsEqual(tensor)) {

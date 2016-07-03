@@ -68,7 +68,6 @@ namespace Construction {
 			Expression(Expression&& other) : pointer(std::move(other.pointer)) { }
 
 			Expression(const AbstractExpression& expr) : pointer(expr.Clone()) { }
-			Expression(AbstractExpression&& expr) : pointer(std::move(ExpressionPointer(&expr))) { }
 		private:
 			Expression(ExpressionPointer pointer) : pointer(std::move(pointer)) { }
 		public:
@@ -88,11 +87,22 @@ namespace Construction {
 				return *this;
 			}
 		public:
-			bool IsScalar() const { return pointer->IsScalar(); }
+			bool IsScalar() const { return pointer->IsScalar(); }
 			bool IsTensor() const { return pointer->IsTensor(); }
 			bool IsBoolean() const { return pointer->IsBoolean(); }
 			bool IsVoid() const { return pointer->IsVoid(); }
 			bool IsTensorList() const { return pointer->IsTensorList(); }
+
+			std::string TypeToString() const {
+				switch (pointer->GetType()) {
+					case AbstractExpression::TENSOR: return "Tensor";
+					case AbstractExpression::SCALAR: return "Scalar";
+					case AbstractExpression::BOOLEAN: return "Boolean";
+					case AbstractExpression::TENSOR_LIST: return "TensorList";
+					case AbstractExpression::VOID_TYPE: return "Void";
+				}
+				return "Unknown";
+			}
 
 			AbstractExpression::Type GetType() const { return pointer->GetType(); }
 		public:

@@ -239,7 +239,9 @@ namespace Construction {
                         newResult = (*command)();
 
                         // Only overwrite last result if the command returns ones
-                        if (command->ReturnsTensors()) lastResult = newResult;
+                        if (command->ReturnsTensors()) {
+                            lastResult = newResult;
+                        }
 
                     } catch (WrongNumberOfArgumentsException err) {
                         Error("Wrong number of arguments");
@@ -368,8 +370,8 @@ namespace Construction {
                 std::cout << "\033[32m";
 
                 // Shift the output by three characters
-                while (std::getline(ss, line, '\n')) {
-                    std::cout << "   " << line;
+                while (std::getline(ss, line)) {
+                    std::cout << "   " << line << std::endl;
                 }
                 
                 // Change the color back

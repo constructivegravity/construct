@@ -6,6 +6,47 @@
 namespace Construction {
     namespace Vector {
 
+        template<class V>
+        class LinearSystem {
+        public:
+            LinearSystem() : matrix(0,0) { }
+        public:
+            void Insert(const Vector& coefficients, const V& variable) {
+                // The number of equations
+                unsigned m = (matrix.GetNumberOfColumns() == 0) ? coefficients.GetDimension() : matrix.GetNumberOfRows();
+
+                // If the coefficients have the wrong dimension, throw exception
+                if (coefficients.GetDimension() != m) {
+                    assert(false);
+                }
+
+                variables.push_back(variable);
+
+                // Expand the matrix
+                unsigned n = matrix.GetNumberOfColumns();
+                matrix = matrix.Resize(n + 1, m);
+
+                // Insert the coefficients
+                for (auto i=0; i<coefficients.GetDimension(); i++) {
+                    matrix(i,n) = coefficients[i];
+                }
+            }
+
+            /** 
+                \brief Solve the linear system
+
+
+             */
+            std::map<Variable, double> Solve() const {
+                
+            }
+        private:
+            Matrix matrix;
+            std::vector<V> variables;
+        };
+
+        /*
+
         // Forward declaration
         template<typename F, class V>
         class LinearSystem;
@@ -14,7 +55,7 @@ namespace Construction {
             \class LinearElement
 
 
-         */
+         *//*
         template<class F, class V>
         class LinearElement {
         public:
@@ -39,7 +80,7 @@ namespace Construction {
             Implements the abstract notion of a vector space. The field is given by
             template and so is the principle class for the vector elements.
             It allows to add an arbitrary amount of
-         */
+         *//*
         template<typename F, class V>
         class LinearSystem {
         public:
@@ -173,7 +214,7 @@ namespace Construction {
 
         LinearElement::LinearElement(LinearSystem *system) : system(system) {
             components.resize(system->GetDimension());
-        }
+        }*/
 
     }
 }

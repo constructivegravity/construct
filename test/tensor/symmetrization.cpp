@@ -2,7 +2,19 @@
 #include <tensor/symmetrization.hpp>
 #include <generator/symmetrized_tensor.hpp>
 
-SCENARIO("Block symmetrization", "[block-symmetrization]") {
+SCENARIO("Symmetrization", "[symmetrization]") {
+    GIVEN("  four indices") {
+        auto tensor = Construction::Tensor::Tensor::EpsilonGamma(0,2,Construction::Tensor::Indices::GetRomanSeries(4, {1,3}));
+
+        Construction::Generator::SymmetrizedTensorGenerator generator ({{"a", {1,3}}, {"c", {1,3}}});
+        Construction::Generator::SymmetrizedTensorGenerator generator2 ({{"b", {1,3}}, {"d", {1,3}}});
+        auto result = generator2(generator(tensor)).Simplify();
+
+        REQUIRE(result.ToString() == "1/2 * (\\gamma_{ab}\\gamma_{cd} + \\gamma_{cb}\\gamma_{ad})");
+    }
+}
+
+/*SCENARIO("Block symmetrization", "[block-symmetrization]") {
 
 
 
@@ -47,4 +59,4 @@ SCENARIO("Block symmetrization", "[block-symmetrization]") {
         }
     }
 
-}
+}*/

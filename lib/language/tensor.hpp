@@ -26,7 +26,7 @@ namespace Construction {
                 return "Arbitrary(<Indices>)";
             }
 
-            Expression Execute() const {
+            Expression Execute() const {                
                 auto indices = GetArgument<IndexArgument>(0)->GetIndices();
                 return API::Arbitrary(indices);
             }
@@ -260,6 +260,42 @@ namespace Construction {
         REGISTER_COMMAND(Evaluate);
         REGISTER_ARGUMENT(Evaluate, 0, ArgumentType::TENSOR);
         REGISTER_REPEATED_ARGUMENT(Evaluate, 1, ArgumentType::NUMERIC);
+
+        /**
+            \class Simplify
+
+            std:string Help
+         */        
+        CLI_COMMAND(Simplify, true)
+            std::string Help() const {
+                return "Simplify(<Tensor>)";
+            }
+
+            Expression Execute() const {
+                return GetTensors(0).Simplify();
+            }
+        };
+
+        REGISTER_COMMAND(Simplify);
+        REGISTER_ARGUMENT(Simplify, 0, ArgumentType::TENSOR);
+
+        /**
+            \class RedefineVariables
+
+            std:string Help
+         */        
+        CLI_COMMAND(RedefineVariables, true)
+            std::string Help() const {
+                return "RedefineVariables(<Tensor>)";
+            }
+
+            Expression Execute() const {
+                return GetTensors(0).RedefineVariables("e");
+            }
+        };
+
+        REGISTER_COMMAND(RedefineVariables);
+        REGISTER_ARGUMENT(RedefineVariables, 0, ArgumentType::TENSOR);
 
     }
 }
