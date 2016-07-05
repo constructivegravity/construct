@@ -320,6 +320,12 @@ namespace Construction {
                 // Read line per line and execute
                 std::string line;
                 while (std::getline(file, line)) {
+                    // Ignore empty lines
+                    if (line == "") continue;
+
+                    // Ignore comments
+                    if (line[0] == '#') continue;
+
                     // Turn silent?
                     if (silent && line[line.size()-1] != ':') line.append(":");
 

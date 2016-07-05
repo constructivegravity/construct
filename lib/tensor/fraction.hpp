@@ -133,10 +133,16 @@ namespace Construction {
             }
 
             virtual std::string ToString() const override {
+                // Do not write 0 to complicated
+                if (numerator == 0) return "0";
+
+                // Reduce
                 Fraction c = *this;
                 c.Reduce();
+
                 std::stringstream ss;
-                ss << c.numerator << "/" << c.denominator;
+                if (c.denominator == 1) ss << c.numerator;
+                else ss << c.numerator << "/" << c.denominator;
                 return ss.str();
             }
 

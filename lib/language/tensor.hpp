@@ -297,18 +297,24 @@ namespace Construction {
         REGISTER_COMMAND(RedefineVariables);
         REGISTER_ARGUMENT(RedefineVariables, 0, ArgumentType::TENSOR);
 
+        /**
+            \class HomogeneousSystem
+
+            std:string Help
+         */ 
         CLI_COMMAND(HomogeneousSystem, false)
             std::string Help() const {
                 return "HomogeneousSystem(<Tensor>)";
             }
 
             Expression Execute() const {
-                auto system = GetTensors(0).ToHomogeneousSystem();
+                auto solution = API::HomogeneousSystem(GetTensors(0));
 
-                std::cout << system.first << std::endl;
-                for (auto& variable : system.second) {
-                    std::cout << variable << std::endl;
+                std::cout << "\033[36m";
+                for (auto& eq : solution) {
+                    std::cout << "   " << eq.first << " = " << eq.second << std::endl;
                 }
+                std::cout << "\033[0m";
 
                 return Expression::Void();
             }
@@ -316,8 +322,6 @@ namespace Construction {
 
         REGISTER_COMMAND(HomogeneousSystem);
         REGISTER_ARGUMENT(HomogeneousSystem, 0, ArgumentType::TENSOR);
-
-        /**
 
     }
 }

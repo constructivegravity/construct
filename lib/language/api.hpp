@@ -56,6 +56,8 @@ namespace Construction {
             std::vector<Tensor::Tensor> LinearIndependent(const std::vector<Tensor::Tensor>& tensors);
             std::vector<std::pair<Tensor::Tensor,Tensor::Tensor>> LinearDependent(const std::vector<Tensor::Tensor>& tensors);
 
+            std::vector<std::pair<Scalar, Scalar>> HomogeneousSystem(const Tensor::Tensor& tensor);
+
             Scalar Evaluate(const Tensor::TensorContainer& tensors, const std::vector<unsigned>& indices);
 
             /**
@@ -209,6 +211,43 @@ namespace Construction {
             std::vector<std::pair<Tensor::Tensor,Tensor::Tensor>> LinearDependent(const std::vector<Tensor::Tensor>& tensors) {
                 // TODO: implement this
                 std::vector<std::pair<Tensor::Tensor,Tensor::Tensor>> result;
+                return result;
+            }
+
+            std::vector<std::pair<Scalar, Scalar>> HomogeneousSystem(const Tensor::Tensor& tensor) {
+                auto system = tensor.ToHomogeneousLinearSystem();
+
+                // Reduce
+                system.first.ToRowEchelonForm();
+
+                std::vector<std::pair<Scalar, Scalar>> result;
+
+                // Extract the results
+                for (int i=0; i<system.first.GetNumberOfRows(); i++) {
+                    auto vec = system.first.GetRowVector(i);
+
+                    // If the vector has zero norm, we get no further information => quit
+                    if (vec * vec == 0) break;
+
+                    bool isZero = true;
+                    Scalar lhs = 0;
+                    Scalar rhs = 0;
+
+                    // Iterate over all the components
+                    for (int j=0; j<vec.GetDimension(); j++) {
+                        if (vec[j] == 0 && isZero) continue;
+                        if (vec[j] == 1 && isZero) {
+                            lhs = system.second[j];
+                            isZero = false;
+                        } else if (vec[j] != 0) {
+                            rhs += (-system.second[j] * vec[j]);
+                        }
+                    }
+
+                    // Add to the result
+                    result.push_back({lhs, rhs});
+                }
+
                 return result;
             }
 

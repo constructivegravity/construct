@@ -125,29 +125,34 @@ namespace Construction {
         public:
             ExchangeSymmetrizedTensorGenerator(const Indices& indices) : indices(indices) { }
         public:
-            Tensor::Tensor operator()(const Tensor::Tensor& tensor, bool scaledResult=false) const {
+            Tensor::Tensor operator()(const Tensor::Tensor& tensor, bool scaledResult=true) const {
                 Tensor::Tensor result = Tensor::Tensor::Zero();
 
                 auto tensors = tensor.GetSummands();
 
-                for (auto& tensor : tensors) {
+                for (auto& _tensor : tensors) {
                     auto oldIndices = tensor.GetIndices();
+                    auto permutation = Tensor::Permutation::From(indices, _tensor.GetIndices());
+                    auto newIndices = permutation(oldIndices);
+
+                    auto scale = _tensor.SeparateScalefactor().first;
+                    auto tensor = _tensor.SeparateScalefactor().second;
+
                     auto copyTensor = tensor;
-                    copyTensor.SetIndices(indices);
+                    copyTensor.SetIndices(newIndices);
 
                     auto added = tensor + copyTensor;
-                    //auto added = tensor + Tensor::Tensor::Substitute(copyTensor, oldIndices);
                     auto scaled = Tensor::Scalar(1,2) * added;
 
                     if (scaled.IsEqual(tensor)) {
-                        result += tensor;
+                        result += _tensor;
                         continue;
                     }
 
                     if (!scaledResult)
-                        result += added;
+                        result += scale * added;
                     else
-                        result += scaled;
+                        result += scale * scaled;
                 }
 
                 return result;

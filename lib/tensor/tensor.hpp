@@ -2016,12 +2016,13 @@ namespace Construction {
 				return result;
 			}
 
-			std::map<scalar_type, Tensor> ExtractVariables(Tensor* inhomogeneousPart = nullptr) const {
+			std::vector<std::pair<scalar_type, Tensor>> ExtractVariables(Tensor* inhomogeneousPart = nullptr) const {
 				// First expand and get summands
-				auto summands = Expand().GetSummands();
+				auto summands = GetSummands();
 
 				// Start result
-				std::map<scalar_type, Tensor> result;
+				std::vector<scalar_type> result_scalars;
+				std::vector<Tensor> result_tensors;
 
 				// Iterate over all the summands
 				for (auto& _tensor : summands) {
@@ -2035,8 +2036,13 @@ namespace Construction {
 					for (auto& v : scalarSummands) {
 						// If the scalar is a variable
 						if (v.IsVariable()) {
-							if (result.find(v) == result.end()) result.insert({ v, tensor });
-							else result[v] += tensor;
+							auto it = std::find(result_scalars.begin(), result_scalars.end(), v);
+							if (it == result_scalars.end()) {
+								result_scalars.push_back(v);
+								result_tensors.push_back(tensor);
+							} else {
+								result_tensors[it - result_scalars.begin()] += tensor;
+							}
 						} 
 						// if the scalar is a number, just add the tensor to the inhomogeneous part
 						else if (v.IsNumeric()) {
@@ -2055,23 +2061,39 @@ namespace Construction {
 							bool b2 = v.As<MultipliedScalar>()->GetSecond()->IsNumeric();
 						
 							if (a1 && b2) {
-								scalar_type s = scalar_type(std::move(std::move(first)));
+								scalar_type s = scalar_type(std::move(first));
 								Tensor newTensor = scalar_type(std::move(second)) * tensor;
 
-								if (result.find(s) == result.end()) result.insert({ s, newTensor });
-								else result[s] += newTensor;
+								auto it = std::find(result_scalars.begin(), result_scalars.end(), s);
+								if (it == result_scalars.end()) {
+									result_scalars.push_back(s);
+									result_tensors.push_back(newTensor);
+								} else {
+									result_tensors[it - result_scalars.begin()] += newTensor;
+								}
 							} else if (a2 && b1) {
 								scalar_type s = scalar_type(std::move(second));
 								Tensor newTensor = scalar_type(std::move(first)) * tensor;
 
-								if (result.find(s) == result.end()) result.insert({ s, newTensor });
-								else result[s] += newTensor;
+								auto it = std::find(result_scalars.begin(), result_scalars.end(), s);
+								if (it == result_scalars.end()) {
+									result_scalars.push_back(s);
+									result_tensors.push_back(newTensor);
+								} else {
+									result_tensors[it - result_scalars.begin()] += newTensor;
+								}
 							} else {
 								// Throw exception, do not support quadratic terms
 								assert(false);
 							}
 						}
 					}
+				}
+
+				// Turn this into the result
+				std::vector< std::pair<scalar_type, Tensor> > result;
+				for (unsigned i=0; i<result_scalars.size(); i++) {
+					result.push_back({ result_scalars[i], result_tensors[i] });
 				}
 
 				return result;
