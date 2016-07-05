@@ -297,5 +297,27 @@ namespace Construction {
         REGISTER_COMMAND(RedefineVariables);
         REGISTER_ARGUMENT(RedefineVariables, 0, ArgumentType::TENSOR);
 
+        CLI_COMMAND(HomogeneousSystem, false)
+            std::string Help() const {
+                return "HomogeneousSystem(<Tensor>)";
+            }
+
+            Expression Execute() const {
+                auto system = GetTensors(0).ToHomogeneousSystem();
+
+                std::cout << system.first << std::endl;
+                for (auto& variable : system.second) {
+                    std::cout << variable << std::endl;
+                }
+
+                return Expression::Void();
+            }
+        };
+
+        REGISTER_COMMAND(HomogeneousSystem);
+        REGISTER_ARGUMENT(HomogeneousSystem, 0, ArgumentType::TENSOR);
+
+        /**
+
     }
 }
