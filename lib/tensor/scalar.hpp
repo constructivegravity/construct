@@ -436,6 +436,45 @@ namespace Construction {
                 // Execute
                 return helper(pointer.get());
             }
+
+            /** 
+                \brief Substitute variables in a scalar expression
+
+                Substitutes a variable with an arbitrary scalar expression. Since
+                we build up the result again after identifying the important terms,
+                all the black magic for simplification works, i.e.
+                terms multiplied by zero will not appear anymore, other terms can
+                drop out etc.
+
+                \param {Scalar} variable        The variable to replace
+                \param {Scalar} other           The expression to plug in
+
+                \returns Scalar                 The substituted expression
+             */
+            Scalar Substitute(const Scalar& variable, const Scalar& other) const {
+                // If the given scalar is not a variable, return the original scalar
+                if (!variable.IsVariable()) return *this;
+
+                // Split into sums
+                auto summands = GetSummands();
+
+                Scalar result = 0;
+
+                // Iterate over all summands
+                for (auto& s : summands) {
+                    // If it is just a number or the searched variable, just add the result
+                    if (s.IsVariable() && s == variable) result += other;
+                    if (s.IsNumeric()) result += s;
+                    
+                    // If it is a multiplication, substite in each factor recursively
+                    if (s.IsMultiplied()) {
+                        result += Scalar(static_cast<MultipliedScalar*>(s.pointer.get())->GetFirst()->Clone()).Substitute(variable, other) * 
+                                  Scalar(static_cast<MultipliedScalar*>(s.pointer.get())->GetSecond()->Clone()).Substitute(variable, other);
+                    }
+                }
+
+                return result;
+            }
         public:
             void Serialize(std::ostream& os) const override;
             static std::shared_ptr<Scalar> Deserialize(std::istream& is);
