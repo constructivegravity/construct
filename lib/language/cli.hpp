@@ -121,6 +121,7 @@ namespace Construction {
             void Execute(const std::shared_ptr<Node>& document, bool silent=false) {
                 // Copy the most recent tensor;
                 Expression lastResult = Session::Instance()->GetCurrent();
+                Common::TimeMeasurement time;
 
                 if (document->IsPrevious()) {
                     PrintExpression(lastResult);
@@ -249,6 +250,9 @@ namespace Construction {
                         Error("Wrong argument type");
                     }
 
+                    // Stop time measurement
+                    time.Stop();
+
                     // Update the session
                     Session::Instance()->SetCurrent(expandedCmd, lastResult);
 
@@ -258,8 +262,10 @@ namespace Construction {
                     }*/
 
                     // Print tensors unless in silent mode
-                    if (command->ReturnsTensors() && !silent) {
+                    if (/*command->ReturnsTensors() &&*/ !silent) {
                         PrintExpression(newResult);
+
+                        std::cout << "\033[90m   " << time << "\033[0m" << std::endl;
                     }
 
                     return;
