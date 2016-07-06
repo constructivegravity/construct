@@ -42,10 +42,44 @@ ScalarPointer AbstractScalar::Add(const AbstractScalar& one, const AbstractScala
         return ScalarPointer(new FloatingPointScalar(one.ToDouble() + other.ToDouble()));
     }
 
+    // From now on, we can assume that one of the summands contains a variable
+
     // If both are the same, multiply them
     if (Scalar(first->Clone()) == Scalar(second->Clone())) {
         return std::move(Multiply(Fraction(2), one));
     }
+
+    // If one is the negative of the other, return zero
+    if (Scalar(first->Clone()) == -Scalar(second->Clone())) {
+        return ScalarPointer(new Fraction());
+    }
+
+    // Simplify linear variable expressions
+    /*if (one.IsMultiplied() && static_cast<MultipliedScalar*>(first.get())->A->IsNumeric() && static_cast<MultipliedScalar*>(first.get())->B->IsVariable()) {
+        Variable* v = static_cast<Variable*>(static_cast<MultipliedScalar*>(first.get())->B.get());
+        AbstractScalar* factor1 = static_cast<Variable*>(static_cast<MultipliedScalar*>(first.get())->A.get());
+
+        if (other.IsVariable() && static_cast<Variable*>(second.get())->ToString() == v->ToString()) {
+            return std::move(Multiply(
+                *Add(*static_cast<MultipliedScalar*>(first.get())->A->Clone(), Fraction(1)),
+
+                // Variable
+                *static_cast<MultipliedScalar*>(first.get())->B->Clone()
+            ));
+        }
+
+        if (other.IsMultiplied() && static_cast<MultipliedScalar*>(second.get())->B->IsVariable() && static_cast<MultipliedScalar*>(second.get())->B->ToString() == v->ToString()) {
+            return std::move(Multiply(
+                *Add(
+                    *static_cast<MultipliedScalar*>(first.get())->A->Clone(), 
+                    *static_cast<MultipliedScalar*>(second.get())->A->Clone(),
+                ),
+
+                // Variable
+                *static_cast<MultipliedScalar*>(first.get())->B->Clone()
+            ));
+        }
+    }*/
 
     // If the first one is a sum, try to simplify
     if ((one.IsAdded() && other.IsNumeric())) {
@@ -146,19 +180,7 @@ ScalarPointer AbstractScalar::Multiply(const AbstractScalar& one, const Abstract
 }
 
 ScalarPointer AbstractScalar::Negate(const AbstractScalar& one) {
-    ScalarPointer first = one.Clone();
-
-    // Do some simplification black magic
-    if (one.IsFraction()) {
-        return ScalarPointer(new Fraction(-(*static_cast<Fraction*>(first.get()))));
-    }
-
-    if (one.IsFloatingPoint()) {
-        return ScalarPointer(new FloatingPointScalar(-
-            one.ToDouble()));
-    }
-
-    return ScalarPointer(new MultipliedScalar(ScalarPointer(new Fraction(-1)), std::move(one.Clone())));
+    return std::move(Multiply(Fraction(-1), one));
 }
 
 ScalarPointer AbstractScalar::Subtract(const AbstractScalar& one, const AbstractScalar& other) {
