@@ -21,7 +21,7 @@ namespace Construction {
             Command that generates tensors for given indices out of
             epsilons and gammas. It uses the API function.
          */
-        CLI_COMMAND(Arbitrary, true)
+        CLI_COMMAND(Arbitrary)
             std::string Help() const {
                 return "Arbitrary(<Indices>)";
             }
@@ -41,7 +41,7 @@ namespace Construction {
             Command that generates one tensor for given indices out of
             epsilons. It uses the API function.
          */
-        CLI_COMMAND(Epsilon, true)
+        CLI_COMMAND(Epsilon)
             std::string Help() const {
                 return "Epsilon(<Indices>)";
             }
@@ -60,7 +60,7 @@ namespace Construction {
             Command that generates one tensor for given indices out of
             epsilons. It uses the API function.
          */
-        CLI_COMMAND(Gamma, true)
+        CLI_COMMAND(Gamma)
             std::string Help() const {
                 return "Gamma(<Indices>)";
             }
@@ -79,7 +79,7 @@ namespace Construction {
             Command that generates one tensor for given indices out of
             epsilons and gammas. It uses the API function.
          */
-        CLI_COMMAND(EpsilonGamma, true)
+        CLI_COMMAND(EpsilonGamma)
             std::string Help() const {
                 return "EpsilonGamma(<Indices>)";
             }
@@ -97,7 +97,7 @@ namespace Construction {
 
             std:string Help
          */
-        CLI_COMMAND(Coefficient, true)
+        CLI_COMMAND(Coefficient)
                 std::string Help() const {
                     return "Coefficient(<Numeric>, <Numeric>, <Numeric>, <Numeric>)";
                 }
@@ -118,7 +118,7 @@ namespace Construction {
 
             Command to add two tensors
          */
-        CLI_COMMAND(Add, true)
+        CLI_COMMAND(Add)
             std::string Help() const {
                 return "Add(<Tensor>, <Tensor>...)";
             }
@@ -150,7 +150,7 @@ namespace Construction {
 
             Scale a tensor
          */
-        CLI_COMMAND(Scale, true)
+        CLI_COMMAND(Scale)
             std::string Help() const {
                 return "Scale(<Tensor>, <Numeric>)";
             }
@@ -194,7 +194,7 @@ namespace Construction {
             Calculates the degrees of freedom of tensors. Uses the
             API command.
          */
-        CLI_COMMAND(DegreesOfFreedom, false)
+        CLI_COMMAND(DegreesOfFreedom)
 
             std::string Help() const {
                 return "DegreesOfFreedom(<Tensors>)";
@@ -215,7 +215,7 @@ namespace Construction {
         REGISTER_COMMAND(DegreesOfFreedom);
         REGISTER_ARGUMENT(DegreesOfFreedom, 0, ArgumentType::TENSOR);
 
-        CLI_COMMAND(IsZero, false)
+        CLI_COMMAND(IsZero)
 
             std::string Help() const {
                 return "IsZero(<Tensor>)";
@@ -239,7 +239,7 @@ namespace Construction {
 
             std:string Help
          */
-        CLI_COMMAND(Evaluate, false)
+        CLI_COMMAND(Evaluate)
                 std::string Help() const {
                     return "Evaluate(<Tensors>, <Numeric>...)";
                 }
@@ -266,7 +266,7 @@ namespace Construction {
 
             std:string Help
          */        
-        CLI_COMMAND(Simplify, true)
+        CLI_COMMAND(Simplify)
             std::string Help() const {
                 return "Simplify(<Tensor>)";
             }
@@ -284,7 +284,7 @@ namespace Construction {
 
             std:string Help
          */        
-        CLI_COMMAND(RedefineVariables, true)
+        CLI_COMMAND(RedefineVariables)
             std::string Help() const {
                 return "RedefineVariables(<Tensor>)";
             }
@@ -302,26 +302,37 @@ namespace Construction {
 
             std:string Help
          */ 
-        CLI_COMMAND(HomogeneousSystem, false)
+        CLI_COMMAND(HomogeneousSystem)
             std::string Help() const {
                 return "HomogeneousSystem(<Tensor>)";
             }
 
             Expression Execute() const {
-                auto solution = API::HomogeneousSystem(GetTensors(0));
-
-                std::cout << "\033[36m";
-                for (auto& eq : solution) {
-                    std::cout << "   " << eq.first << " = " << eq.second << std::endl;
-                }
-                std::cout << "\033[0m";
-
-                return Expression::Void();
+                return API::HomogeneousSystem(GetTensors(0));
             }
         };
 
         REGISTER_COMMAND(HomogeneousSystem);
         REGISTER_ARGUMENT(HomogeneousSystem, 0, ArgumentType::TENSOR);
+
+        /**
+            \class Substitute
+
+            std:string Help
+         */ 
+        CLI_COMMAND(Substitute)
+            std::string Help() const {
+                return "Substitute(<Tensor>, <Substitution>)";
+            }
+
+            Expression Execute() const {
+                return API::Substitute(GetTensors(0), GetSubstitution(1));
+            }
+        };
+
+        REGISTER_COMMAND(Substitute);
+        REGISTER_ARGUMENT(Substitute, 0, ArgumentType::TENSOR);
+        REGISTER_ARGUMENT(Substitute, 1, ArgumentType::SUBSTITUTION);
 
     }
 }

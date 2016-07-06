@@ -12,26 +12,30 @@ namespace Construction {
 				SCALAR = 2,
 				BOOLEAN = 3,
 
-				TENSOR_LIST = 4,
+				SUBSTITUTION = 101,
 
 				VOID_TYPE = 1001,
 			};
 		public:
-			AbstractExpression(Type type) : type(type) { }
+			AbstractExpression(Type type) : type(type), colorCode(32) { }
+			AbstractExpression(Type type, int colorCode) : type(type), colorCode(colorCode) { }
 		public:
 			bool IsTensor() const { return type == TENSOR; }
 			bool IsScalar() const { return type == SCALAR; }
-			bool IsTensorList() const { return type == TENSOR_LIST; }
 			bool IsBoolean() const { return type == BOOLEAN; }
 			bool IsVoid() const { return type == VOID_TYPE; }
+			bool IsSubstitution() const { return type == SUBSTITUTION; }
 
 			Type GetType() const { return type; }
+		public:
+			virtual inline int GetColorCode() const { return colorCode; }
 		public:
 			virtual std::unique_ptr<AbstractExpression> Clone() const = 0;
 		public:
 			virtual std::string ToString() const { return ""; }
 		private:
 			Type type;
+			int colorCode;
 		};
 
 		typedef std::unique_ptr<AbstractExpression> 	ExpressionPointer;
@@ -56,6 +60,8 @@ namespace Construction {
 			virtual std::string ToString() const {
 				return (value) ? "yes" : "no";
 			}
+		public:
+			virtual int GetColorCode() const override { return (value) ? 32 : 31; }
 		private:
 			bool value;
 		};
@@ -87,18 +93,20 @@ namespace Construction {
 				return *this;
 			}
 		public:
+			inline int GetColorCode() const { return pointer->GetColorCode(); }
+		public:
 			bool IsScalar() const { return pointer->IsScalar(); }
 			bool IsTensor() const { return pointer->IsTensor(); }
 			bool IsBoolean() const { return pointer->IsBoolean(); }
 			bool IsVoid() const { return pointer->IsVoid(); }
-			bool IsTensorList() const { return pointer->IsTensorList(); }
+			bool IsSubstitution() const { return pointer->IsSubstitution(); }
 
 			std::string TypeToString() const {
 				switch (pointer->GetType()) {
 					case AbstractExpression::TENSOR: return "Tensor";
 					case AbstractExpression::SCALAR: return "Scalar";
 					case AbstractExpression::BOOLEAN: return "Boolean";
-					case AbstractExpression::TENSOR_LIST: return "TensorList";
+					case AbstractExpression::SUBSTITUTION: return "Substitution";
 					case AbstractExpression::VOID_TYPE: return "Void";
 				}
 				return "Unknown";

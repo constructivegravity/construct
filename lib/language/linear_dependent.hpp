@@ -22,7 +22,7 @@ namespace Construction {
             Command that generates tensors for given indices out of
             epsilons and gammas. It uses the API function.
          */
-        CLI_COMMAND(LinearIndependent, true)
+        CLI_COMMAND(LinearIndependent)
             std::string Help() const {
                 return "LinearIndependent(<Tensors>)";
             }

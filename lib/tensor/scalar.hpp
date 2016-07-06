@@ -463,7 +463,7 @@ namespace Construction {
                 // Iterate over all summands
                 for (auto& s : summands) {
                     // If it is just a number or the searched variable, just add the result
-                    if (s.IsVariable() && s == variable) result += other;
+                    if (s.IsVariable()) result += (s == variable) ? other : s;
                     if (s.IsNumeric()) result += s;
                     
                     // If it is a multiplication, substite in each factor recursively

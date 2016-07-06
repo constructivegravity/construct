@@ -66,10 +66,55 @@ SCENARIO("Scalars", "[scalar]") {
 
 			REQUIRE((s1 + (f1*v1)).ToString() == "3.3 + 5/8 * x");
 
+			REQUIRE( (Scalar("x") - Scalar("x")).ToString() == "0" );
+
 			/*Scalar t = Scalar(1,3) * Scalar("x");
 			Scalar s = 3.3 + t;
 			//mREQUIRE(s.IsAdded());
 			REQUIRE(s.ToString() == "3.3 + 1/3 * x");*/
+		}
+
+	}
+
+	GIVEN(" an expression containing a variable") {
+
+		Scalar s = Scalar(3) - Scalar(5) * Scalar("x");
+
+		WHEN(" printing the expression") {
+			THEN(" we get the proper TeX code") {
+				REQUIRE(s.ToString() == "3 - 5 * x");
+			}
+		}
+
+		WHEN(" checking if it contains a variable") {
+			THEN(" we get yes") {
+				REQUIRE(s.HasVariables());
+			}
+		}
+
+		WHEN(" substituting the variable") {
+			THEN(" for x=2 we have a number") {
+				Scalar substituted = s.Substitute(Scalar("x"), Scalar(2));
+
+				REQUIRE(substituted.IsNumeric());
+				REQUIRE(substituted.ToDouble() == -7);
+			}
+
+			THEN(" inserting zero gives 3") {
+				REQUIRE(s.Substitute(Scalar("x"), Scalar(0)).ToString() == "3");
+			}
+
+			THEN(" inserting 3/5 gives zero") {
+				REQUIRE(s.Substitute(Scalar("x"), Scalar(3,5)).ToString() == "0");
+			}
+
+			THEN(" inserting a variable renames it") {
+				REQUIRE(s.Substitute(Scalar("x"), Scalar("y")).ToString() == "3 - 5 * y");
+			}
+
+			THEN(" trying to replace the 3 does not work") {
+				REQUIRE(s.Substitute(Scalar(3), Scalar(2)).ToString() == "3 - 5 * x");
+			}
 		}
 
 	}

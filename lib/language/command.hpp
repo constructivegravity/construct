@@ -24,6 +24,10 @@ namespace Construction {
     class WrongArgumentTypeException : public Exception {
     public:
         WrongArgumentTypeException() : Exception("The command was called with a wrong argument type") { }
+        WrongArgumentTypeException(const std::string& expected, const std::string& got) : expected(expected), got(got), Exception("The command was called with a wrong argument type") { }
+    public:
+        std::string expected;
+        std::string got;
     };
 
     class UnknownCommandException : public Exception {
@@ -85,7 +89,6 @@ namespace Construction {
         public:
             Command() = default;
             Command(const std::string& name) : name(name) { }
-            Command(const std::string& name, bool returnsTensors) : name(name), returnsTensors(returnsTensors) { }
         public:
             std::string GetName() const { return name; }
             void SetName(const std::string& name) { this->name = name; }
@@ -127,6 +130,12 @@ namespace Construction {
                 return GetArgument<TensorArgument>(pos)->GetTensor();
             }
 
+            Tensor::Substitution GetSubstitution(unsigned pos) const {
+                assert(pos < arguments.size());
+                assert(arguments[pos]->IsSubstitutionArgument());
+                return GetArgument<SubstitutionArgument>(pos)->GetSubstitution();
+            }
+
             double GetNumeric(unsigned pos) const {
                 assert(pos < arguments.size());
                 assert(arguments[pos]->IsNumericArgument());
@@ -158,7 +167,7 @@ namespace Construction {
 
                 for (int i=0; i<arguments.size(); i++) {
                     if (!ArgumentDictionary::Instance()->IsA(name, i, arguments[i]->GetType())) {
-                        throw WrongArgumentTypeException();
+                        throw WrongArgumentTypeException(name, ArgumentDictionary::Instance()->TypeToString(arguments[i]->GetType()));
                     }
                 }
             }
@@ -175,15 +184,12 @@ namespace Construction {
                 return Execute();
             }
         public:
-            bool ReturnsTensors() const { return returnsTensors; }
-
             static bool Cachable() { return true; }
         public:
             virtual std::string Help() const = 0;
             virtual Expression Execute() const = 0;
         protected:
             std::string name;
-            bool returnsTensors=true;
 
             std::vector<ArgumentPointer> arguments;
         };
@@ -259,9 +265,9 @@ namespace Construction {
         };
 
 #define REGISTER_COMMAND(name) static CommandRegistrar<name##Command> registrar_command_##name (#name);
-#define CLI_COMMAND(name, tensors) class name##Command : public Command { \
+#define CLI_COMMAND(name) class name##Command : public Command { \
 public: \
-    name##Command() : Command(#name, tensors) { }    \
+    name##Command() : Command(#name) { }    \
 public:
 
     }

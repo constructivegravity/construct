@@ -1757,7 +1757,10 @@ namespace Construction {
 				auto summands = GetSummands();
 
 				// Stop recursion if atomic tensor
-				if (summands.size() == 1) return summands[0].pointer->ToString();
+				if (summands.size() == 1) {
+					if (summands[0].IsZeroTensor()) return "0";
+					return summands[0].pointer->ToString();
+				}
 
 				// Else, iterate over all summands
 				std::stringstream ss;
@@ -1988,6 +1991,29 @@ namespace Construction {
 				} else {
 					return { 1, *this };
 				}
+			}
+
+			Tensor SubstituteVariable(const scalar_type& variable, const scalar_type& expression) const {
+				auto summands = GetSummands();
+
+				Tensor result = Tensor::Zero();
+
+				for (auto& _tensor : summands) {
+					auto tmp = _tensor.SeparateScalefactor();
+					result += tmp.first.Substitute(variable, expression) * tmp.second;
+				}
+
+				return result;
+			}
+
+			Tensor SubstituteVariables(const std::vector<std::pair<scalar_type, scalar_type>>& substitutions) const {
+				Tensor result = *this;
+
+				for (auto& substitution : substitutions) {
+					result = std::move(result.SubstituteVariable(substitution.first, substitution.second));
+				}
+
+				return result;
 			}
 
 			Tensor RedefineVariables(const std::string& name) const {

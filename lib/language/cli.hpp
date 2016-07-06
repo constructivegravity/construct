@@ -119,11 +119,15 @@ namespace Construction {
             }
 
             void Execute(const std::shared_ptr<Node>& document, bool silent=false) {
-                // Copy the most recent tensor;
+                // Copy the most recent expression;
                 Expression lastResult = Session::Instance()->GetCurrent();
+                Expression previousResult = lastResult;
+
                 Common::TimeMeasurement time;
 
                 if (document->IsPrevious()) {
+                    std::cout << " -> " << lastResult.TypeToString() << std::endl;
+
                     PrintExpression(lastResult);
                     return;
                 } else if (document->IsCommand()) {
@@ -175,6 +179,15 @@ namespace Construction {
                                         break;
                                 }
 
+                                // Substitution
+                                {
+                                    case Tensor::AbstractExpression::SUBSTITUTION:
+                                        auto newArg = std::make_shared<SubstitutionArgument>();
+                                        newArg->SetSubstitution(lastResult.As<Tensor::Substitution>());
+                                        command->AddArgument(std::move(newArg));
+                                        break;
+                                }
+
                                 case Tensor::AbstractExpression::SCALAR:
                                     // TODO: implement scalar argument
                                     throw WrongTypeException();
@@ -187,9 +200,32 @@ namespace Construction {
                         }
                         // If pointer to previous, add this
                         else if (arg->IsPrevious()) {
-                            auto newArg = std::make_shared<TensorArgument>();
-                            newArg->SetTensor(lastResult.As<Tensor::Tensor>());
-                            command->AddArgument(std::move(newArg));
+                            switch (previousResult.GetType()) {
+                                {
+                                    case Tensor::AbstractExpression::TENSOR:
+                                        auto newArg = std::make_shared<TensorArgument>();
+                                        newArg->SetTensor(previousResult.As<Tensor::Tensor>());
+                                        command->AddArgument(std::move(newArg));
+                                        break;
+                                }
+
+                                {
+                                    case Tensor::AbstractExpression::SUBSTITUTION:
+                                        auto newArg = std::make_shared<SubstitutionArgument>();
+                                        newArg->SetSubstitution(previousResult.As<Tensor::Substitution>());
+                                        command->AddArgument(std::move(newArg));
+                                        break;
+                                }
+
+                                case Tensor::AbstractExpression::SCALAR:
+                                    // TODO: implement scalar argument
+                                    throw WrongTypeException();
+                                    break;
+
+                                default:
+                                    throw WrongTypeException();
+                                    break;
+                            }
                         }
                         // If is a literal, load the name from memory
                         else if (arg->IsLiteral()) {
@@ -201,6 +237,14 @@ namespace Construction {
                                     case Tensor::AbstractExpression::TENSOR:
                                         auto newArg = std::make_shared<TensorArgument>();
                                         newArg->SetTensor(lastResult.As<Tensor::Tensor>());
+                                        command->AddArgument(std::move(newArg));
+                                        break;
+                                }
+
+                                {
+                                    case Tensor::AbstractExpression::SUBSTITUTION:
+                                        auto newArg = std::make_shared<SubstitutionArgument>();
+                                        newArg->SetSubstitution(lastResult.As<Tensor::Substitution>());
                                         command->AddArgument(std::move(newArg));
                                         break;
                                 }
@@ -239,22 +283,30 @@ namespace Construction {
                     try {
                         newResult = (*command)();
 
-                        // Only overwrite last result if the command returns ones
-                        if (command->ReturnsTensors()) {
+                        // Overwrite last result
+                        if (!newResult.IsVoid()) {
                             lastResult = newResult;
                         }
 
                     } catch (WrongNumberOfArgumentsException err) {
                         Error("Wrong number of arguments");
                     } catch (WrongArgumentTypeException err) {
-                        Error("Wrong argument type");
+                        if (err.expected != "" && err.got != "") {
+                            std::stringstream ss;
+                            ss << "Wrong argument type (expected `" << err.expected << "`, got `" << err.got << "`)";
+                            Error(ss.str());
+                        } else {
+                            Error("Wrong argument type");
+                        }
                     }
 
                     // Stop time measurement
                     time.Stop();
 
                     // Update the session
-                    Session::Instance()->SetCurrent(expandedCmd, lastResult);
+                    if (!lastResult.IsVoid()) {
+                        Session::Instance()->SetCurrent(expandedCmd, lastResult);
+                    }
 
                     // Update database
                     /*if (command->Cachable()) {
@@ -262,9 +314,10 @@ namespace Construction {
                     }*/
 
                     // Print tensors unless in silent mode
-                    if (/*command->ReturnsTensors() &&*/ !silent) {
+                    if (!silent) {
                         PrintExpression(newResult);
 
+                        // Print the required time
                         std::cout << "\033[90m   " << time << "\033[0m" << std::endl;
                     }
 
@@ -275,15 +328,32 @@ namespace Construction {
 
                     Execute(expression, true);
 
+                    // Update current
+                    lastResult = Session::Instance()->GetCurrent();
+
                     // Store the variable in memory
                     Session::Instance()->Get(id) = lastResult;
 
                     definition[id] = lastCmd;
                     //database[lastCmd] = lastResult;
+
+                    // Print tensors unless in silent mode
+                    if (!silent) {
+                        PrintExpression(lastResult);
+
+                        time.Stop();
+
+                        // Print the required time
+                        std::cout << "\033[90m   " << time << "\033[0m" << std::endl;
+                    }
+
                     return;
                 } else if (document->IsLiteral()) {
                     auto id = std::dynamic_pointer_cast<LiteralNode>(document)->GetText();
                     Session::Instance()->SetCurrent(definition[id], Session::Instance()->Get(id));
+
+                    // Update current
+                    lastResult = Session::Instance()->GetCurrent();
 
                     if (!silent) PrintExpression(lastResult);
                     return;
@@ -379,7 +449,7 @@ namespace Construction {
                 std::string line;
 
                 // Change the output color
-                std::cout << "\033[32m";
+                std::cout << "\033[" << expression.GetColorCode() << "m";
 
                 // Shift the output by three characters
                 while (std::getline(ss, line)) {

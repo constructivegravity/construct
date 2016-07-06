@@ -2,6 +2,7 @@
 
 #include <tensor/index.hpp>
 #include <tensor/tensor.hpp>
+#include <tensor/substitution.hpp>
 
 #include <common/time_measurement.hpp>
 
@@ -11,6 +12,7 @@
 using Construction::Tensor::Tensor;
 using Construction::Tensor::Scalar;
 using Construction::Tensor::Indices;
+using Construction::Tensor::Substitution;
 
 namespace Construction {
     namespace Language {
@@ -56,7 +58,9 @@ namespace Construction {
             std::vector<Tensor::Tensor> LinearIndependent(const std::vector<Tensor::Tensor>& tensors);
             std::vector<std::pair<Tensor::Tensor,Tensor::Tensor>> LinearDependent(const std::vector<Tensor::Tensor>& tensors);
 
-            std::vector<std::pair<Scalar, Scalar>> HomogeneousSystem(const Tensor::Tensor& tensor);
+            Substitution HomogeneousSystem(const Tensor::Tensor& tensor);
+
+            Tensor::Tensor Substitute(const Tensor::Tensor& tensor, const Substitution& substitution);
 
             Scalar Evaluate(const Tensor::TensorContainer& tensors, const std::vector<unsigned>& indices);
 
@@ -235,13 +239,13 @@ namespace Construction {
                 return result;
             }
 
-            std::vector<std::pair<Scalar, Scalar>> HomogeneousSystem(const Tensor::Tensor& tensor) {
+            Substitution HomogeneousSystem(const Tensor::Tensor& tensor) {
                 auto system = tensor.ToHomogeneousLinearSystem();
 
                 // Reduce
                 system.first.ToRowEchelonForm();
 
-                std::vector<std::pair<Scalar, Scalar>> result;
+                Substitution result;
 
                 // Extract the results
                 for (int i=0; i<system.first.GetNumberOfRows(); i++) {
@@ -266,10 +270,14 @@ namespace Construction {
                     }
 
                     // Add to the result
-                    result.push_back({lhs, rhs});
+                    result.Insert(lhs, rhs);
                 }
 
                 return result;
+            }
+
+            Tensor::Tensor Substitute(const Tensor::Tensor& tensor, const Substitution& substitution) {
+                return substitution(tensor);
             }
 
             Scalar Evaluate(const Tensor::Tensor& tensor, const std::vector<unsigned>& indices) {

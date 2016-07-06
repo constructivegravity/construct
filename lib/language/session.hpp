@@ -257,7 +257,7 @@ namespace Construction {
 
 
          */
-        CLI_COMMAND(Save, false)
+        CLI_COMMAND(Save)
             std::string Help() const {
                 return "Save(<String>)";
             }
@@ -281,7 +281,7 @@ namespace Construction {
 
 
          */
-        CLI_COMMAND(Load, false)
+        CLI_COMMAND(Load)
             std::string Help() const {
                 return "Load(<String>)";
             }

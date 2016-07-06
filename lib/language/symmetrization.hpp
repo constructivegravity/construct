@@ -15,7 +15,7 @@ using Construction::Tensor::Expression;
 namespace Construction {
     namespace Language {
 
-        CLI_COMMAND(Symmetrize, true)
+        CLI_COMMAND(Symmetrize)
 
             std::string Help() const {
                 return "Symmetrize(<Tensors>, <Indices>)";
@@ -41,7 +41,7 @@ namespace Construction {
         REGISTER_ARGUMENT(Symmetrize, 0, ArgumentType::TENSOR);
         REGISTER_REPEATED_ARGUMENT(Symmetrize, 1, ArgumentType::INDEX);
 
-        CLI_COMMAND(AntiSymmetrize, true)
+        CLI_COMMAND(AntiSymmetrize)
 
             std::string Help() const {
                 return "AntiSymmetrize(<Tensors>, <Indices>)";
@@ -61,7 +61,7 @@ namespace Construction {
         REGISTER_ARGUMENT(AntiSymmetrize, 0, ArgumentType::TENSOR);
         REGISTER_ARGUMENT(AntiSymmetrize, 1, ArgumentType::INDEX);
 
-        CLI_COMMAND(ExchangeSymmetrize, true)
+        CLI_COMMAND(ExchangeSymmetrize)
 
             std::string Help() const {
                 return "ExchangeSymmetrize(<Tensors>, <Indices>)";
@@ -81,7 +81,7 @@ namespace Construction {
         REGISTER_ARGUMENT(ExchangeSymmetrize, 0, ArgumentType::TENSOR);
         REGISTER_ARGUMENT(ExchangeSymmetrize, 1, ArgumentType::INDEX);
 
-        CLI_COMMAND(BlockSymmetrize, true)
+        CLI_COMMAND(BlockSymmetrize)
 
             std::string Help() const {
                 return "BlockSymmetrize(<Tensors>, <Indices>, ...)";
@@ -106,7 +106,7 @@ namespace Construction {
         REGISTER_REPEATED_ARGUMENT(BlockSymmetrize, 1, ArgumentType::INDEX);
 
 
-        CLI_COMMAND(IsSymmetric, false)
+        CLI_COMMAND(IsSymmetric)
 
             std::string Help() const {
                 return "IsSymmetric(<Tensors>, <Indices>)";
@@ -129,7 +129,7 @@ namespace Construction {
         REGISTER_ARGUMENT(IsSymmetric, 0, ArgumentType::TENSOR);
         REGISTER_ARGUMENT(IsSymmetric, 1, ArgumentType::INDEX);
 
-        CLI_COMMAND(HasExchangeSymmetry, false)
+        CLI_COMMAND(HasExchangeSymmetry)
 
             std::string Help() const {
                 return "HasExchangeSymmetry(<Tensor>, <Indices>)";

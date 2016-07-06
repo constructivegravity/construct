@@ -1,7 +1,8 @@
 #pragma once
 
 #include <common/singleton.hpp>
-#include <tensor/tensor_container.hpp>
+#include <tensor/tensor.hpp>
+#include <tensor/substitution.hpp>
 
 namespace Construction {
     namespace Language {
@@ -11,6 +12,7 @@ namespace Construction {
             TENSOR = 102,
             NUMERIC = 103,
             STRING = 104,
+            SUBSTITUTION = 105,
 
             UNKNOWN = -1
         };
@@ -25,6 +27,7 @@ namespace Construction {
             bool IsTensorArgument() const { return type == ArgumentType::TENSOR; }
             bool IsNumericArgument() const { return type == ArgumentType::NUMERIC; }
             bool IsStringArgument() const { return type == ArgumentType::STRING; }
+            bool IsSubstitutionArgument() const { return type == ArgumentType::SUBSTITUTION; }
         public:
             virtual void Parse(const std::string& code) = 0;
         private:
@@ -77,6 +80,7 @@ namespace Construction {
                     case ArgumentType::TENSOR: return "Tensor";
                     case ArgumentType::NUMERIC: return "Numeric";
                     case ArgumentType::STRING: return "String";
+                    case ArgumentType::SUBSTITUTION: return "Substitution";
 
                     default: return "Unknown";
                 }
@@ -211,6 +215,21 @@ namespace Construction {
             virtual void Parse(const std::string& code) { }
         public:
             std::string value;
+        };
+
+        class SubstitutionArgument : public BaseArgument {
+        public:
+            SubstitutionArgument() : BaseArgument(ArgumentType::SUBSTITUTION) { }
+        public:
+            inline void SetSubstitution(const Tensor::Substitution& substitution) {
+                this->substitution = substitution;
+            }
+
+            inline Tensor::Substitution GetSubstitution() const { return substitution; }
+        public:
+            virtual void Parse(const std::string& code) { }
+        private:
+            Tensor::Substitution substitution;
         };
 
     }
