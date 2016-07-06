@@ -60,7 +60,7 @@ namespace Construction {
                 };
 
                 // Let the magic happen ...
-                //Indices empty = {};
+                Indices empty = {};
                 //pool.Enqueue(fn, 0, empty, indices);
                 fn(0, {}, indices);
 

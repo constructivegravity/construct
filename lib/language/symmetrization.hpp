@@ -129,5 +129,25 @@ namespace Construction {
         REGISTER_ARGUMENT(IsSymmetric, 0, ArgumentType::TENSOR);
         REGISTER_ARGUMENT(IsSymmetric, 1, ArgumentType::INDEX);
 
+        CLI_COMMAND(HasExchangeSymmetry, false)
+
+            std::string Help() const {
+                return "HasExchangeSymmetry(<Tensor>, <Indices>)";
+            }
+
+            static bool Cachable() {
+                return false;
+            }
+
+            Expression Execute() const {
+                return Expression::Boolean(API::HasExchangeSymmetry(GetTensors(0), GetIndices(1)));
+            }
+
+        };
+
+        REGISTER_COMMAND(HasExchangeSymmetry);
+        REGISTER_ARGUMENT(HasExchangeSymmetry, 0, ArgumentType::TENSOR);
+        REGISTER_ARGUMENT(HasExchangeSymmetry, 1, ArgumentType::INDEX);
+
     }
 }

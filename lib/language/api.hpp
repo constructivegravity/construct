@@ -176,6 +176,27 @@ namespace Construction {
                 return symmetrizer(tensor, true).IsEqual(tensor);
             }
 
+            bool HasExchangeSymmetry(const Tensor::Tensor& tensor, const Indices& indices) {
+                auto summands = tensor.GetSummands();
+
+                for (auto& _tensor : summands) {
+                    auto oldIndices = tensor.GetIndices();
+                    auto permutation = Tensor::Permutation::From(indices, _tensor.GetIndices());
+                    auto newIndices = permutation(oldIndices);
+
+                    auto tensor = _tensor.SeparateScalefactor().second;
+
+                    auto clone = tensor;
+                    clone.SetIndices(newIndices);
+
+                    auto subst = Tensor::Tensor::Substitute(clone, _tensor.GetIndices());
+
+                    if (!subst.IsEqual(tensor)) return false;
+                }
+
+                return true;
+            }
+
             bool IsBlockSymmetric(const Tensor::Tensor& tensor, const Indices& indices) {
                 // TODO: implement this
                 return false;
