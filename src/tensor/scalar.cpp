@@ -263,37 +263,82 @@ bool AbstractScalar::HasVariables() const {
 
     fn(this);
     return hasVariables;
-}
-
-void AbstractScalar::Serialize(std::ostream& os) const {
-
-}
+}   
 
 void Scalar::Serialize(std::ostream& os) const {
+    switch (pointer->GetType()) {
+        case AbstractScalar::FRACTION:
+            static_cast<class Fraction*>(pointer.get())->Serialize(os);
+            break;
 
+        case AbstractScalar::FLOATING_POINT:
+            static_cast<class FloatingPointScalar*>(pointer.get())->Serialize(os);
+            break;
+
+        case AbstractScalar::VARIABLE:
+            static_cast<class Variable*>(pointer.get())->Serialize(os);
+            break;
+
+        case AbstractScalar::ADDED:
+            static_cast<AddedScalar*>(pointer.get())->Serialize(os);
+            break;
+
+        case AbstractScalar::MULTIPLIED:
+            static_cast<MultipliedScalar*>(pointer.get())->Serialize(os);
+            break;  
+    } 
 }
 
-//virtual void Scalar::Replace(const Variable& variable, const Scalar& scalar) {
-    // Recursive helper function to go through all the scalars
-    /*std::function<void()> fn = [&](const Scalar* sc) {
-        switch (sc->GetType()) {
-            case VARIABLE:
-                if (*sc == variable) {
+std::unique_ptr<Scalar> Scalar::Deserialize(std::istream& is) {
+    // Read type
+    AbstractScalar::Type type = static_cast<AbstractScalar::Type>(ReadBinary<unsigned>(is));
 
-                }
-                break;
-            case ADDED:
-                fn(static_cast<const AddedScalar*>(sc)->GetFirst().get());
-                fn(static_cast<const AddedScalar*>(sc)->GetSecond().get());
-                break;
-            case MULTIPLIED:
-                fn(static_cast<const MultipliedScalar*>(sc)->GetFirst().get());
-                fn(static_cast<const MultipliedScalar*>(sc)->GetSecond().get());
-                break;
-            default:
-                ;
+    ScalarPointer result;
+
+    switch (type) {
+        case AbstractScalar::FRACTION:
+            result = std::move(Fraction::Deserialize(is));
+            break;
+
+        case AbstractScalar::VARIABLE:
+            result = std::move(Variable::Deserialize(is));
+            break;
+
+        case AbstractScalar::FLOATING_POINT:
+            result = std::move(FloatingPointScalar::Deserialize(is));
+            break;
+
+        {
+        case AbstractScalar::ADDED:
+            auto tmp = Scalar::Deserialize(is);
+            if (!tmp) return std::unique_ptr<Scalar>(nullptr);
+            auto A = std::move(tmp->pointer);
+
+            tmp = Scalar::Deserialize(is);
+            if (!tmp) return std::unique_ptr<Scalar>(nullptr);
+            auto B = std::move(tmp->pointer);
+
+            result = ScalarPointer(new AddedScalar(std::move(A), std::move(B)));
+            break;
         }
+
+        {
+        case AbstractScalar::MULTIPLIED:
+            auto tmp = Scalar::Deserialize(is);
+            if (!tmp) return std::unique_ptr<Scalar>(nullptr);
+            auto A = std::move(tmp->pointer);
+
+            tmp = Scalar::Deserialize(is);
+            if (!tmp) return std::unique_ptr<Scalar>(nullptr);
+            auto B = std::move(tmp->pointer);
+
+            result = ScalarPointer(new MultipliedScalar(std::move(A), std::move(B)));
+            break;
+        }
+
+        default:
+            return std::unique_ptr<Scalar>(nullptr);
     }
 
-    fn(this);*/
-//}
+    return std::unique_ptr<Scalar>(new Scalar(std::move(result)));
+}

@@ -26,8 +26,17 @@ namespace Construction {
             }
         public:
             template<typename S>
-            void WriteBinary(std::ostream& os, S data) {
+            void WriteBinary(std::ostream& os, S data) const {
+                //os << "(" << data << ")";
                 os.write(reinterpret_cast<const char*>(&data), sizeof(data));
+                //os.write(reinterpret_cast<const char*>(&data), sizeof(data));
+            }
+
+            template<typename S>
+            static S ReadBinary(std::istream& is) {
+                S data;
+                is.read(reinterpret_cast<char*>(&data), sizeof(data));
+                return data;
             }
         };
 

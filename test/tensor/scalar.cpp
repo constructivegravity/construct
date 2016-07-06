@@ -86,6 +86,26 @@ SCENARIO("Scalars", "[scalar]") {
 			}
 		}
 
+		WHEN(" serializing this") {
+			THEN(" we get something") {
+				std::string content;
+				{
+					std::stringstream ss;
+					s.Serialize(ss);
+					content = ss.str();
+				}
+
+				{
+					std::stringstream ss(content);
+					auto pointer = Scalar::Deserialize(ss);
+					REQUIRE(pointer != nullptr);
+
+					Scalar deserialized = *pointer;
+					REQUIRE(deserialized.ToString() == s.ToString());
+				}
+			}
+		}
+
 		WHEN(" checking if it contains a variable") {
 			THEN(" we get yes") {
 				REQUIRE(s.HasVariables());

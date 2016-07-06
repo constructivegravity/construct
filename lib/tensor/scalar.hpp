@@ -114,8 +114,11 @@ namespace Construction {
              */
             //virtual void Replace(const Variable& variable, const Scalar& scalar);
         public:
-            void Serialize(std::ostream& os) const override;
-            static std::unique_ptr<AbstractScalar> Deserialize(std::istream& is);
+            void Serialize(std::ostream& os) const override {
+                WriteBinary(os, static_cast<unsigned>(type));
+            }
+
+            static std::unique_ptr<AbstractScalar> Deserialize(std::istream& is) { return nullptr; }
         protected:
             Type type;
         };
@@ -150,17 +153,13 @@ namespace Construction {
                 // Call parent
                 AbstractScalar::Serialize(os);
 
-                os.write(reinterpret_cast<const char*>(&c), sizeof(c));
+                WriteBinary(os, c);
             }
 
             static std::unique_ptr<AbstractScalar> Deserialize(std::istream& is) {
-                // Call parent
-                AbstractScalar::Deserialize(is);
+                double c = ReadBinary<double>(is);
 
-                double c;
-                is.read(reinterpret_cast<char*>(&c), sizeof(c));
-
-                return std::move(std::unique_ptr<AbstractScalar>(new FloatingPointScalar(c)));
+                return ScalarPointer(new FloatingPointScalar(c));
             }
         public:
             friend class AbstractScalar;
@@ -207,13 +206,7 @@ namespace Construction {
             }
 
             static std::unique_ptr<AbstractScalar> Deserialize(std::istream& is) {
-                // Call parent
-                AbstractScalar::Deserialize(is);
-
-                double c;
-                is.read(reinterpret_cast<char*>(&c), sizeof(c));
-
-                return std::move(std::unique_ptr<AbstractScalar>(new FloatingPointScalar(c)));
+                // do nothing
             }
 
             inline const ScalarPointer& GetFirst() const { return A; }
@@ -268,6 +261,18 @@ namespace Construction {
                     std::move(A->Clone()),
                     std::move(B->Clone())
                 )));
+            }
+
+            virtual void Serialize(std::ostream& os) const override {
+                // Call parent
+                AbstractScalar::Serialize(os);
+
+                A->Serialize(os);
+                B->Serialize(os);
+            }
+
+            static std::unique_ptr<AbstractScalar> Deserialize(std::istream& is) {
+                // do nothing
             }
         public:
             friend class AbstractScalar;
@@ -477,7 +482,7 @@ namespace Construction {
             }
         public:
             void Serialize(std::ostream& os) const override;
-            static std::shared_ptr<Scalar> Deserialize(std::istream& is);
+            static std::unique_ptr<Scalar> Deserialize(std::istream& is);
         private:
             ScalarPointer pointer;
         };

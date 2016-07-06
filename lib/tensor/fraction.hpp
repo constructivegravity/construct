@@ -2,6 +2,7 @@
 
 #include <sstream>
 #include <string>
+#include <iostream>
 
 #include <tensor/scalar.hpp>
 
@@ -154,18 +155,16 @@ namespace Construction {
                 // Call parent
                 AbstractScalar::Serialize(os);
 
-                os.write(reinterpret_cast<const char*>(&numerator), sizeof(numerator));
-                os.write(reinterpret_cast<const char*>(&denominator), sizeof(denominator));
+                WriteBinary<int>(os, numerator);
+                WriteBinary<unsigned>(os, denominator);
             }
 
             static std::unique_ptr<AbstractScalar> Deserialize(std::istream& is) {
                 // Call parent
                 AbstractScalar::Deserialize(is);
 
-                int numerator;
-                unsigned int denominator;
-                is.read(reinterpret_cast<char*>(&numerator), sizeof(numerator));
-                is.read(reinterpret_cast<char*>(&denominator), sizeof(denominator));
+                int numerator = ReadBinary<int>(is);
+                unsigned denominator = ReadBinary<unsigned>(is);
 
                 return std::move(std::unique_ptr<AbstractScalar>(new Fraction(numerator, denominator)));
             }
