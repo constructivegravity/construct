@@ -13,6 +13,8 @@
 #include <boost/serialization/utility.hpp>
 #include <boost/serialization/shared_ptr.hpp>
 
+#include <common/time_measurement.hpp>
+
 #include <common/task_pool.hpp>
 #include <tensor/permutation.hpp>
 #include <tensor/fraction.hpp>
@@ -1893,43 +1895,71 @@ namespace Construction {
 				if (summands.size() == 1) return *this;
 
 				// Initialize
-                std::vector<Vector::Vector> vectors;
+                //std::vector<Vector::Vector> vectors;
+                std::map<unsigned,Vector::Vector> vectors;
 
 				// Get the indices of the resulting tensor
 				auto indices = GetIndices();
 				auto combinations = GetAllIndexCombinations();
 
-				// Iterate over all summands
-				for (auto& _tensor : summands) {
-					// Remove all prefactors (if present) since we will add them add the end anway
-					Tensor tensor = std::move(_tensor.SeparateScalefactor().second); 
+				unsigned dimension = combinations.size();
+				std::vector<std::thread> threads;
+				std::mutex mutex;
 
-					// TODO: implement optimization for all indices that are trivially zero
-                    Vector::Vector v (combinations.size());
-                    for (int i=0; i<combinations.size(); i++) {
-                        IndexAssignments assignment;
+				// Helper method
+				std::function<void(TensorPointer,unsigned)> helper = [&](TensorPointer tensor, unsigned id) {
+					Vector::Vector v (dimension);
 
-                        // Convert into index assignment
+					for (int i=0; i<combinations.size(); i++) {
+						IndexAssignments assignment;
+
+						// Convert into index assignment
                         int j = 0;
                         for (auto &index : indices) {
                             assignment[index.GetName()] = combinations[i][j];
                             j++;
                         }
 
-                        v[i] = tensor(assignment).ToDouble();
-                    }
+                        // Lock based guarding
+                        {
+                        	std::unique_lock<std::mutex> lock(mutex);
 
-                    vectors.push_back(v);
+                        	v[i] = (*tensor)(assignment).ToDouble();
+                    	}
+					}
+
+					vectors.insert({ id, v });
+				};
+
+				// Iterate over all summands
+				for (int i=0; i<summands.size(); i++) {
+					// Remove all prefactors (if present) since we will add them add the end anyway
+					Tensor tensor = std::move(summands[i].SeparateScalefactor().second); 
+
+					threads.push_back(std::thread(helper, std::move(tensor.pointer->Clone()), i));
+				}
+
+				// Wait for the threads to finish
+				for (auto& thread : threads) {
+					thread.join();
 				}
 
 				// Create matrix
-                Vector::Matrix M (vectors);
+				Vector::Matrix M (dimension, vectors.size());
+
+				// Fill the matrix with values
+				for (auto& pair : vectors) {
+					for (int i=0; i<dimension; i++) {
+						M(i, pair.first) = pair.second[i];
+					}
+				}
 
                 // Reduce to reduced matrix echelon form
                 M.ToRowEchelonForm();
 
                 // Now start collecting the tensors
                 Tensor result = Tensor::Zero();
+
                 int k=0;
 
                 std::vector<scalar_type> _map_scalars;
