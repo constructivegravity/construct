@@ -381,8 +381,8 @@ namespace Construction {
                 try {
                     Execute(document, silent);
                     Session::Instance()->GetNotebook().Append(code);
-                } catch (const Exception& e) {
-                    Error(e.what());
+                } catch (const std::bad_alloc& e) {
+                    Error("Out of memory. :(");
                 } catch (...) {
                     Error("Something went terribly wrong. :(");
                 }
