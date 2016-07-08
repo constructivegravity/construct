@@ -21,6 +21,15 @@ SCENARIO("General tensors", "[tensor]") {
 
         }
 
+        WHEN(" looking at the size of the tensors in memory") {
+            THEN(" EpsilonGammas are of size ") {
+                auto tensor = Construction::Tensor::Tensor::EpsilonGamma(0,6, Construction::Tensor::Indices::GetRomanSeries(12, {1,3}));
+
+                REQUIRE(tensor.ToString() == "\\gamma_{ab}\\gamma_{cd}\\gamma_{ef}\\gamma_{gh}\\gamma_{ij}\\gamma_{kl}");
+                REQUIRE(tensor.Size() == 144);
+            }
+        }
+
         WHEN(" evaluating the tensor components") {
 
             std::array<double, 9> components;

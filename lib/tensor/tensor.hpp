@@ -102,11 +102,11 @@ namespace Construction {
 
 			// Copy constructor
 			AbstractTensor(const AbstractTensor& other)
-				: name(other.name), Printable(other.printed_text), indices(other.indices), type(other.type), symmetries(other.symmetries) { }
+				: name(other.name), Printable(other.printed_text), indices(other.indices), type(other.type) { }
 
 			// Move constructor
 			AbstractTensor(AbstractTensor&& other)
-				: name(std::move(other.name)), Printable(std::move(other.printed_text)), indices(std::move(other.indices)), type(std::move(other.type)), symmetries(std::move(other.symmetries)) { }
+				: name(std::move(other.name)), Printable(std::move(other.printed_text)), indices(std::move(other.indices)), type(std::move(other.type)) { }
 		public:
 			// Copy assignment
 			AbstractTensor& operator=(const AbstractTensor& other) {
@@ -114,7 +114,6 @@ namespace Construction {
 				printed_text = other.printed_text;
 				indices = other.indices;
 				type = other.type;
-				symmetries = other.symmetries;
 				return *this;
 			}
 
@@ -124,7 +123,6 @@ namespace Construction {
 				printed_text = std::move(other.printed_text);
 				indices = std::move(other.indices);
 				type = std::move(other.type);
-				symmetries = std::move(other.symmetries);
 				return *this;
 			}
 		public:
@@ -297,6 +295,8 @@ namespace Construction {
 					default: return "Custom";
 				}
 			}
+
+			TensorType GetType() const { return type; }
 		public:
 
 
@@ -442,11 +442,6 @@ namespace Construction {
 				return true;
 			}
 
-			bool IsIndexEqual(const AbstractTensor& other) const {
-				if (other.type != type) return false;
-				return symmetries.IsEqual(indices, other.indices);
-			}
-
 			/*bool IsEqual(const Tensor& tensor) const {
 				return (*this - tensor).IsZero();
 			}*/
@@ -472,7 +467,6 @@ namespace Construction {
 			Indices indices;
 
 			TensorType type;
-			Symmetry symmetries;
 
 			//EvaluationFunction evaluator;
 		};
@@ -1137,7 +1131,6 @@ namespace Construction {
 
 				assert(indices[0].GetRange().GetTo()+1 -indices[0].GetRange().GetFrom() == indices.Size());
 				type = TensorType::EPSILON;
-				symmetries.Add({ {0,1,2} , false});
 			}
 		public:
 			virtual TensorPointer Clone() const override {
@@ -1224,7 +1217,6 @@ namespace Construction {
 
                 type = TensorType::GAMMA;
 				std::vector<unsigned> _indices = {0,1};
-				symmetries.Add(ElementarySymmetry(_indices));
             }
 
 			GammaTensor(const Indices& indices, int p, int q)
@@ -1233,7 +1225,6 @@ namespace Construction {
 
                 type = TensorType::GAMMA;
 				std::vector<unsigned> _indices = {0,1};
-				symmetries.Add(ElementarySymmetry(_indices));
 			}
 
 			GammaTensor(const Indices& indices)
@@ -1242,7 +1233,6 @@ namespace Construction {
 
                 type = TensorType::GAMMA;
 				std::vector<unsigned> _indices = {0,1};
-				symmetries.Add(ElementarySymmetry(_indices));
 			}
 		public:
 			virtual TensorPointer Clone() const override {
@@ -1347,18 +1337,13 @@ namespace Construction {
 
 				if (numEpsilon == 1) {
 					std::vector<unsigned> _indices = {0,1,2};
-					symmetries.Add(ElementarySymmetry(_indices, false));
 					i = 3;
 				}
 				for (int j=0; j<numGamma; j++) {
 					std::vector<unsigned> _indices = {i, i+1};
-					symmetries.Add(ElementarySymmetry(_indices));
 					blocks.push_back({i, i+1});
 					i += 2;
 				}
-
-				// Do not forget the block symmetry of the gammas
-				symmetries.Add({ blocks });
 			}
 
 			EpsilonGammaTensor(const EpsilonGammaTensor& other)
@@ -2274,6 +2259,37 @@ namespace Construction {
 
 			Tensor operator*(const Tensor& other) const {
 				return Tensor(std::move(AbstractTensor::Multiply(*pointer, *other.pointer)));
+			}
+		public:
+			size_t Size() const {
+				switch (pointer->GetType()) {
+					case AbstractTensor::TensorType::ADDITION:
+						return sizeof(*static_cast<AddedTensor*>(pointer.get()));
+					case AbstractTensor::TensorType::MULTIPLICATION:
+						return sizeof(*static_cast<MultipliedTensor*>(pointer.get()));
+					case AbstractTensor::TensorType::SCALED:
+						return sizeof(*static_cast<ScaledTensor*>(pointer.get()));
+					case AbstractTensor::TensorType::ZERO:
+						return sizeof(*static_cast<ZeroTensor*>(pointer.get()));
+
+					case AbstractTensor::TensorType::SCALAR:
+						return sizeof(*static_cast<ScalarTensor*>(pointer.get()));
+
+					case AbstractTensor::TensorType::EPSILON:
+						return sizeof(*static_cast<EpsilonTensor*>(pointer.get()));
+
+					case AbstractTensor::TensorType::GAMMA:
+						return sizeof(*static_cast<GammaTensor*>(pointer.get()));
+
+					case AbstractTensor::TensorType::EPSILONGAMMA:
+						return sizeof(*static_cast<EpsilonGammaTensor*>(pointer.get()));
+
+					case AbstractTensor::TensorType::SUBSTITUTE:
+						return sizeof(*static_cast<SubstituteTensor*>(pointer.get()));
+
+					default:
+						return 0;
+				}
 			}
 		private:
 			TensorPointer pointer;
