@@ -43,20 +43,18 @@ SCENARIO("General tensors", "[tensor]") {
 
             std::stringstream ss;
             auto tensor = Construction::Tensor::Tensor::EpsilonGamma(1,2, Construction::Tensor::Indices::GetRomanSeries(7, {1,3}));
-            auto gamma = Construction::Tensor::Tensor::Gamma(Construction::Tensor::Indices::GetRomanSeries(2, {1,3}));
 
             tensor.Serialize(ss);
-            //gamma.Serialize(ss);
-            //std::cout << ss.str() << std::endl;
-            //std::cout << "Length: " << ss.str().size() << std::endl;
+	    
+	        std::string content = ss.str();
 
             THEN(" the deserialized tensor is correct") {
-                std::stringstream is(ss.str());
+                std::stringstream is(content);
                 auto read = Construction::Tensor::Tensor::Deserialize(is);
-                //std::cout << read->ToString() << std::endl;
 
-                /*auto read2 = Construction::Tensor::Tensor::Deserialize(is);
-                std::cout << read2->ToString() << std::endl;*/
+		        REQUIRE(read);
+
+		        REQUIRE(read->ToString() == tensor.ToString());
             }
 
             /*std::stringstream ss;
@@ -308,7 +306,7 @@ SCENARIO("Addition", "[tensor-addition]") {
         WHEN(" printing the TeX code") {
 
             THEN(" get twice the metric \\gamma") {
-                REQUIRE(a.ToString() == "\\gamma_{ab} + \\gamma_{ab}");
+                REQUIRE(a.ToString() == "\\gamma_{ab} + \n\\gamma_{ab}");
             }
         }
 
@@ -338,7 +336,7 @@ SCENARIO("Addition", "[tensor-addition]") {
             }
 
             THEN(" the expanded term looks correct") {
-                REQUIRE(expanded.ToString() == "1/2 * \\gamma_{ab} + 1/2 * \\gamma_{ba}");
+                REQUIRE(expanded.ToString() == "1/2 * \\gamma_{ab} + \n1/2 * \\gamma_{ba}");
             }
 
             THEN(" we get the metric again after simplification") {
@@ -355,6 +353,34 @@ SCENARIO("Addition", "[tensor-addition]") {
 
             THEN(" should be {ab}") {
                 REQUIRE(indices.ToString() == "{ab}");
+            }
+        }
+
+        WHEN(" serializing an addition of two tensors") {
+            auto A = Construction::Tensor::Scalar("x") * Construction::Tensor::Tensor::EpsilonGamma(0, 3, Construction::Tensor::Indices::GetRomanSeries(6, {1,3}));
+            auto B = Construction::Tensor::Scalar("y") * Construction::Tensor::Tensor::EpsilonGamma(2, 0, Construction::Tensor::Indices::GetRomanSeries(6, {1,3}));
+
+            auto tensor = A + B;
+
+            std::cout << tensor << std::endl;
+
+            std::string content;
+
+            // Serialize
+            {
+                std::stringstream ss;
+                tensor.Serialize(ss);
+                content = ss.str();
+            }
+
+            std::cout << content << std::endl;
+
+            THEN(" the deserialized gives the same tensor again") {
+                std::stringstream ss(content);
+                auto deserialized = Construction::Tensor::Tensor::Deserialize(ss);
+
+                REQUIRE(deserialized);
+                REQUIRE(deserialized->ToString() == tensor.ToString());
             }
         }
 

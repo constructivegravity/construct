@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <numeric>
 #include <cmath>
+#include <memory>
 
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/archive/binary_iarchive.hpp>
@@ -451,7 +452,7 @@ namespace Construction {
 			}*/
 		public:
 			void Serialize(std::ostream& os) const override;
-			static std::shared_ptr<AbstractTensor> Deserialize(std::istream& is);
+			static std::unique_ptr<AbstractTensor> Deserialize(std::istream& is);
 		private:
 			friend class boost::serialization::access;
 
@@ -812,18 +813,18 @@ namespace Construction {
 			void SetScale(const Scalar& c) { this->c = c; }
 		public:
 			static void DoSerialize(std::ostream& os, const ScaledTensor& tensor) {
-				os.write(reinterpret_cast<const char*>(&tensor.c), sizeof(&tensor.c));
+				tensor.c.Serialize(os);
 				tensor.A->Serialize(os);
 			}
 
 			static TensorPointer DoDeserialize(std::istream& is, const Indices& indices) {
+				// Deserialize the scale
+				auto p = Scalar::Deserialize(is);
+				if (!p) return nullptr;
+				Scalar c = *p;
+				
+				// Deserialize the tensor
 				auto A = AbstractTensor::Deserialize(is)->Clone();
-
-				Scalar c;
-				// TODO: implement serialization
-
-				//double c;
-				//is.read(reinterpret_cast<char*>(&c), sizeof(c));
 
 				return TensorPointer(new ScaledTensor(std::move(A), c));
 			}
@@ -851,8 +852,8 @@ namespace Construction {
 				return "0";
 			}
 		public:
-			static void DoSerialize(std::ostream& os, const ScaledTensor& tensor) {
-				// TODO: serialization
+			static void DoSerialize(std::ostream& os, const ZeroTensor& tensor) {
+				// do nothing
 			}
 
 			static TensorPointer DoDeserialize(std::istream& is, const Indices& indices) {
@@ -1018,12 +1019,14 @@ namespace Construction {
 		public:
 			static void DoSerialize(std::ostream& os, const ScalarTensor& tensor) {
 				//os.write(reinterpret_cast<const char*>(&tensor.value), sizeof(tensor.value));
+				tensor.value.Serialize(os);
 			}
 
 			static TensorPointer DoDeserialize(std::istream& is, const Indices& indices) {
-				Scalar value;
-				/*double value;
-				is.read(reinterpret_cast<char*>(&value), sizeof(value));*/
+				auto ptr = Scalar::Deserialize(is);
+				if (!ptr) return nullptr;
+
+				Scalar value = *ptr;
 
 				return TensorPointer(new ScalarTensor(value));
 			}
@@ -1041,7 +1044,7 @@ namespace Construction {
 			return ScalarTensor("1", "1", 1);
 		}
 
-				std::unique_ptr<AbstractTensor> AbstractTensor::Add(const AbstractTensor& one, const AbstractTensor& other) {
+		std::unique_ptr<AbstractTensor> AbstractTensor::Add(const AbstractTensor& one, const AbstractTensor& other) {
 			// Clone the tensors
 			auto first = one.Clone();
 			auto second = other.Clone();
@@ -1385,8 +1388,8 @@ namespace Construction {
 				std::stringstream ss;
 				unsigned pos = 0;
 
-				if (numEpsilon == 1) {
-					ss << "\\epsilon_" << indices.Partial({0,2});
+				for (unsigned i=0; i<numEpsilon; i++) {
+					ss << "\\epsilon_" << indices.Partial({pos,pos+2});
 					pos += 3;
 				}
 
@@ -1447,11 +1450,11 @@ namespace Construction {
 				unsigned pos = 0;
 
 				// Calculate the epsilon contribution
-				if (numEpsilon == 1) {
-					auto indices = this->indices.Partial({0,2});
-					auto partialArgs = Partial(args, {0,2});
+				for (unsigned i=0; i<numEpsilon; i++) {
+					auto indices = this->indices.Partial({pos,pos+2});
+					auto partialArgs = Partial(args, {pos,pos+2});
 
-					result = EpsilonTensor::GetEpsilonComponents(partialArgs);
+					result *= EpsilonTensor::GetEpsilonComponents(partialArgs);
 
 					if (result == 0.0) return result;
 
@@ -1528,17 +1531,23 @@ namespace Construction {
 			friend class boost::serialization::access;
 
 			static void DoSerialize(std::ostream& os, const EpsilonGammaTensor& tensor) {
-				/*unsigned numEpsilon = tensor.numEpsilon;
+				unsigned numEpsilon = tensor.numEpsilon;
 				unsigned numGamma = tensor.numGamma;
 
 				os.write(reinterpret_cast<const char*>(&tensor.numEpsilon), sizeof(tensor.numEpsilon));
-				os.write(reinterpret_cast<const char*>(&tensor.numGamma), sizeof(tensor.numGamma));*/
+				os.write(reinterpret_cast<const char*>(&tensor.numGamma), sizeof(tensor.numGamma));
 			}
 
 			static TensorPointer DoDeserialize(std::istream& is, const Indices& indices) {
-				unsigned numEpsilon = (indices.Size() % 2 == 0) ? 0 : 1;
+				unsigned numEpsilon, numGamma;
+				is.read(reinterpret_cast<char*>(&numEpsilon), sizeof(numEpsilon));
+				is.read(reinterpret_cast<char*>(&numGamma), sizeof(numGamma));
+
+				return TensorPointer(new EpsilonGammaTensor(numEpsilon, numGamma, indices));
+
+				/*unsigned numEpsilon = (indices.Size() % 2 == 0) ? 0 : 1;
 				unsigned numGamma = (indices.Size() % 2 == 0) ? indices.Size()/2 : (indices.Size()-3)/2;
-				return std::move(TensorPointer(new EpsilonGammaTensor(numEpsilon, numGamma, indices)));
+				return std::move(TensorPointer(new EpsilonGammaTensor(numEpsilon, numGamma, indices)));*/
 			}
 
 			template<class Archive>
@@ -1583,6 +1592,9 @@ namespace Construction {
 				case AbstractTensor::TensorType::SUBSTITUTE:
 					SubstituteTensor::DoSerialize(os, *static_cast<const SubstituteTensor*>(this));
 					break;
+				case AbstractTensor::TensorType::ZERO:
+					ZeroTensor::DoSerialize(os, *static_cast<const ZeroTensor*>(this));
+					break;
 				case AbstractTensor::TensorType::SCALAR:
 					ScalarTensor::DoSerialize(os, *static_cast<const ScalarTensor*>(this));
 					break;
@@ -1597,7 +1609,7 @@ namespace Construction {
 			}
 		}
 
-		std::shared_ptr<AbstractTensor> AbstractTensor::Deserialize(std::istream& is) {
+		std::unique_ptr<AbstractTensor> AbstractTensor::Deserialize(std::istream& is) {
 			// Read name
 			std::string name;
 			std::getline(is, name, ';');
@@ -1646,8 +1658,12 @@ namespace Construction {
 					result = std::move(SubstituteTensor::DoDeserialize(is, indices));
 					break;
 
+				case TensorType::ZERO:
+					result = std::move(ZeroTensor::DoDeserialize(is, indices));
+					break;
+
 				default:
-					auto t = std::make_shared<AbstractTensor>(name, printed_text, indices);
+					auto t = TensorPointer(new AbstractTensor(name, printed_text, indices));
 					t->SetName(name);
 					t->SetPrintedText(printed_text);
 					return std::move(t);
@@ -1695,7 +1711,8 @@ namespace Construction {
 			typedef Scalar scalar_type;
 		public:
 			static Tensor Zero() { return Tensor(TensorPointer(new ZeroTensor())); }
-			static Tensor Scalar(const Scalar& c) { return Tensor(TensorPointer(new ScalarTensor(c))); }
+			static Tensor One() { return Tensor(TensorPointer(new ScalarTensor(1))); }
+			//static Tensor Scalar(const Scalar& c) { return Tensor(TensorPointer(new ScalarTensor(c))); }
 
 			static Tensor Epsilon(const Indices& indices) { return Tensor(TensorPointer(new EpsilonTensor(indices))); }
 			static Tensor Gamma(const Indices& indices) { return Tensor(TensorPointer(new GammaTensor(indices))); }
@@ -1791,6 +1808,11 @@ namespace Construction {
 				return result;
 			}
 
+			/** 
+				\brief Splits the tensor in its summands
+
+				\returns {std::vector<Tensor>}		List of all the tensors
+			 */
 			std::vector<Tensor> GetSummands() const {
 				// Helper method
 				std::function<std::vector<Tensor>(const AbstractTensor*)> helper = [&](const AbstractTensor* tensor) {
@@ -2173,11 +2195,13 @@ namespace Construction {
 			}
 		public:
 			void Serialize(std::ostream& os) const override {
-
+				pointer->Serialize(os);
 			}
 
-			static std::shared_ptr<Tensor> Deserialize(std::istream& is) {
-				return std::shared_ptr<Tensor>(new Tensor(TensorPointer(new GammaTensor())));
+			static std::unique_ptr<Tensor> Deserialize(std::istream& is) {
+				auto tensor = AbstractTensor::Deserialize(is);
+				if (!tensor) return nullptr;
+				return std::unique_ptr<Tensor>(new Tensor(std::move(tensor)));
 			}
 		public:
 			/** Comparison **/

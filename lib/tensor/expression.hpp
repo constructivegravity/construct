@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include <common/printable.hpp>
 
 namespace Construction {

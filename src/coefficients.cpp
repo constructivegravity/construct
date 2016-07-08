@@ -32,7 +32,7 @@ Tensor GenerateTensor(const Coefficient& coeff, std::mutex& mutex, std::string& 
 
     // If no indices, return scalar
     if (indices.Size() == 0) {
-        return Construction::Tensor::Tensor::Scalar(1);
+        return Construction::Tensor::Tensor::One();
     }
 
     // Generate the tensor

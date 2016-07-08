@@ -3,6 +3,7 @@
 #include <string>
 #include <sstream>
 #include <vector>
+#include <memory>
 
 #include <common/printable.hpp>
 #include <common/serializable.hpp>

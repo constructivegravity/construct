@@ -2,6 +2,7 @@
 
 #include <sstream>
 #include <random>
+#include <mutex>
 
 #include <common/datetime.hpp>
 
