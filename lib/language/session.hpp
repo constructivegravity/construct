@@ -6,6 +6,7 @@
 #include <fstream>
 
 #include <common/singleton.hpp>
+#include <common/error.hpp>
 
 #include <tensor/expression.hpp>
 #include <language/notebook.hpp>
@@ -20,9 +21,15 @@
 
 using Construction::Tensor::TensorContainer;
 using Construction::Tensor::Expression;
+using Construction::Exception;
 
 namespace Construction {
     namespace Language {
+
+        class CannotOpenSessionException : public Exception {
+        public:
+            CannotOpenSessionException() : Exception("Cannot open the session.") { }
+        };
 
         class Session : public Singleton<Session> {
         public:
@@ -123,14 +130,23 @@ namespace Construction {
                 file.close();
             }
 
+            /** 
+                \brief Load a session from a file
+
+                Load a session from a file. It reads all the executed command lines and restores
+                the expressions on the stack and in the variable memory.
+
+                \param  {std::string}    The filename
+
+                \throws CannotOpenSessionException
+             */
             void LoadFromFile(const std::string& filename) {
-                /*
                 std::ifstream file (filename);
                 std::stringstream is;
 
                 // Clear
                 notebook.Clear();
-                current = Tensor::Tensor::Zero();
+                current = Expression::Void();
                 memory.clear();
 
                 // Decompress
@@ -160,19 +176,8 @@ namespace Construction {
 
                 // Read the most recent result
                 {
-                    // Load last cmd
-                    {
-                        size_t size;
-                        is.read(reinterpret_cast<char*>(&size), sizeof(size));
-
-                        std::string string(size, ' ');
-                        is.read(&string[0], size);
-
-                        lastCmd = string;
-                    }
-
                     // Load container data
-                    std::string containerString;
+                    std::string expressionString;
                     {
                         size_t length;
                         is.read(reinterpret_cast<char*>(&length), sizeof(length));
@@ -180,17 +185,18 @@ namespace Construction {
                         std::string string (length, ' ');
                         is.read(&string[0], length);
 
-                        containerString = string;
+                        expressionString = string;
                     }
 
                     // Deserialize
                     {
-                        std::shared_ptr<Tensor::Tensor> container;
-            
-                        std::stringstream ss (containerString);
-                        container = Tensor::Tensor::Deserialize(ss);
+                        std::stringstream ss(expressionString);
 
-                        current = *container;
+                        std::unique_ptr<Expression> expression = Tensor::Expression::Deserialize(ss);
+
+                        if (!expression) throw CannotOpenSessionException();
+
+                        current = *expression;
                     }
                 }
 
@@ -214,7 +220,7 @@ namespace Construction {
                         }
 
                         // Read the container
-                        std::string containerString;
+                        std::string expressionString;
                         {
                             size_t length;
                             is.read(reinterpret_cast<char*>(&length), sizeof(length));
@@ -222,20 +228,22 @@ namespace Construction {
                             std::string string (length, ' ');
                             is.read(&string[0], length);
 
-                            containerString = string;
+                            expressionString = string;
                         }
 
                         // Deserialize
-                        std::shared_ptr<Tensor::Tensor> container;
+                        std::unique_ptr<Tensor::Expression> expression;
                         {
-                            std::stringstream ss (containerString);
-                            container = Tensor::Tensor::Deserialize(ss);
+                            std::stringstream ss (expressionString);
+                            expression = Tensor::Expression::Deserialize(ss);
+
+                            if (!expression) throw CannotOpenSessionException();
                         }
 
                         // Insert into memory
-                        memory.insert({name, *container});
+                        memory.insert({name, *expression});
                     }
-                }*/
+                }
             }
         private:
             Notebook notebook;
@@ -250,21 +258,21 @@ namespace Construction {
 
 
          */
-        CLI_COMMAND(Save)
+        CLI_COMMAND(SaveSession)
             std::string Help() const {
-                return "Save(<String>)";
+                return "SaveSession(<String>)";
             }
 
             Expression Execute() const {
                 auto filename = GetString(0);
                 Session::Instance()->SaveToFile(filename);
 
-                return Tensor::Tensor();
+                return Expression::Void();
             }
         };
 
-        REGISTER_COMMAND(Save);
-        REGISTER_ARGUMENT(Save, 0, ArgumentType::STRING);
+        REGISTER_COMMAND(SaveSession);
+        REGISTER_ARGUMENT(SaveSession, 0, ArgumentType::STRING);
 
         /**
             
@@ -274,21 +282,21 @@ namespace Construction {
 
 
          */
-        CLI_COMMAND(Load)
+        CLI_COMMAND(LoadSession)
             std::string Help() const {
-                return "Load(<String>)";
+                return "LoadSession(<String>)";
             }
 
             Expression Execute() const {
                 auto filename = GetString(0);
                 Session::Instance()->LoadFromFile(filename);
 
-                return Tensor::Tensor();
+                return Expression::Void();
             }
         };
 
-        REGISTER_COMMAND(Load);
-        REGISTER_ARGUMENT(Load, 0, ArgumentType::STRING);
+        REGISTER_COMMAND(LoadSession);
+        REGISTER_ARGUMENT(LoadSession, 0, ArgumentType::STRING);
 
     }
 }
