@@ -32,8 +32,8 @@ namespace Construction {
             }
         };
 
-        //REGISTER_COMMAND(LinearIndependent);
-        //REGISTER_ARGUMENT(LinearIndependent, 0, ArgumentType::TENSOR);
+        REGISTER_COMMAND(LinearIndependent);
+        REGISTER_ARGUMENT(LinearIndependent, 0, ArgumentType::TENSOR);
 
     }
 }
