@@ -381,6 +381,8 @@ namespace Construction {
                 try {
                     Execute(document, silent);
                     Session::Instance()->GetNotebook().Append(code);
+                } catch (const Exception& e) {
+                    Error(e.what());
                 } catch (...) {
                     Error("Something went terribly wrong. :(");
                 }
