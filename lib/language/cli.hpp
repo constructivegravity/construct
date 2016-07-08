@@ -126,8 +126,6 @@ namespace Construction {
                 Common::TimeMeasurement time;
 
                 if (document->IsPrevious()) {
-                    std::cout << " -> " << lastResult.TypeToString() << std::endl;
-
                     PrintExpression(lastResult);
                     return;
                 } else if (document->IsCommand()) {
