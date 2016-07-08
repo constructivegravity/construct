@@ -1,13 +1,19 @@
 #pragma once
 
 #include <memory>
+#include <string>
+#include <sstream>
+#include <iostream>
 
+#include <common/serializable.hpp>
 #include <common/printable.hpp>
+
+using Construction::Common::Serializable;
 
 namespace Construction {
 	namespace Tensor {
 
-		class AbstractExpression : public Common::Printable {
+		class AbstractExpression : public Common::Printable, public Serializable<AbstractExpression> {
 		public:
 			enum Type {
 				TENSOR = 1,
@@ -34,7 +40,13 @@ namespace Construction {
 		public:
 			virtual std::unique_ptr<AbstractExpression> Clone() const = 0;
 		public:
-			virtual std::string ToString() const { return ""; }
+			virtual std::string ToString() const override { return ""; }
+		public:
+			void Serialize(std::ostream& os) const override {
+				// do nothing
+            }
+
+            static std::unique_ptr<AbstractExpression> Deserialize(std::istream& is) { return nullptr; }
 		private:
 			Type type;
 			int colorCode;
@@ -46,29 +58,44 @@ namespace Construction {
 		public:
 			VoidExpression() : AbstractExpression(VOID_TYPE) { }
 		public:
-			virtual ExpressionPointer Clone() const { return std::move(ExpressionPointer(new VoidExpression())); }
+			virtual ExpressionPointer Clone() const override { return std::move(ExpressionPointer(new VoidExpression())); }
 		public:
-			virtual std::string ToString() const {
+			virtual std::string ToString() const override {
 				return "";
 			}
+		public:
+			virtual void Serialize(std::ostream& os) const override {
+				// do nothing
+            }
+
+            static std::unique_ptr<AbstractExpression> Deserialize(std::istream& is) { return ExpressionPointer(new VoidExpression()); }
 		};
 
 		class BoolExpression : public AbstractExpression {
 		public:
 			BoolExpression(bool value=false) : AbstractExpression(BOOLEAN), value(value) { }
 		public:
-			virtual ExpressionPointer Clone() const { return std::move(ExpressionPointer(new BoolExpression(value))); }
+			virtual ExpressionPointer Clone() const override { return std::move(ExpressionPointer(new BoolExpression(value))); }
 		public:
-			virtual std::string ToString() const {
+			virtual std::string ToString() const override {
 				return (value) ? "yes" : "no";
 			}
 		public:
 			virtual int GetColorCode() const override { return (value) ? 32 : 31; }
+		public:
+			virtual void Serialize(std::ostream& os) const override {
+				WriteBinary<char>(os, static_cast<char>(value));
+            }
+
+            static std::unique_ptr<AbstractExpression> Deserialize(std::istream& is) { 
+            	bool value = static_cast<bool>(ReadBinary<char>(is));
+            	return ExpressionPointer(new BoolExpression(value)); 
+            }
 		private:
 			bool value;
 		};
 
-		class Expression : public Common::Printable {
+		class Expression : public Common::Printable, public Serializable<Expression> {
 		public:
 			Expression() : pointer(ExpressionPointer(new VoidExpression())) { }
 
@@ -117,6 +144,9 @@ namespace Construction {
 			AbstractExpression::Type GetType() const { return pointer->GetType(); }
 		public:
 			virtual std::string ToString() const override { return pointer->ToString(); }
+		public:
+			virtual void Serialize(std::ostream& os) const override;
+            static std::unique_ptr<Expression> Deserialize(std::istream& is);
 		public:
 			template<class T>
 			T As() { return *static_cast<T*>(pointer.get()); }

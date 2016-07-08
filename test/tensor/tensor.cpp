@@ -357,12 +357,8 @@ SCENARIO("Addition", "[tensor-addition]") {
         }
 
         WHEN(" serializing an addition of two tensors") {
-            auto A = Construction::Tensor::Scalar("x") * Construction::Tensor::Tensor::EpsilonGamma(0, 3, Construction::Tensor::Indices::GetRomanSeries(6, {1,3}));
-            auto B = Construction::Tensor::Scalar("y") * Construction::Tensor::Tensor::EpsilonGamma(2, 0, Construction::Tensor::Indices::GetRomanSeries(6, {1,3}));
-
-            auto tensor = A + B;
-
-            std::cout << tensor << std::endl;
+            auto tensor = Construction::Tensor::Scalar("x") * Construction::Tensor::Tensor::EpsilonGamma(0, 3, Construction::Tensor::Indices::GetRomanSeries(6, {1,3})) + 
+                     Construction::Tensor::Scalar("y") * Construction::Tensor::Tensor::EpsilonGamma(2, 0, Construction::Tensor::Indices::GetRomanSeries(6, {1,3}));
 
             std::string content;
 
@@ -372,8 +368,6 @@ SCENARIO("Addition", "[tensor-addition]") {
                 tensor.Serialize(ss);
                 content = ss.str();
             }
-
-            std::cout << content << std::endl;
 
             THEN(" the deserialized gives the same tensor again") {
                 std::stringstream ss(content);

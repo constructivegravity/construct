@@ -11,6 +11,7 @@ set(CONSTRUCTION_TENSOR_HEADERS
 
 set(CONSTRUCTION_TENSOR_SOURCE
 	scalar.cpp
+	expression.cpp
 )
 
 add_library(tensor SHARED ${CONSTRUCTION_TENSOR_SOURCE})

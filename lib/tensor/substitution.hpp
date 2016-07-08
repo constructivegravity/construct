@@ -45,6 +45,37 @@ namespace Construction {
 
 				return ss.str();
 			}
+		public:
+			virtual void Serialize(std::ostream& os) const override {
+				// Write size
+				WriteBinary<size_t>(os, substitutions.size());
+
+				// Write the pairs
+				for (auto& substitution : substitutions) {
+					substitution.first.Serialize(os);
+					substitution.second.Serialize(os);
+				}
+			}
+
+			static std::unique_ptr<AbstractExpression> Deserialize(std::istream& is) {
+				// Read size
+				size_t size = ReadBinary<size_t>(is);
+
+				std::unique_ptr<Substitution> result (new Substitution());
+
+				// Iterate over the entries
+				for (int i=0; i<size; i++) {
+					auto lhs = Scalar::Deserialize(is);
+					if (!lhs) return nullptr;
+
+					auto rhs = Scalar::Deserialize(is);
+					if (!rhs) return nullptr;
+
+					result->Insert(*static_cast<Scalar*>(lhs.get()), *static_cast<Scalar*>(rhs.get()));
+				}
+
+				return std::move(result);
+			}
 		private:
 			std::vector< std::pair<Scalar, Scalar> > substitutions;
 		};

@@ -289,7 +289,7 @@ void Scalar::Serialize(std::ostream& os) const {
     } 
 }
 
-std::unique_ptr<Scalar> Scalar::Deserialize(std::istream& is) {
+std::unique_ptr<AbstractExpression> Scalar::Deserialize(std::istream& is) {
     // Read type
     AbstractScalar::Type type = static_cast<AbstractScalar::Type>(ReadBinary<unsigned>(is));
 
@@ -311,12 +311,12 @@ std::unique_ptr<Scalar> Scalar::Deserialize(std::istream& is) {
         {
         case AbstractScalar::ADDED:
             auto tmp = Scalar::Deserialize(is);
-            if (!tmp) return std::unique_ptr<Scalar>(nullptr);
-            auto A = std::move(tmp->pointer);
+            if (!tmp) return std::unique_ptr<AbstractExpression>(nullptr);
+            auto A = std::move(static_cast<Scalar*>(tmp.get())->pointer);
 
             tmp = Scalar::Deserialize(is);
-            if (!tmp) return std::unique_ptr<Scalar>(nullptr);
-            auto B = std::move(tmp->pointer);
+            if (!tmp) return std::unique_ptr<AbstractExpression>(nullptr);
+            auto B = std::move(static_cast<Scalar*>(tmp.get())->pointer);
 
             result = ScalarPointer(new AddedScalar(std::move(A), std::move(B)));
             break;
@@ -325,20 +325,20 @@ std::unique_ptr<Scalar> Scalar::Deserialize(std::istream& is) {
         {
         case AbstractScalar::MULTIPLIED:
             auto tmp = Scalar::Deserialize(is);
-            if (!tmp) return std::unique_ptr<Scalar>(nullptr);
-            auto A = std::move(tmp->pointer);
+            if (!tmp) return std::unique_ptr<AbstractExpression>(nullptr);
+            auto A = std::move(static_cast<Scalar*>(tmp.get())->pointer);
 
             tmp = Scalar::Deserialize(is);
-            if (!tmp) return std::unique_ptr<Scalar>(nullptr);
-            auto B = std::move(tmp->pointer);
+            if (!tmp) return std::unique_ptr<AbstractExpression>(nullptr);
+            auto B = std::move(static_cast<Scalar*>(tmp.get())->pointer);
 
             result = ScalarPointer(new MultipliedScalar(std::move(A), std::move(B)));
             break;
         }
 
         default:
-            return std::unique_ptr<Scalar>(nullptr);
+            return std::unique_ptr<AbstractExpression>(nullptr);
     }
 
-    return std::unique_ptr<Scalar>(new Scalar(std::move(result)));
+    return std::unique_ptr<AbstractExpression>(new Scalar(std::move(result)));
 }

@@ -821,8 +821,8 @@ namespace Construction {
 				// Deserialize the scale
 				auto p = Scalar::Deserialize(is);
 				if (!p) return nullptr;
-				Scalar c = *p;
-				
+				Scalar c = *static_cast<Scalar*>(p.get());
+
 				// Deserialize the tensor
 				auto A = AbstractTensor::Deserialize(is)->Clone();
 
@@ -1026,7 +1026,7 @@ namespace Construction {
 				auto ptr = Scalar::Deserialize(is);
 				if (!ptr) return nullptr;
 
-				Scalar value = *ptr;
+				Scalar value = *static_cast<Scalar*>(ptr.get());
 
 				return TensorPointer(new ScalarTensor(value));
 			}
@@ -1676,7 +1676,7 @@ namespace Construction {
 			return std::move(result);
 		}
 
-		class Tensor : public AbstractExpression, public Serializable<Tensor> {
+		class Tensor : public AbstractExpression {
 		public:
 			Tensor() : AbstractExpression(TENSOR), pointer(TensorPointer(new ZeroTensor())) { }
 			Tensor(const std::string& name, const std::string& printable, const Indices& indices) : AbstractExpression(TENSOR), pointer(TensorPointer(new AbstractTensor(name, printable, indices))) { }
@@ -2198,10 +2198,10 @@ namespace Construction {
 				pointer->Serialize(os);
 			}
 
-			static std::unique_ptr<Tensor> Deserialize(std::istream& is) {
+			static std::unique_ptr<AbstractExpression> Deserialize(std::istream& is) {
 				auto tensor = AbstractTensor::Deserialize(is);
 				if (!tensor) return nullptr;
-				return std::unique_ptr<Tensor>(new Tensor(std::move(tensor)));
+				return std::unique_ptr<AbstractExpression>(new Tensor(std::move(tensor)));
 			}
 		public:
 			/** Comparison **/

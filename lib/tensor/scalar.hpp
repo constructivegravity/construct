@@ -87,15 +87,6 @@ namespace Construction {
         public:
             virtual std::unique_ptr<AbstractScalar> Clone() const = 0;
         public:
-            /**
-                \brief Simplify the scalar expression
-
-
-             */
-            virtual std::unique_ptr<AbstractScalar> Simplify() {
-                // do nothing
-            }
-        public:
             /** Arithmetics **/
 
             static std::unique_ptr<AbstractScalar> Add(const AbstractScalar& one, const AbstractScalar& other);
@@ -119,7 +110,7 @@ namespace Construction {
                 WriteBinary(os, static_cast<unsigned>(type));
             }
 
-            static std::unique_ptr<AbstractScalar> Deserialize(std::istream& is) { return nullptr; }
+            static std::unique_ptr<AbstractScalar> Deserialize(std::istream& is) { return nullptr; }
         protected:
             Type type;
         };
@@ -134,10 +125,6 @@ namespace Construction {
         public:
             virtual ScalarPointer Clone() const override {
                 return std::move(ScalarPointer(new FloatingPointScalar(c)));
-            }
-        public:
-            virtual ScalarPointer Simplify() override {
-                return nullptr;
             }
         public:
             virtual std::string ToString() const override {
@@ -179,10 +166,6 @@ namespace Construction {
                 )));
 			}
         public:
-            virtual ScalarPointer Simplify() override {
-
-            }
-        public:
             virtual std::string ToString() const override {
                 std::stringstream ss;
                 auto s = B->ToString();
@@ -208,6 +191,7 @@ namespace Construction {
 
             static std::unique_ptr<AbstractScalar> Deserialize(std::istream& is) {
                 // do nothing
+                return nullptr;
             }
 
             inline const ScalarPointer& GetFirst() const { return A; }
@@ -274,6 +258,7 @@ namespace Construction {
 
             static std::unique_ptr<AbstractScalar> Deserialize(std::istream& is) {
                 // do nothing
+                return nullptr;
             }
         public:
             friend class AbstractScalar;
@@ -289,7 +274,7 @@ namespace Construction {
             them without having to use the pointers and worrying about what happens under
             the surface. This will greatly simplify the work with the scalars!
          */
-        class Scalar : public AbstractExpression, public Serializable<Scalar> {
+        class Scalar : public AbstractExpression {
         public:
             Scalar();
             Scalar(double v);
@@ -483,7 +468,7 @@ namespace Construction {
             }
         public:
             void Serialize(std::ostream& os) const override;
-            static std::unique_ptr<Scalar> Deserialize(std::istream& is);
+            static std::unique_ptr<AbstractExpression> Deserialize(std::istream& is);
         private:
             ScalarPointer pointer;
         };

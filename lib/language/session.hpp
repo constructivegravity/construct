@@ -54,7 +54,6 @@ namespace Construction {
             size_t Size() const { return memory.size(); }
         public:
             void SaveToFile(const std::string& filename) const {
-                /*
                 std::stringstream os;
 
                 // Store the notebook
@@ -75,12 +74,6 @@ namespace Construction {
                 // Store the current tensors
                 {
                     // Store last command string
-                    {
-                        size_t size = lastCmd.size();
-                        os.write(reinterpret_cast<const char*>(&size), sizeof(size));
-                        os << lastCmd;
-                    }
-
                     {
                         std::stringstream ss;
                         current.Serialize(ss);
@@ -127,7 +120,7 @@ namespace Construction {
                     boost::iostreams::copy(out, file);
                 }
 
-                file.close();*/
+                file.close();
             }
 
             void LoadFromFile(const std::string& filename) {
