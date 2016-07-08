@@ -28,14 +28,12 @@ namespace Construction {
             }
 
             Expression Execute() const {
-                // TODO: implement
-                return Expression::Void();
-                //return API::LinearIndependent(GetTensors(0));
+                return GetTensors(0).Simplify().RedefineVariables("e");
             }
         };
 
-        REGISTER_COMMAND(LinearIndependent);
-        REGISTER_ARGUMENT(LinearIndependent, 0, ArgumentType::TENSOR);
+        //REGISTER_COMMAND(LinearIndependent);
+        //REGISTER_ARGUMENT(LinearIndependent, 0, ArgumentType::TENSOR);
 
     }
 }
