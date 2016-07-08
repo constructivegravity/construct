@@ -298,8 +298,6 @@ namespace Construction {
 
 			TensorType GetType() const { return type; }
 		public:
-
-
 			/**
 				\brief Multiplication of two tensors
 
@@ -313,7 +311,6 @@ namespace Construction {
 			 	\throws CannotMultiplyTensorsException
 			 */
 			static std::unique_ptr<AbstractTensor> Multiply(const AbstractTensor& one, const AbstractTensor& second); 	
-			MultipliedTensor operator*(const AbstractTensor& other) const;
 
 			/**
 				\brief Multiplication of a tensor by a real number
@@ -323,15 +320,6 @@ namespace Construction {
 			 	them to calculate the result.
 			 */
 			static std::unique_ptr<AbstractTensor> Multiply(const AbstractTensor& one, const Scalar& c);
-			ScaledTensor operator*(const Scalar& c) const;
-			friend inline ScaledTensor operator*(const Scalar& c, const AbstractTensor& other);
-
-			/**
-				\brief Negation of a tensor
-
-			 	Negation of a tensor. Is equal to a multiplication by -1.
-			 */
-			inline ScaledTensor operator-() const;
 
 			/**
 				\brief Addition of two tensors
@@ -345,18 +333,7 @@ namespace Construction {
 
 			 	\throws CannotAddTensorsException
 			 */
-			static std::unique_ptr<AbstractTensor> Add(const AbstractTensor& one, const AbstractTensor& second); 	
-			AddedTensor operator+(const AbstractTensor& other) const;
-
-			/**
-				\brief Subtraction of two tensor
-
-			 	Subtraction of two tensors. Is equal to the sum of the tensor
-			 	and the second tensor multiplied by -1.
-
-			 	\throws CannotAddTensorsException
-			 */
-			AddedTensor operator-(const AbstractTensor& other) const;
+			static std::unique_ptr<AbstractTensor> Add(const AbstractTensor& one, const AbstractTensor& second);
 		public:
 			/**
 				\brief Checks if all the ranges are equal
@@ -488,16 +465,36 @@ namespace Construction {
 				Constructor of an AddedTensor
 			 */
 			AddedTensor(TensorPointer A, TensorPointer B)
-				: AbstractTensor("", "", A->GetIndices()), A(std::move(A)), B(std::move(B)) {
+				: AbstractTensor("", "", A->GetIndices()) {
 
 				type = TensorType::ADDITION;
+				summands.push_back(std::move(A));
+				summands.push_back(std::move(B));
+			}
+
+			AddedTensor(std::vector<TensorPointer>&& vec) {
+				type = TensorType::ADDITION;
+				summands = std::move(vec);
+
+				if (summands.size() > 0) indices = summands[0]->GetIndices();
+			}
+		public:
+			void AddFromRight(TensorPointer A) {
+				summands.push_back(std::move(A));
+			}
+
+			void AddFromLeft(TensorPointer A) {
+				summands.insert(summands.begin(), std::move(A));
 			}
 		public:
 			virtual TensorPointer Clone() const override {
-				return TensorPointer(new AddedTensor(
-					std::move(A->Clone()),
-					std::move(B->Clone())
-				));
+				std::vector<TensorPointer> newSummands;
+
+				for (auto& tensor : summands) {
+					newSummands.push_back(std::move(tensor->Clone()));
+				}
+
+				return TensorPointer(new AddedTensor(std::move(newSummands)));
 			}
 		public:
 			/**
@@ -505,31 +502,48 @@ namespace Construction {
 			 */
 			virtual std::string ToString() const override;
 		public:
-			const TensorPointer& GetFirst() const { return A; }
-			const TensorPointer& GetSecond() const { return B; }
+			const TensorPointer& At(unsigned id) const { return summands[id]; }
+			size_t Size() const { return summands.size(); }
 		public:
 			static void DoSerialize(std::ostream& os, const AddedTensor& tensor) {
-				tensor.A->Serialize(os);
-				tensor.B->Serialize(os);
+				// Write size of
+				size_t size = tensor.summands.size();
+				os.write(reinterpret_cast<const char*>(&size), sizeof(size));
+
+				for (int i=0; i<size; i++) {
+					tensor.summands[i]->Serialize(os);
+				}
 			}
 
 			static TensorPointer DoDeserialize(std::istream& is, const Indices& indices) {
-				auto A = AbstractTensor::Deserialize(is)->Clone();
-				auto B = AbstractTensor::Deserialize(is)->Clone();
-				return TensorPointer(new AddedTensor(std::move(A), std::move(B)));
+				std::vector<TensorPointer> summands;
+
+				// Read size
+				size_t size;
+				is.read(reinterpret_cast<char*>(&size), sizeof(size));
+
+				// Deserialize all the summands
+				for (int i=0; i<size; i++) {
+					auto tensor = AbstractTensor::Deserialize(is)->Clone();
+					if (!tensor) return nullptr;
+
+					summands.push_back(std::move(tensor));
+				}
+
+				return TensorPointer(new AddedTensor(std::move(summands)));
 			}
 		public:
 			/**
 				Set the indices to the new order
 			 */
 			virtual void SetIndices(const Indices& newIndices) override {
-				// Need to permute the indices in A and B
-				auto permutationA = Permutation::From(indices, A->GetIndices());
-				auto permutationB = Permutation::From(indices, B->GetIndices());
-
 				indices = newIndices;
-				A->SetIndices(permutationA(newIndices));
-				B->SetIndices(permutationB(newIndices));
+
+				// Need to permute indices in all the summands
+				for (auto& tensor : summands) {
+					auto permutation = Permutation::From(indices, tensor->GetIndices());
+					tensor->SetIndices(permutation(newIndices));
+				}
 			}
 		public:
 			/**
@@ -548,6 +562,9 @@ namespace Construction {
             	\throws IncompleteIndexAssignmentException
              */
 			virtual Scalar Evaluate(const std::vector<unsigned>& args) const override {
+				// Get the indices
+				auto indices = GetIndices();
+
 				// If number of args and indices differ return
 				if (args.size() != indices.Size()) {
 					throw IncompleteIndexAssignmentException();
@@ -559,27 +576,27 @@ namespace Construction {
 					assignment[indices[i].GetName()] = args[i];
 				}
 
-				return (*A)(assignment) + (*B)(assignment);
+				Scalar result = 0;
+				for (auto& tensor : summands) {
+					result += (*tensor)(assignment);
+				}
+				return result;
 			}
 
 			/**
 				Canonicalize a sum of two tensors
 			 */
 			TensorPointer Canonicalize() const override {
-				auto newA = A->Canonicalize();
-				auto newB = B->Canonicalize();
-				return std::move(TensorPointer(new AddedTensor(std::move(newA), std::move(newB))));
-			}
-		public:
-			template<class Archive>
-			void serialize(Archive& ar, const unsigned version) {
-				ar & boost::serialization::base_object<AbstractTensor>(*this);
-				ar & A;
-				ar & B;
+				std::vector<TensorPointer> newSummands;
+
+				for (auto& tensor : summands) {
+					newSummands.push_back(std::move(tensor->Canonicalize()));
+				}
+
+				return std::move(TensorPointer(new AddedTensor(std::move(newSummands))));
 			}
 		private:
-			TensorPointer A;
-			TensorPointer B;
+			std::vector<TensorPointer> summands;
 		};
 
 		/**
@@ -855,53 +872,21 @@ namespace Construction {
 			}
 		};
 
-		MultipliedTensor AbstractTensor::operator*(const AbstractTensor &other) const {
-			// Check if all indices are distinct
-			for (auto& index : indices) {
-				if (other.indices.ContainsIndex(index)) {
-					throw CannotMultiplyTensorsException();
-				}
-			}
-
-			return MultipliedTensor(
-					std::move(Clone()),
-					std::move(other.Clone())
-			);
-		}
-
-		ScaledTensor AbstractTensor::operator*(const Scalar& c) const {
-			return ScaledTensor(
-				std::move(Clone()),
-				c
-			);
-		}
-
-		ScaledTensor operator*(const Scalar& c, const AbstractTensor& other) {
-			return other*c;
-		}
-
-		inline ScaledTensor AbstractTensor::operator-() const {
-			return Scalar(-1) * (*this);
-		}
-
-		AddedTensor AbstractTensor::operator+(const AbstractTensor& other) const {
-			// Tensors can only be added if it contains the same indices (but not necessarily in the same slots)
-			if (!indices.IsPermutationOf(other.indices)) throw CannotAddTensorsException();
-			return AddedTensor(
-				std::move(Clone()),
-				std::move(other.Clone())
-			);
-		}
-
 		std::string AddedTensor::ToString() const {
-			std::stringstream ss;
+			if (summands.size() == 0) return "";
+			if (summands.size() == 1) return summands[0]->ToString();
 
-			if (B->IsScaledTensor() && static_cast<const ScaledTensor*>(B.get())->GetScale() == Scalar(-1)) {
-				ss << A->ToString() << " - " << static_cast<const ScaledTensor*>(B.get())->GetTensor()->ToString();
-			} else {
-				ss << A->ToString() <<
-				 " + " << B->ToString();
+			std::stringstream ss;
+			ss << summands[0]->ToString();
+
+			for (int i=1; i<summands.size(); i++) {
+				if (summands[i]->IsScaledTensor() && static_cast<const ScaledTensor*>(summands[i].get())->GetScale() == Scalar(-1)) {
+					ss << " - ";
+				} else ss << " + ";
+
+				ss << summands[i]->ToString();
 			}
+
 			return ss.str();
 		}
 
@@ -1047,20 +1032,32 @@ namespace Construction {
 			if (one.IsZeroTensor()) return std::move(second);
 			if (other.IsZeroTensor()) return std::move(first);
 
-			// If the first one is an added tensor, the second isn't, 
-			// interchange the roles. If both are sums, keep the original order.
-			// Thus, sums will always be one the right and we can thus easily iterate
-			// through the chains
+			// If the first one is an added tensor and the second isn't, simply add the new one to the other
+			// and return the original pointer to keep memory allocation low
 			if (first->IsAddedTensor() && !second->IsAddedTensor()) {
-				return TensorPointer(new AddedTensor(
-					std::move(static_cast<AddedTensor*>(first.get())->GetFirst()->Clone()),
-					std::move(TensorPointer(new AddedTensor(
-						std::move(static_cast<AddedTensor*>(first.get())->GetSecond()->Clone()), 
-						std::move(second)
-					)))
-				));
-			} 
+				static_cast<AddedTensor*>(first.get())->AddFromRight(std::move(second));
+				return std::move(first);
+			}
 
+			// If the second one is an added tensor and the second isn't, simply add the new one to the other
+			// and return the original pointer to keep memory allocation low
+			if (second->IsAddedTensor() && !second->IsAddedTensor()) {
+				static_cast<AddedTensor*>(first.get())->AddFromLeft(std::move(first));
+				return std::move(second);
+			}
+
+			// If both are added tensors, move all the content from the right one into the left
+			if (first->IsAddedTensor() && second->IsAddedTensor()) {
+				AddedTensor* _second = static_cast<AddedTensor*>(second.get());
+
+				for (int i=0; i<_second->Size(); i++) {
+					static_cast<AddedTensor*>(first.get())->AddFromRight(std::move(_second->At(i)->Clone()));
+				}
+
+				return std::move(first);
+			}
+
+			// Else, return a new added tensor
 			return TensorPointer(new AddedTensor(std::move(first), std::move(second)));
 		}
 
@@ -1709,7 +1706,13 @@ namespace Construction {
 			static Tensor Substitute(const Tensor& tensor, const Indices& indices) { 
 				// Syntactic sugar for addition
 				if (tensor.IsAdded()) {
-					return Substitute(Tensor(tensor.As<AddedTensor>()->GetFirst()->Clone()), indices) + Substitute(Tensor(tensor.As<AddedTensor>()->GetSecond()->Clone()), indices);
+					Tensor result = Tensor::Zero();
+
+					for (int i=0; i<tensor.As<AddedTensor>()->Size(); ++i) {
+						result += Substitute(Tensor(tensor.As<AddedTensor>()->At(i)->Clone()), indices);
+					}
+
+					return result;
 				}
 
 				// Syntactic sugar for scaling
@@ -1780,8 +1783,9 @@ namespace Construction {
 				std::function<void(AbstractTensor* tensor)> helper = [&](const AbstractTensor* tensor) {
 					if (tensor->IsScaledTensor()) result = result || As<ScaledTensor>()->GetScale().HasVariables();
 					else if (tensor->IsAddedTensor()) {
-						helper(static_cast<const AddedTensor*>(tensor)->GetFirst().get());
-						helper(static_cast<const AddedTensor*>(tensor)->GetSecond().get());	
+						for (int i=0; i<static_cast<const AddedTensor*>(tensor)->Size(); ++i) {
+							helper(static_cast<const AddedTensor*>(tensor)->At(i).get());
+						}
 					} else if (tensor->IsMultipliedTensor()) {
 						helper(static_cast<const MultipliedTensor*>(tensor)->GetFirst().get());
 						helper(static_cast<const MultipliedTensor*>(tensor)->GetSecond().get());	
@@ -1799,27 +1803,17 @@ namespace Construction {
 				\returns {std::vector<Tensor>}		List of all the tensors
 			 */
 			std::vector<Tensor> GetSummands() const {
-				// Helper method
-				std::function<std::vector<Tensor>(const AbstractTensor*)> helper = [&](const AbstractTensor* tensor) {
+				if (IsAdded()) {
 					std::vector<Tensor> result;
 
-					if (tensor->IsAddedTensor()) {
-						// Recursively look at the leafs from the sum node
-						auto left = helper(static_cast<const AddedTensor*>(tensor)->GetFirst().get());
-						auto right = helper(static_cast<const AddedTensor*>(tensor)->GetSecond().get());
-
-						// Add the found tensors to the result
-						for (auto& item : left) result.push_back(item);
-						for (auto& item : right) result.push_back(item);
-					} else {
-						result.push_back(Tensor(TensorPointer(std::move(tensor->Clone()))));
+					for (int i=0; i<As<AddedTensor>()->Size(); ++i) {
+						result.push_back(Tensor(std::move(As<AddedTensor>()->At(i)->Clone())));
 					}
 
 					return result;
-				};
-
-				// Execute
-				return helper(pointer.get());
+				} else {
+					return { *this };
+				}
 			}
 
 			/** 
