@@ -1,3 +1,5 @@
+#define RECOVER_FROM_EXCEPTIONS 	0
+
 #include <common/time_measurement.hpp>
 
 #include <tensor/index.hpp>

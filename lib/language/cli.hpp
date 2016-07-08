@@ -378,12 +378,16 @@ namespace Construction {
                     return;
                 }
 
+                #if RECOVER_FROM_EXCEPTIONS == 1
                 try {
+                #endif
                     Execute(document, silent);
                     Session::Instance()->GetNotebook().Append(code);
+                #if RECOVER_FROM_EXCEPTIONS == 1
                 } catch (...) {
                     Error("Something went terribly wrong. :(");
                 }
+                #endif
             }
 
             void ExecuteScript(const std::string& filename, bool silent=false) {
