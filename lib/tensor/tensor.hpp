@@ -1888,6 +1888,23 @@ namespace Construction {
 				\returns {Tensor}	The simplified tensorial expression
 			 */
 			Tensor Simplify() const {
+				// Scaling heuristics
+				if (IsScaled()) {
+					auto it = SeparateScalefactor();
+					return it.first * it.second.Simplify();
+				};
+
+				// Multiplied tensors heuristics
+				if (IsMultiplied()) {
+					return Tensor(static_cast<MultipliedTensor*>(pointer.get())->GetFirst()->Clone()).Simplify() * Tensor(static_cast<MultipliedTensor*>(pointer.get())->GetSecond()->Clone()).Simplify();
+				}
+
+				// If the tensor is not added, check if it is zero, otherwise no further simplification possible
+				if (!IsAdded()) {
+					if (IsZero()) return Tensor::Zero();
+					return *this;
+				}
+
 				// Get the summands
 				auto summands = GetSummands();
 
@@ -1928,7 +1945,7 @@ namespace Construction {
 					}
 				};
 
-				Common::TaskPool task_pool (20);
+				Common::TaskPool task_pool;
 
 				// Iterate over all summands
 				for (int i=0; i<summands.size(); ++i) {
@@ -1945,14 +1962,9 @@ namespace Construction {
 				Vector::Matrix M (dimension, summands.size());
 
 				// Update the matrix components
-				for (int i=0; i<summands.size(); i++) {
-					auto it = vectors.find(i);
-					if (it == vectors.end()) {
-						return Tensor::Zero();
-					}
-
-					for (int j=0; j<dimension; j++) {
-						M(j, i) = it->second[j];
+				for (auto& pair : vectors) {
+					for (int i=0; i<dimension; i++) {
+						M(i, pair.first) = pair.second[i];
 					}
 				}
 
@@ -1988,7 +2000,11 @@ namespace Construction {
                 			scalar = summands[i].SeparateScalefactor().first;
                 			tensor = summands[i].SeparateScalefactor().second.Simplify();
                 		} else if (foundBase) {
-                			scalar += summands[i].SeparateScalefactor().first * M(currentRow,i);
+                			if (std::fmod(M(currentRow,i),1) == 0) {
+                				scalar += summands[i].SeparateScalefactor().first * Scalar(M(currentRow,i),1);
+                			} else {
+                				scalar += summands[i].SeparateScalefactor().first * M(currentRow,i);
+                			}
                 		} else {
                 			// SOMETHING WENT WRONG!!!
                 			// TODO: throw exception
