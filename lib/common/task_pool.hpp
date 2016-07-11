@@ -10,20 +10,29 @@
 #include <functional>
 #include <stdexcept>
 
+#include <iostream>
+
 namespace Construction {
     namespace Common {
 
         class TaskPool {
         public:
-            TaskPool(int threads) : terminate(false), stopped(false) {
+            TaskPool(int threads = std::thread::hardware_concurrency()) : terminate(false), stopped(false), activeTasks(0) {
+                threadPool.reserve(threads);
+
+                activeTasks = threads;
+
                 for (size_t i = 0; i < threads; ++i) {
                     threadPool.emplace_back([this] {
-                        for (; ;) {
+                        while (true) {
                             std::function<void()> task;
 
                             // Scope based locking
                             {
                                 std::unique_lock<std::mutex> lock(this->tasksMutex);
+
+                                // Decrease the number of active tasks
+                                this->activeTasks--;
 
                                 // Wait until queue is not empty or termination signal is sent
                                 this->condition.wait(lock, [this] {
@@ -32,6 +41,9 @@ namespace Construction {
 
                                 if (this->terminate && this->tasks.empty()) return;
 
+                                // Increase the number of active tasks;
+                                this->activeTasks++;
+
                                 // Move the top task to our reference and remove it from the queue
                                 task = std::move(this->tasks.front());
                                 this->tasks.pop();
@@ -39,12 +51,18 @@ namespace Construction {
 
                             // Execute task
                             task();
+
+                            // Notify that a task was finished
+                            this->condition_finished.notify_all();
                         }
                     });
                 }
             }
 
-            TaskPool() : TaskPool(std::thread::hardware_concurrency()) { }
+            TaskPool(const TaskPool&) = delete;
+            TaskPool& operator=(const TaskPool&) = delete;
+            TaskPool(TaskPool&&) = delete;
+            TaskPool& operator=(TaskPool&&) = delete;
 
             ~TaskPool() {
                 if (!stopped) {
@@ -93,6 +111,7 @@ namespace Construction {
 
                 // Wake up one thread and return the future
                 condition.notify_one();
+                
                 return res;
             }
 
@@ -102,16 +121,10 @@ namespace Construction {
 
             // Wait for all tasks to finish
             void Wait() {
-                std::thread block([&]() {
-                    // Scope based locking
-                    while (true) {
-                        std::unique_lock<std::mutex> lock(tasksMutex);
-                        if (tasks.empty()) return;
-                    }
+                std::unique_lock<std::mutex> lock(tasksMutex);
+                this->condition_finished.wait(lock, [this]() { 
+                    return this->tasks.empty() && this->activeTasks == 0; 
                 });
-
-                // Wait to finish
-                block.join();
             }
 
             void Shutdown() {
@@ -141,9 +154,11 @@ namespace Construction {
         private:
             std::vector<std::thread> threadPool;
             std::queue<std::function<void()>> tasks;
+            unsigned activeTasks;
 
             std::mutex tasksMutex;
             std::condition_variable condition;
+            std::condition_variable condition_finished;
 
             bool terminate;
             bool stopped;

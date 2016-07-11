@@ -1903,14 +1903,13 @@ namespace Construction {
 				auto combinations = GetAllIndexCombinations();
 
 				unsigned dimension = combinations.size();
-				std::vector<std::thread> threads;
 				std::mutex mutex;
 
 				// Helper method
-				std::function<void(TensorPointer,unsigned)> helper = [&](TensorPointer tensor, unsigned id) {
+				std::function<void(const Tensor& tensor,unsigned)> helper = [&](const Tensor& tensor, unsigned id) {
 					Vector::Vector v (dimension);
 
-					for (int i=0; i<combinations.size(); i++) {
+					for (int i=0; i<dimension; i++) {
 						IndexAssignments assignment;
 
 						// Convert into index assignment
@@ -1920,37 +1919,40 @@ namespace Construction {
                             j++;
                         }
 
-                        // Lock based guarding
-                        {
-                        	std::unique_lock<std::mutex> lock(mutex);
-
-                        	v[i] = (*tensor)(assignment).ToDouble();
-                    	}
+                        v[i] = tensor(assignment).ToDouble();
 					}
 
-					vectors.insert({ id, v });
+					{
+						std::unique_lock<std::mutex> lock(mutex);
+						vectors.insert({ id, v });
+					}
 				};
 
+				Common::TaskPool task_pool (20);
+
 				// Iterate over all summands
-				for (int i=0; i<summands.size(); i++) {
+				for (int i=0; i<summands.size(); ++i) {
 					// Remove all prefactors (if present) since we will add them add the end anyway
 					Tensor tensor = std::move(summands[i].SeparateScalefactor().second); 
 
-					threads.push_back(std::thread(helper, std::move(tensor.pointer->Clone()), i));
+					task_pool.Enqueue(helper, tensor, i);
 				}
 
-				// Wait for the threads to finish
-				for (auto& thread : threads) {
-					thread.join();
-				}
+				// Wait for all tasks to finish
+				task_pool.Wait();
 
 				// Create matrix
-				Vector::Matrix M (dimension, vectors.size());
+				Vector::Matrix M (dimension, summands.size());
 
-				// Fill the matrix with values
-				for (auto& pair : vectors) {
-					for (int i=0; i<dimension; i++) {
-						M(i, pair.first) = pair.second[i];
+				// Update the matrix components
+				for (int i=0; i<summands.size(); i++) {
+					auto it = vectors.find(i);
+					if (it == vectors.end()) {
+						return Tensor::Zero();
+					}
+
+					for (int j=0; j<dimension; j++) {
+						M(j, i) = it->second[j];
 					}
 				}
 
