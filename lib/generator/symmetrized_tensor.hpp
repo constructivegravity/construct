@@ -1,5 +1,6 @@
 #pragma once
 
+#include <common/task_pool.hpp>
 #include <common/time_measurement.hpp>
 
 #include <tensor/tensor.hpp>
@@ -58,8 +59,15 @@ namespace Construction {
                 // Extract summands
                 std::vector<Tensor::Tensor> _tensors = tensor.GetSummands();
 
-                // Symmetrize everything in the list
-                for (auto& _tensor : _tensors) {
+                // Task pool
+                Common::TaskPool pool;
+
+                // Helper map
+                std::mutex mutex;
+                std::map<unsigned, Tensor::Tensor> tensors;
+
+                // Helper function
+                auto helper = [&](const Tensor::Tensor& _tensor, unsigned id) {
                     // Separate the scale factor, if present
                     auto scale = _tensor.SeparateScalefactor().first;
                     auto tensor = _tensor.SeparateScalefactor().second;
@@ -78,8 +86,22 @@ namespace Construction {
 
                     // Check if the tensor is zero
                     if (!newTensor.IsZero()) {
-                        result += newTensor;
+                        std::unique_lock<std::mutex> lock(mutex);
+                        tensors.insert({ id, std::move(newTensor) });
                     }
+                };
+
+                // Symmetrize every tensor in the list
+                for (unsigned i=0; i<_tensors.size(); ++i) {
+                    pool.Enqueue(helper, _tensors[i], i);
+                }
+
+                // Wait for the tasks to finish
+                pool.Wait();
+
+                // Build the result
+                for (auto& pair : tensors) {
+                    result += pair.second;
                 }
 
                 return result;
@@ -98,21 +120,47 @@ namespace Construction {
                 // Extract summands
                 std::vector<Tensor::Tensor> tensors = tensor.GetSummands();
 
-                // Symmetrize everything in the list
-                for (auto& tensor : tensors) {
+                // Task pool
+                Common::TaskPool pool (1);
+
+                // Helper map
+                std::map<unsigned, Tensor::Tensor> _tensors;
+
+                // Helper function
+                auto helper = [&](const Tensor::Tensor& _tensor, unsigned id) {
+                    // Separate the scale factor, if present
+                    auto scale = _tensor.SeparateScalefactor().first;
+                    auto tensor = _tensor.SeparateScalefactor().second;
+
                     // Build symmetrization
                     std::vector<unsigned> s;
                     for (auto& index : symmetrization) {
-                        int pos = tensor.GetIndices().IndexOf(index) + 1;
+                        int pos = _tensor.GetIndices().IndexOf(index) + 1;
                         s.push_back(pos);
                     }
+
                     AntiSymmetrization symm(s, scaledResult);
 
                     // Symmetrize
-                    auto newTensor = symm(tensor);
+                    auto newTensor = scale * symm(tensor);
 
                     // Check if the tensor is zero
-                    if (!newTensor.IsZero()) result += newTensor;
+                    if (!newTensor.IsZero()) {
+                        _tensors.insert({ id, newTensor });
+                    }
+                };
+
+                // Symmetrize every tensor in the list
+                for (unsigned i=0; i<tensors.size(); ++i) {
+                    pool.Enqueue(helper, tensors[i], i);
+                }
+
+                // Wait for the tasks to finish
+                pool.Wait();
+
+                // Build the result
+                for (auto& pair : _tensors) {
+                    result += pair.second;
                 }
 
                 return result;
