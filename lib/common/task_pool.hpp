@@ -32,7 +32,7 @@ namespace Construction {
                                 std::unique_lock<std::mutex> lock(this->tasksMutex);
 
                                 // Decrease the number of active tasks
-                                this->activeTasks--;
+                                std::atomic_fetch_sub_explicit(&this->activeTasks, static_cast<unsigned>(1), std::memory_order_relaxed);
 
                                 // Wait until queue is not empty or termination signal is sent
                                 this->condition.wait(lock, [this] {
@@ -42,7 +42,7 @@ namespace Construction {
                                 if (this->terminate && this->tasks.empty()) return;
 
                                 // Increase the number of active tasks;
-                                this->activeTasks++;
+                                std::atomic_fetch_add_explicit(&this->activeTasks, static_cast<unsigned>(1), std::memory_order_relaxed);
 
                                 // Move the top task to our reference and remove it from the queue
                                 task = std::move(this->tasks.front());
@@ -122,6 +122,7 @@ namespace Construction {
             // Wait for all tasks to finish
             void Wait() {
                 std::unique_lock<std::mutex> lock(tasksMutex);
+
                 this->condition_finished.wait(lock, [this]() { 
                     return this->tasks.empty() && this->activeTasks == 0; 
                 });
@@ -154,14 +155,14 @@ namespace Construction {
         private:
             std::vector<std::thread> threadPool;
             std::queue<std::function<void()>> tasks;
-            unsigned activeTasks;
+            std::atomic<unsigned> activeTasks;
 
-            std::mutex tasksMutex;
+            mutable std::mutex tasksMutex;
             std::condition_variable condition;
             std::condition_variable condition_finished;
 
-            bool terminate;
-            bool stopped;
+            std::atomic<bool> terminate;
+            std::atomic<bool> stopped;
         };
 
     }

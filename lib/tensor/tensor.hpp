@@ -496,7 +496,7 @@ namespace Construction {
 					newSummands.push_back(std::move(tensor->Clone()));
 				}
 
-				return TensorPointer(new AddedTensor(std::move(newSummands)));
+				return std::move(TensorPointer(new AddedTensor(std::move(newSummands))));
 			}
 		public:
 			/**
@@ -628,10 +628,10 @@ namespace Construction {
 			}
 		public:
 			virtual TensorPointer Clone() const override {
-				return TensorPointer(new MultipliedTensor(
+				return std::move(TensorPointer(new MultipliedTensor(
 					std::move(A->Clone()),
 					std::move(B->Clone())
-				));
+				)));
 			}
 		public:
 			virtual void SetIndices(const Indices& newIndices) override {
@@ -1923,7 +1923,7 @@ namespace Construction {
 				std::mutex mutex;
 
 				// Helper method
-				std::function<void(const Tensor& tensor,unsigned)> helper = [&](const Tensor& tensor, unsigned id) {
+				auto helper = [&](const Tensor& tensor, unsigned id) {
 					Vector::Vector v (dimension);
 
 					for (int i=0; i<dimension; i++) {

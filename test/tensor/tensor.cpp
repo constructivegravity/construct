@@ -48,6 +48,10 @@ SCENARIO("General tensors", "[tensor]") {
 
         }
 
+        WHEN(" going out of scope, all memory is freed") {
+            
+        }
+
         WHEN(" serializing the tensor") {
 
             std::stringstream ss;
