@@ -200,6 +200,24 @@ namespace Construction {
                     }
                 }
 
+                // Print the most recent result
+                {
+                    std::stringstream ss;
+                    ss << current.ToString();
+                    std::string line;
+
+                    // Change the output color
+                    std::cout << "\033[" << current.GetColorCode() << "m";
+
+                    // Shift the output by three characters
+                    while (std::getline(ss, line)) {
+                        std::cout << "   " << line << std::endl;
+                    }
+                }
+                
+                // Change the color back
+                std::cout << "\033[0m";
+
                 // Read the memory
                 {
                     size_t size;
