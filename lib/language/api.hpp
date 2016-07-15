@@ -158,13 +158,11 @@ namespace Construction {
             }
 
             bool IsSymmetric(const Tensor::Tensor& tensor, const Indices& indices) {
-                Construction::Generator::SymmetrizedTensorGenerator symmetrizer(indices);
-                return symmetrizer(tensor, true).IsEqual(tensor);
+                return tensor.Symmetrize(indices).IsEqual(tensor);
             }
 
             bool IsAntiSymmetric(const Tensor::Tensor& tensor, const Indices& indices) {
-                Construction::Generator::AntiSymmetrizedTensorGenerator symmetrizer(indices);
-                return symmetrizer(tensor, true).IsEqual(tensor);
+                return tensor.AntiSymmetrize(indices).IsEqual(tensor);
             }
 
             bool HasExchangeSymmetry(const Tensor::Tensor& tensor, const Indices& indices) {

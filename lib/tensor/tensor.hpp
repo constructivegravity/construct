@@ -883,10 +883,8 @@ namespace Construction {
 
 			for (int i=1; i<summands.size(); i++) {
 				if (summands[i]->IsScaledTensor() && static_cast<const ScaledTensor*>(summands[i].get())->GetScale() == Scalar(-1)) {
-					ss << " - ";
-				} else ss << " + ";
-
-				ss << summands[i]->ToString();
+					ss << " - " << static_cast<const ScaledTensor*>(summands[i].get())->GetTensor()->ToString();
+				} else ss << " + " << summands[i]->ToString();
 			}
 
 			return ss.str();
@@ -2319,7 +2317,12 @@ namespace Construction {
 				// Handle scales
 				if (IsScaled()) {
 					auto s = SeparateScalefactor();
-					return s.first * s.second.Symmetrize(indices);
+					auto t = s.second.Symmetrize(indices);
+
+					// If the tensor is zero, do not care about the scale
+					if (t.IsZeroTensor()) return t;
+
+					return s.first * t;
 				}
 
 				// Do not waste time on zero tensor
@@ -2352,21 +2355,56 @@ namespace Construction {
 				if (IsAdded()) {
 					auto summands = GetSummands();
 
-					Tensor result = Tensor::Zero();
-					for (auto& tensor : summands) {
-						result += tensor.AntiSymmetrize(indices);
+					std::map<unsigned, Tensor> permuted;
+					bool hasScaled=false;
+
+					// Permute the summands in parallel
+					{
+						Common::TaskPool pool (8);
+
+						for (int i=0; i<summands.size(); ++i) {
+							if (summands[i].IsScaled()) hasScaled = true;
+
+							pool.Enqueue([&](const Tensor& tensor, unsigned id) {
+								permuted.insert({ id, std::move(tensor.AntiSymmetrize(indices)) });
+							}, summands[i], i);
+						}
+
+						pool.Wait();
 					}
-					return result;
+
+					Tensor result = Tensor::Zero();
+
+					Scalar scale = 1;
+					for (auto& pair : permuted) {
+						if (pair.second.IsZeroTensor()) continue;
+
+						if (hasScaled) {
+							result += std::move(pair.second);
+						} else {
+							auto s = pair.second.SeparateScalefactor();
+							scale = s.first;
+
+							result += std::move(s.second);
+						}
+					}
+					
+					return scale * result;
 				}
 
 				// Handle scales
 				if (IsScaled()) {
 					auto s = SeparateScalefactor();
-					return s.first * s.second.AntiSymmetrize(indices);
+					auto t = s.second.AntiSymmetrize(indices);
+
+					// If the tensor is zero, do not care about the scale
+					if (t.IsZeroTensor()) return t;
+
+					return s.first * t;
 				}
 
 				// Do not waste time on zero tensor
-				if (IsZero()) return *this;
+				if (IsZeroTensor()) return *this;
 
 				// Get the permutation of the tensor
 				auto permutations = PermuteIndices(indices);
