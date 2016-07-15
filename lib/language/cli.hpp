@@ -141,7 +141,6 @@ namespace Construction {
                     /*if (database.Contains(expandedCmd)) {
                         lastResult = database[expandedCmd];
                         lastCmd = expandedCmd;
-
                         if (!silent) PrintTensor();
                         return;
                     }*/
@@ -383,7 +382,9 @@ namespace Construction {
                 #endif
                     Execute(document, silent);
                     Session::Instance()->GetNotebook().Append(code);
-                #if RECOVER_FROM_EXCEPTIONS == 1
+                #if RECOVER_FROM_EXCEPTIONS == 1    
+                } catch (const std::bad_alloc& e) {
+                    Error("Out of memory. :(");
                 } catch (...) {
                     Error("Something went terribly wrong. :(");
                 }

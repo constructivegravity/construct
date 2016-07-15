@@ -1,4 +1,5 @@
-#define RECOVER_FROM_EXCEPTIONS 	0
+#define RECOVER_FROM_EXCEPTIONS 	1
+
 
 #include <common/time_measurement.hpp>
 
@@ -51,7 +52,6 @@ std::ostream& operator<<(std::ostream& os, const std::pair<S,T>& vec) {
 	os << "(" << vec.first << ", " << vec.second << ")";
 	return os;
 }
-
 template<typename T>
 std::ostream& operator<<(std::ostream& os, const std::vector<T>& vec) {
 	os << "[";
@@ -143,10 +143,8 @@ int main(int argc, char** argv) {
 	indices.Insert(Index("b", {1,3}));
 	indices.Insert(Index("a", {1,3}));
 	indices.Insert(Index("d", {1,3}));
-
 	std::cout << indices << std::endl;
 	std::cout << indices.Ordered() << std::endl;
-
 	auto permutation = Permutation::From(indices, Indices::GetRomanSeries(4, {1,3}));
 	std::cout << permutation << std::endl;
 	std::cout << indices << " <-> " << permutation(indices) << std::endl;
@@ -158,86 +156,59 @@ int main(int argc, char** argv) {
 	// (a|:1 (b|:2 |c):1 |d):2 e => abcde with symmetries (ac) and (bd)
 
 	/*int order = (argc >= 2) ? atoi(argv[1]) : 7;
-
 	Construction::Common::TimeMeasurement time;
-
 	Construction::Generator::BaseTensorGenerator generator;
 	Construction::Generator::BasisSelector selector;
-
 	auto tensors = generator.Generate(order);
-
 	time.Stop();
-
 	std::cerr << std::setw(5) << order << std::setw(10) << tensors.Size() << std::setw(20) << time << std::endl;
-
 	TensorContainer symmetrized;
-
 	std::cerr << tensors[0].GetIndices() << std::endl;
-
 	// Symmetrize
 	{
 		Indices toSymmetrize = Construction::Tensor::Indices::GetRomanSeries(2, {1,3});
 		std::cout << toSymmetrize << std::endl;
-
 		Construction::Generator::SymmetrizedTensorGenerator symmetrizer(toSymmetrize);
-
 		Construction::Common::TimeMeasurement time2;
 		symmetrized = symmetrizer(tensors);
 		time2.Stop();
-
 		std::cerr << std::setw(5) << order << std::setw(10) << symmetrized.Size() << std::setw(20) << time2 <<
 		std::endl;
-
 		for (auto& tensor : symmetrized) {
 			std::cerr << "  " << tensor->ToString() << std::endl;
 		}
 	}
-
 	std::cerr << std::endl;
-
 	// Symmetrize second
 	{
 		Indices toSymmetrize = Construction::Tensor::Indices::GetRomanSeries(2, {1,3}, 3);
 		std::cerr << toSymmetrize << std::endl;
-
 		Construction::Generator::SymmetrizedTensorGenerator symmetrizer(toSymmetrize);
-
 		Construction::Common::TimeMeasurement time2;
 		symmetrized = symmetrizer(symmetrized);
 		time2.Stop();
-
 		std::cerr << std::setw(5) << order << std::setw(10) << symmetrized.Size() << std::setw(20) << time2 <<
 		std::endl;
-
 		//std::cout << "\\begin{eqnarray}" << std::endl;
 		for (auto& tensor : symmetrized) {
-
 			//std::cout << tensor->ToString() << std::endl;
-
 			std::cout << tensor->ToString() << " \\\\" << std::endl;
 		}
 		//std::cout << "\\end{eqnarray}" << std::endl;
 	}
-
 	// Symmetrize third
 	{
 		Indices toSymmetrize = Construction::Tensor::Indices::GetRomanSeries(2, {1,3}, 5);
 		std::cerr << toSymmetrize << std::endl;
-
 		Construction::Generator::SymmetrizedTensorGenerator symmetrizer(toSymmetrize);
-
 		Construction::Common::TimeMeasurement time2;
 		symmetrized = symmetrizer(symmetrized);
 		time2.Stop();
-
 		std::cerr << std::setw(5) << order << std::setw(10) << symmetrized.Size() << std::setw(20) << time2 <<
 		std::endl;
-
 		//std::cout << "\\begin{eqnarray}" << std::endl;
 		for (int i=0; i<symmetrized.Size(); i++) {
-
 			//std::cout << tensor->ToString() << std::endl;
-
 			std::cout << "\033[34m" << "c_" << (i+1) << "\\cdot\\left(" << symmetrized[i].ToString() << "\\right) \\\\ \033[0m" << std::endl;
 		}
 		//std::cout << "\\end{eqnarray}" << std::endl;
@@ -247,21 +218,15 @@ int main(int argc, char** argv) {
 	{
 		Indices toSymmetrize = Construction::Tensor::Indices::GetRomanSeries(2, {1,3}, 6);
 		std::cerr << toSymmetrize << std::endl;
-
 		Construction::Generator::SymmetrizedTensorGenerator symmetrizer(toSymmetrize);
-
 		Construction::Common::TimeMeasurement time2;
 		symmetrized = symmetrizer(symmetrized);
 		time2.Stop();
-
 		std::cerr << std::setw(5) << order << std::setw(10) << symmetrized.Size() << std::setw(20) << time2 <<
 		std::endl;
-
 		//std::cout << "\\begin{eqnarray}" << std::endl;
 		for (auto& tensor : symmetrized) {
-
 			std::cout << tensor->ToString() << std::endl;
-
 			//std::cout << tensor->ToString() << " \\\\" << std::endl;
 		}
 		//std::cout << "\\end{eqnarray}" << std::endl;
@@ -270,9 +235,7 @@ int main(int argc, char** argv) {
 	/*Construction::Common::TimeMeasurement time2;
 	auto basis = selector(tensors);
 	time2.Stop();
-
 	std::cerr << std::setw(5) << order << std::setw(10) << basis.Size() << std::setw(20) << time2 << std::endl << std::endl;
-
 	std::cout << "\\begin{eqnarray}" << std::endl;
 	for (auto& tensor : tensors) {
 		std::cout << "  " << tensor->ToString() << " \\\\"<< std::endl;
