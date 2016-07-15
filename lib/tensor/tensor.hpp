@@ -1459,6 +1459,10 @@ namespace Construction {
 				return result;
 			}
 
+			virtual void SetIndices(const Indices& indices) {
+				this->indices = indices;
+			}
+
 			virtual TensorPointer Canonicalize() const override {
 				unsigned pos = 0;
 				int sign = 1;
@@ -1912,7 +1916,6 @@ namespace Construction {
 				if (summands.size() == 1) return *this;
 
 				// Initialize
-                //std::vector<Vector::Vector> vectors;
                 std::map<unsigned,Vector::Vector> vectors;
 
 				// Get the indices of the resulting tensor
@@ -1945,18 +1948,21 @@ namespace Construction {
 					}
 				};
 
-				Common::TaskPool task_pool;
+				// Scope
+				{
+					Common::TaskPool task_pool;
 
-				// Iterate over all summands
-				for (int i=0; i<summands.size(); ++i) {
-					// Remove all prefactors (if present) since we will add them add the end anyway
-					Tensor tensor = std::move(summands[i].SeparateScalefactor().second); 
+					// Iterate over all summands
+					for (int i=0; i<summands.size(); ++i) {
+						// Remove all prefactors (if present) since we will add them add the end anyway
+						Tensor tensor = std::move(summands[i].SeparateScalefactor().second); 
 
-					task_pool.Enqueue(helper, tensor, i);
+						task_pool.Enqueue(helper, tensor, i);
+					}
+
+					// Wait for all tasks to finish
+					task_pool.Wait();
 				}
-
-				// Wait for all tasks to finish
-				task_pool.Wait();
 
 				// Create matrix
 				Vector::Matrix M (dimension, summands.size());
@@ -2219,6 +2225,175 @@ namespace Construction {
 				}
 
 				return { M, _variables };
+			}
+		public:
+			std::vector<Indices> PermuteIndices(const Indices& indices) const {
+				auto tensorIndices = GetIndices();
+
+				// Calculate the position of the indices to permute
+				std::vector<unsigned> positionsToPermute;
+				for (auto& index : indices) {
+					positionsToPermute.push_back(tensorIndices.IndexOf(index) + 1);
+				}
+
+				std::vector<Indices> permutations;
+
+				// Helper method
+                std::function<void(unsigned,Indices,Indices)> fn = [&](unsigned i, Indices used, Indices unused) {
+                    // if all indices are used,
+                    if (unused.Size() == 0) {
+                        permutations.push_back(used);
+                    } else {
+                        // if the current index is not part of the symmetrized indices, just insert and go to the next
+                        if (std::find(positionsToPermute.begin(), positionsToPermute.end(), i+1) == positionsToPermute.end()) {
+                            used.Insert(tensorIndices[i]);
+                            unused.Remove(std::distance(unused.begin(), std::find(unused.begin(), unused.end(), tensorIndices[i])));
+                            fn(i+1, used, unused);
+                        } else {
+                            // else, iterate over the indices to change
+                            for (auto& k : positionsToPermute) {
+                                Indices newUnused = unused;
+                                Indices newUsed = used;
+
+                                auto it = std::find(newUnused.begin(), newUnused.end(), tensorIndices[k-1]);
+
+                                // if the index is unused, add it and call recursion for next index
+                                if (it != newUnused.end()) {
+                                    int pos = std::distance(newUnused.begin(), it);
+                                    newUnused.Remove(std::distance(newUnused.begin(), it));
+                                    newUsed.Insert(tensorIndices[k - 1]);
+                                    fn(i + 1, newUsed, newUnused);
+                                }
+                            }
+                        }
+                    }
+                };
+
+                // Let the magic happen ...
+                Indices empty = {};
+                fn(0, {}, tensorIndices);
+
+                return permutations;
+			}
+
+			Tensor Symmetrize(const Indices& indices) const {
+				// Handle sums differently
+				if (IsAdded()) {
+					auto summands = GetSummands();
+
+					std::map<unsigned, Tensor> permuted;
+					bool hasScaled=false;
+
+					// Permute the summands in parallel
+					{
+						Common::TaskPool pool (8);
+
+						for (int i=0; i<summands.size(); ++i) {
+							if (summands[i].IsScaled()) hasScaled = true;
+
+							pool.Enqueue([&](const Tensor& tensor, unsigned id) {
+								permuted.insert({ id, std::move(tensor.Symmetrize(indices)) });
+							}, summands[i], i);
+						}
+
+						pool.Wait();
+					}
+
+					Tensor result = Tensor::Zero();
+
+					Scalar scale = 1;
+					for (auto& pair : permuted) {
+						if (hasScaled) {
+							if (!pair.second.IsZeroTensor()) result += std::move(pair.second);
+						} else {
+							auto s = pair.second.SeparateScalefactor();
+							scale = s.first;
+
+							if (!s.second.IsZeroTensor()) result += std::move(s.second);
+						}
+					}
+					
+					return scale * result;
+				}
+
+				// Handle scales
+				if (IsScaled()) {
+					auto s = SeparateScalefactor();
+					return s.first * s.second.Symmetrize(indices);
+				}
+
+				// Do not waste time on zero tensor
+				if (IsZeroTensor()) return *this;
+
+				// Get the permutation of the tensor
+				auto permutations = PermuteIndices(indices);
+
+				Tensor result = Tensor::Zero();
+				for (auto permutation : permutations) {
+					Tensor clone = *this;
+					clone.SetIndices(permutation);
+					result = result + clone;
+				}
+
+				// Scale
+				result = Scalar(1,permutations.size()) * result;
+
+				// If the scaled tensor is the original one, return
+				if (IsEqual(result)) return *this;
+
+				// If the tensor is zero, simplify memory
+				if (result.IsZero()) return Tensor::Zero();
+
+				return result;
+			}
+
+			Tensor AntiSymmetrize(const Indices& indices) const {
+				// Handle sums differently
+				if (IsAdded()) {
+					auto summands = GetSummands();
+
+					Tensor result = Tensor::Zero();
+					for (auto& tensor : summands) {
+						result += tensor.AntiSymmetrize(indices);
+					}
+					return result;
+				}
+
+				// Handle scales
+				if (IsScaled()) {
+					auto s = SeparateScalefactor();
+					return s.first * s.second.AntiSymmetrize(indices);
+				}
+
+				// Do not waste time on zero tensor
+				if (IsZero()) return *this;
+
+				// Get the permutation of the tensor
+				auto permutations = PermuteIndices(indices);
+
+				Tensor result = Tensor::Zero();
+				for (auto permutation : permutations) {
+					Tensor clone = *this;
+					clone.SetIndices(permutation);
+
+					int sign = Permutation::From(GetIndices(), permutation).Sign();
+
+					if (sign > 0)
+						result = result + clone;
+					else 
+						result = result - clone;
+				}
+
+				// Scale
+				result = Scalar(1,permutations.size()) * result;
+
+				// If the scaled tensor is the original one, return
+				if (IsEqual(result)) return *this;
+
+				// If the tensor is zero, simplify memory
+				if (result.IsZero()) return Tensor::Zero();
+
+				return result;
 			}
 		public:
 			void Serialize(std::ostream& os) const override {

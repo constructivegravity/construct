@@ -75,7 +75,7 @@ namespace Construction {
                     // Build symmetrization
                     std::vector<unsigned> s;
                     for (auto& index : symmetrization) {
-                        int pos = _tensor.GetIndices().IndexOf(index) + 1;
+                        int pos = tensor.GetIndices().IndexOf(index) + 1;
                         s.push_back(pos);
                     }
 
@@ -83,6 +83,10 @@ namespace Construction {
 
                     // Symmetrize
                     auto newTensor = scale * symm(tensor);
+
+                    {
+                        std::unique_lock<std::mutex> lock(mutex);
+                    }
 
                     // Check if the tensor is zero
                     if (!newTensor.IsZero()) {

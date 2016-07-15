@@ -30,6 +30,12 @@ SCENARIO("General tensors", "[tensor]") {
             }
         }
 
+        WHEN(" symmetrizing a tensor") {
+            auto tensor = Construction::Tensor::Tensor::EpsilonGamma(0,2, Construction::Tensor::Indices::GetRomanSeries(4, {1,3}));
+
+            std::cout << tensor.Symmetrize({ {"a", {1,3}}, {"c", {1,3}} }) << std::endl;
+        }
+
         WHEN(" evaluating the tensor components") {
 
             std::array<double, 9> components;
