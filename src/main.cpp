@@ -25,6 +25,7 @@
 #include <cassert>
 #include <fstream>
 #include <string>
+#include <cstdio>
 
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/archive/text_oarchive.hpp>
@@ -117,6 +118,31 @@ int main(int argc, char** argv) {
 		return 0;
 	}
 
+	{
+		std::ifstream crashfile (".crashfile");
+
+		// If the file exists
+		if (crashfile) {
+			// Close file
+			crashfile.close();
+
+			// Ask if the session should be restored
+			std::cout << "Construction can restore the previous session. Should it? [Y/n]: ";
+
+			while (true) {
+				std::string input;
+				std::cin >> input;
+
+				if (input == "Y") {
+					Construction::Language::Session::Instance()->LoadFromFile(".crashfile");
+					break;
+				} else if (input == "n") break;
+				else 
+					std::cout << "Construction can restore the previous session. Should it? [Y/n]: ";
+			}
+		}
+	}
+
 	// CLI mode
 
 	std::string input;
@@ -124,6 +150,9 @@ int main(int argc, char** argv) {
 		input = std::string(readline("> "));
 
 		if (input == "Exit") {
+			// Delete crash file
+			remove(".crashfile");
+
 			std::cout << "Bye!" << std::endl;
 			break;
 		}

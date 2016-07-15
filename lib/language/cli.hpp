@@ -390,6 +390,9 @@ namespace Construction {
                     Error("Something went terribly wrong. :(");
                 }
                 #endif
+
+                // Store the session on disk in order to recover in case of crash
+                Session::Instance()->SaveToFile(".crashfile");
             }
 
             void ExecuteScript(const std::string& filename, bool silent=false) {
