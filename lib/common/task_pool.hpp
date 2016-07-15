@@ -17,10 +17,8 @@ namespace Construction {
 
         class TaskPool {
         public:
-            TaskPool(int threads = std::thread::hardware_concurrency()) : terminate(false), stopped(false), activeTasks(0) {
+            TaskPool(int threads = std::thread::hardware_concurrency()) : terminate(false), stopped(false), remainingTasks(0) {
                 threadPool.reserve(threads);
-
-                activeTasks = threads;
 
                 for (size_t i = 0; i < threads; ++i) {
                     threadPool.emplace_back([this] {
@@ -31,18 +29,12 @@ namespace Construction {
                             {
                                 std::unique_lock<std::mutex> lock(this->tasksMutex);
 
-                                // Decrease the number of active tasks
-                                std::atomic_fetch_sub_explicit(&this->activeTasks, static_cast<unsigned>(1), std::memory_order_relaxed);
-
                                 // Wait until queue is not empty or termination signal is sent
                                 this->condition.wait(lock, [this] {
                                     return this->terminate || !this->tasks.empty();
                                 });
 
                                 if (this->terminate && this->tasks.empty()) return;
-
-                                // Increase the number of active tasks;
-                                std::atomic_fetch_add_explicit(&this->activeTasks, static_cast<unsigned>(1), std::memory_order_relaxed);
 
                                 // Move the top task to our reference and remove it from the queue
                                 task = std::move(this->tasks.front());
@@ -51,6 +43,13 @@ namespace Construction {
 
                             // Execute task
                             task();
+
+                            {
+                                std::unique_lock<std::mutex> lock(tasksMutex);
+
+                                // Decrease the number of remaining tasks
+                                std::atomic_fetch_sub_explicit(&this->remainingTasks, static_cast<unsigned>(1), std::memory_order_relaxed);
+                            }
 
                             // Notify that a task was finished
                             this->condition_finished.notify_all();
@@ -107,6 +106,9 @@ namespace Construction {
 
                     // Put task in the queue
                     tasks.emplace([task]() { (*task)(); });
+
+                    // Increase the number of active tasks;
+                    std::atomic_fetch_add_explicit(&this->remainingTasks, static_cast<unsigned>(1), std::memory_order_relaxed);
                 }
 
                 // Wake up one thread and return the future
@@ -124,7 +126,7 @@ namespace Construction {
                 std::unique_lock<std::mutex> lock(tasksMutex);
 
                 this->condition_finished.wait(lock, [this]() { 
-                    return this->tasks.empty() && this->activeTasks == 0; 
+                    return this->tasks.empty() && this->remainingTasks == 0; 
                 });
             }
 
@@ -155,7 +157,7 @@ namespace Construction {
         private:
             std::vector<std::thread> threadPool;
             std::queue<std::function<void()>> tasks;
-            std::atomic<unsigned> activeTasks;
+            std::atomic<unsigned> remainingTasks;
 
             mutable std::mutex tasksMutex;
             std::condition_variable condition;
