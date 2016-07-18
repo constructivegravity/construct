@@ -32,7 +32,9 @@ namespace Construction {
         class CLI {
         public:
             CLI(int argc, char** argv) {
-                crashFile = boost::filesystem::system_complete(argv[0]).remove_filename().string() + ".crashfile";
+                auto crashFile = boost::filesystem::system_complete(argv[0]).remove_filename().string();
+                if (crashFile[crashFile.size()-1] != '/') crashFile += "/";
+                crashFile += ".crashfile";
             }
 
             ~CLI() {
