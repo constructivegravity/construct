@@ -27,6 +27,8 @@ namespace Construction {
 		public:
 			AbstractExpression(Type type) : type(type), colorCode(32) { }
 			AbstractExpression(Type type, int colorCode) : type(type), colorCode(colorCode) { }
+
+			virtual ~AbstractExpression() = default;
 		public:
 			bool IsTensor() const { return type == TENSOR; }
 			bool IsScalar() const { return type == SCALAR; }

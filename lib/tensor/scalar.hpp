@@ -48,6 +48,8 @@ namespace Construction {
                 \param type     The type of the scalar
              */
             AbstractScalar(Type type) : type(type) { }
+
+            virtual ~AbstractScalar() = default;
         public:
             /**
              *  Return the type of the scalar
@@ -122,6 +124,8 @@ namespace Construction {
         public:
             FloatingPointScalar() : AbstractScalar(FLOATING_POINT), c(0) { }
             FloatingPointScalar(double c) : AbstractScalar(FLOATING_POINT), c(c) { }
+
+            virtual ~FloatingPointScalar() = default;
         public:
             virtual ScalarPointer Clone() const override {
                 return std::move(ScalarPointer(new FloatingPointScalar(c)));
@@ -158,6 +162,8 @@ namespace Construction {
         class AddedScalar : public AbstractScalar {
         public:
             AddedScalar(ScalarPointer A, ScalarPointer B) : AbstractScalar(ADDED), A(std::move(A)), B(std::move(B)) { }
+
+            virtual ~AddedScalar() = default;
         public:
             virtual ScalarPointer Clone() const override {
                 return std::move(ScalarPointer(new AddedScalar(
@@ -209,6 +215,7 @@ namespace Construction {
         class MultipliedScalar : public AbstractScalar {
         public:
             MultipliedScalar(ScalarPointer A, ScalarPointer B) : AbstractScalar(MULTIPLIED), A(std::move(A)), B(std::move(B)) { }
+            virtual ~MultipliedScalar() = default;
         public:
             virtual std::string ToString() const override {
                 std::stringstream ss;
@@ -290,6 +297,8 @@ namespace Construction {
             Scalar(Scalar&& other) : AbstractExpression(SCALAR), pointer(std::move(other.pointer)) { }
  
             Scalar(std::unique_ptr<AbstractScalar> pointer) : AbstractExpression(SCALAR), pointer(std::move(pointer)) { }
+
+            virtual ~Scalar() = default;
         public:
             // Syntactic sugar
             inline static Scalar Integer(int v) { return Scalar(v); }

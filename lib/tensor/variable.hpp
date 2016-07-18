@@ -25,6 +25,8 @@ namespace Construction {
 
             Variable(const Variable& other) : AbstractScalar(AbstractScalar::VARIABLE), name(other.name), Printable(other.printed_text) { }
             //Variable(Variable&& other) : name(std::move(other.name)), Printable(std::move(other.printed_text)) { }
+
+            virtual ~Variable() = default;
         public:
             std::string GetName() const { return name; }
             void SetName(const std::string& name) { this->name = name; }

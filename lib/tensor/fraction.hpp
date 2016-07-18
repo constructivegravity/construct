@@ -14,6 +14,8 @@ namespace Construction {
             Fraction() : numerator(0), denominator(1), AbstractScalar(AbstractScalar::FRACTION) { }
             Fraction(int number) :  AbstractScalar(AbstractScalar::FRACTION), numerator(number), denominator(1) { }
             Fraction(int numerator, unsigned int denominator) :  AbstractScalar(AbstractScalar::FRACTION), numerator(numerator), denominator(denominator) { }
+
+            virtual ~Fraction() = default;
         public:
             int gcd(int num1, int num2) {
                 int tmp;
