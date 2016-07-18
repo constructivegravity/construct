@@ -18,6 +18,9 @@
 #include <generator/linear_dependent_selector.hpp>
 #include <generator/symmetrized_tensor.hpp>
 
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+
 namespace Construction {
     namespace Language {
 
@@ -28,21 +31,9 @@ namespace Construction {
 
         class CLI {
         public:
-            CLI() { }
-            /*CLI(bool forceNewDatabase=false) {
-                if (!forceNewDatabase) {
-                    // Check if file exists
-                    std::ifstream file("tensors.db");
-                    if (file) {
-                        file.close();
-                        try {
-                            //database.LoadFromFile("tensors.db");
-                        } catch (...) {
-                            database.Clear();
-                        }
-                    } else file.close();
-                }
-            }*/
+            CLI(int argc, char** argv) {
+                crashFile = boost::filesystem::system_complete(argv[0]).remove_filename().append(".crashfile").string();
+            }
 
             ~CLI() {
                 //database.SaveToFile("tensors.db");
@@ -392,7 +383,7 @@ namespace Construction {
                 #endif
 
                 // Store the session on disk in order to recover in case of crash
-                Session::Instance()->SaveToFile(".crashfile");
+                Session::Instance()->SaveToFile(crashFile);
             }
 
             void ExecuteScript(const std::string& filename, bool silent=false) {
@@ -473,6 +464,7 @@ namespace Construction {
 
             // Store the command to that was executed to create %
             std::string lastCmd;
+            std::string crashFile;
             std::map<std::string, std::string> definition;
         };
 

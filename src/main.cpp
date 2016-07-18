@@ -27,15 +27,13 @@
 #include <string>
 #include <cstdio>
 
-#include <boost/archive/text_iarchive.hpp>
-#include <boost/archive/text_oarchive.hpp>
-
-#include <boost/archive/binary_oarchive.hpp>
-#include <boost/archive/binary_iarchive.hpp>
-#include <boost/serialization/export.hpp>
-
 #include <readline/readline.h>
 #include <readline/history.h>
+
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+
+namespace fs = boost::filesystem;
 
 using namespace Construction::Tensor;
 
@@ -106,7 +104,7 @@ char** getCommandCompletions(const char* text, int start, int) {
 
 int main(int argc, char** argv) {
 
-	Construction::Language::CLI cli;
+	Construction::Language::CLI cli (argc, argv);
 
 	// Hook readline completion
 	rl_attempted_completion_function = &getCommandCompletions;
@@ -118,28 +116,23 @@ int main(int argc, char** argv) {
 		return 0;
 	}
 
-	{
-		std::ifstream crashfile (".crashfile");
+	auto crashFile = boost::filesystem::system_complete(argv[0]).remove_filename().append(".crashfile").string();
 
-		// If the file exists
-		if (crashfile) {
-			// Close file
-			crashfile.close();
+	// If the file exists
+	if (boost::filesystem::exists( crashFile )) {
+		// Ask if the session should be restored
+		std::cout << "Construction can restore the previous session. Should it? [Y/n]: ";
 
-			// Ask if the session should be restored
-			std::cout << "Construction can restore the previous session. Should it? [Y/n]: ";
+		while (true) {
+			std::string input;
+			std::cin >> input;
 
-			while (true) {
-				std::string input;
-				std::cin >> input;
-
-				if (input == "Y") {
-					Construction::Language::Session::Instance()->LoadFromFile(".crashfile");
-					break;
-				} else if (input == "n") break;
-				else 
-					std::cout << "Construction can restore the previous session. Should it? [Y/n]: ";
-			}
+			if (input == "Y") {
+				Construction::Language::Session::Instance()->LoadFromFile(crashFile);
+				break;
+			} else if (input == "n") break;
+			else 
+				std::cout << "Construction can restore the previous session. Should it? [Y/n]: ";
 		}
 	}
 
@@ -151,7 +144,7 @@ int main(int argc, char** argv) {
 
 		if (input == "Exit") {
 			// Delete crash file
-			remove(".crashfile");
+			remove(crashFile.c_str());
 
 			std::cout << "Bye!" << std::endl;
 			break;
