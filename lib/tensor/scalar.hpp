@@ -49,7 +49,7 @@ namespace Construction {
              */
             AbstractScalar(Type type) : type(type) { }
 
-            virtual ~AbstractScalar() = default;
+            virtual ~AbstractScalar() { }
         public:
             /**
              *  Return the type of the scalar
