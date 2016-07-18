@@ -116,7 +116,7 @@ int main(int argc, char** argv) {
 		return 0;
 	}
 
-	auto crashFile = boost::filesystem::system_complete(argv[0]).remove_filename().append(".crashfile").string();
+	auto crashFile = boost::filesystem::system_complete(argv[0]).remove_filename().string() + ".crashfile";
 
 	// If the file exists
 	if (boost::filesystem::exists( crashFile )) {
