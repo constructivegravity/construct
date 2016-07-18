@@ -7,12 +7,6 @@
 #include <cmath>
 #include <memory>
 
-#include <boost/archive/binary_oarchive.hpp>
-#include <boost/archive/binary_iarchive.hpp>
-#include <boost/serialization/export.hpp>
-#include <boost/serialization/utility.hpp>
-#include <boost/serialization/shared_ptr.hpp>
-
 #include <common/task_pool.hpp>
 #include <tensor/permutation.hpp>
 #include <tensor/fraction.hpp>
@@ -102,11 +96,14 @@ namespace Construction {
 
 			// Copy constructor
 			AbstractTensor(const AbstractTensor& other)
-				: name(other.name), Printable(other.printed_text), indices(other.indices), type(other.type), symmetries(other.symmetries) { }
+				: name(other.name), Printable(other.printed_text), indices(other.indices), type(other.type) { }
 
 			// Move constructor
 			AbstractTensor(AbstractTensor&& other)
-				: name(std::move(other.name)), Printable(std::move(other.printed_text)), indices(std::move(other.indices)), type(std::move(other.type)), symmetries(std::move(other.symmetries)) { }
+				: name(std::move(other.name)), Printable(std::move(other.printed_text)), indices(std::move(other.indices)), type(std::move(other.type)) { }
+
+			// Virtual destructor
+			virtual ~AbstractTensor() = default;
 		public:
 			// Copy assignment
 			AbstractTensor& operator=(const AbstractTensor& other) {
@@ -114,7 +111,6 @@ namespace Construction {
 				printed_text = other.printed_text;
 				indices = other.indices;
 				type = other.type;
-				symmetries = other.symmetries;
 				return *this;
 			}
 
@@ -124,7 +120,6 @@ namespace Construction {
 				printed_text = std::move(other.printed_text);
 				indices = std::move(other.indices);
 				type = std::move(other.type);
-				symmetries = std::move(other.symmetries);
 				return *this;
 			}
 		public:
@@ -442,10 +437,10 @@ namespace Construction {
 				return true;
 			}
 
-			bool IsIndexEqual(const AbstractTensor& other) const {
+			/*bool IsIndexEqual(const AbstractTensor& other) const {
 				if (other.type != type) return false;
 				return symmetries.IsEqual(indices, other.indices);
-			}
+			}*/
 
 			/*bool IsEqual(const Tensor& tensor) const {
 				return (*this - tensor).IsZero();
@@ -453,27 +448,11 @@ namespace Construction {
 		public:
 			void Serialize(std::ostream& os) const override;
 			static std::unique_ptr<AbstractTensor> Deserialize(std::istream& is);
-		private:
-			friend class boost::serialization::access;
-
-			/**
-				Serialization of a tensor. Stores the name, LaTeX code and the
-			 	indices to an archive
-			 */
-			template<class Archive>
-			void serialize(Archive& ar, const unsigned int version) {
-				/*ar & name;
-				ar & printed_text;
-                ar & type;
-				ar & indices;*/
-			}
 		protected:
 			std::string name;
 			Indices indices;
 
 			TensorType type;
-			Symmetry symmetries;
-
 			//EvaluationFunction evaluator;
 		};
 
@@ -498,6 +477,8 @@ namespace Construction {
 
 				type = TensorType::ADDITION;
 			}
+
+			virtual ~AddedTensor() = default;
 		public:
 			virtual TensorPointer Clone() const override {
 				return TensorPointer(new AddedTensor(
@@ -576,13 +557,6 @@ namespace Construction {
 				auto newB = B->Canonicalize();
 				return std::move(TensorPointer(new AddedTensor(std::move(newA), std::move(newB))));
 			}
-		public:
-			template<class Archive>
-			void serialize(Archive& ar, const unsigned version) {
-				ar & boost::serialization::base_object<AbstractTensor>(*this);
-				ar & A;
-				ar & B;
-			}
 		private:
 			TensorPointer A;
 			TensorPointer B;
@@ -613,6 +587,8 @@ namespace Construction {
 
 				type = TensorType::MULTIPLICATION;
 			}
+
+			virtual ~MultipliedTensor() = default;
 		public:
 			virtual TensorPointer Clone() const override {
 				return TensorPointer(new MultipliedTensor(
@@ -690,13 +666,6 @@ namespace Construction {
 				auto B = AbstractTensor::Deserialize(is)->Clone();
 				return TensorPointer(new MultipliedTensor(std::move(A), std::move(B)));
 			}
-
-			template<class Archive>
-			void serialize(Archive& ar, const unsigned version) {
-				ar & boost::serialization::base_object<AbstractTensor>(*this);
-				ar & A;
-				ar & B;
-			}
 		private:
 			TensorPointer A;
 			TensorPointer B;
@@ -713,11 +682,13 @@ namespace Construction {
 		 */
 		class ScaledTensor : public AbstractTensor {
 		public:
-			ScaledTensor(ConstTensorPointer A, const Scalar& c)
+			ScaledTensor(ConstTensorPointer&& A, const Scalar& c)
 				: AbstractTensor("", "", A->GetIndices()), A(std::move(A)), c(c) {
 
 				type = TensorType::SCALED;
 			}
+
+			virtual ~ScaledTensor() = default;
 		public:
 			virtual TensorPointer Clone() const override {
 				return TensorPointer(new ScaledTensor(
@@ -784,27 +755,6 @@ namespace Construction {
 				A = std::move(B);
 			}
 		public:
-			ScaledTensor operator*(const Scalar& c) const {
-				return ScaledTensor(
-						std::move(A->Clone()),
-						c*this->c
-				);
-			}
-
-			friend inline ScaledTensor operator*(const Scalar& c, const ScaledTensor& other) {
-				return ScaledTensor(
-						std::move(other.A->Clone()),
-						c * other.c
-				);
-			}
-
-			ScaledTensor operator-() const {
-				return ScaledTensor(
-					std::move(A->Clone()),
-					-c
-				);
-			}
-		public:
 			const ConstTensorPointer& GetTensor() const {
 				return A;
 			}
@@ -828,13 +778,6 @@ namespace Construction {
 
 				return TensorPointer(new ScaledTensor(std::move(A), c));
 			}
-
-			template<class Archive>
-			void serialize(Archive& ar, const unsigned version) {
-				ar & boost::serialization::base_object<AbstractTensor>(*this);
-				ar & A;
-				//ar & c;
-			}
 		private:
 			ConstTensorPointer A;
 			Scalar c;
@@ -843,6 +786,8 @@ namespace Construction {
 		class ZeroTensor : public AbstractTensor {
 		public:
 			ZeroTensor() : AbstractTensor("0", "0", Indices()) { type = TensorType::ZERO; }
+
+			virtual ~ZeroTensor() = default;
 		public:
 			virtual Scalar Evaluate(const std::vector<unsigned>& args) const override {
 				return 0;
@@ -861,7 +806,7 @@ namespace Construction {
 			}
 		};
 
-		MultipliedTensor AbstractTensor::operator*(const AbstractTensor &other) const {
+		/*MultipliedTensor AbstractTensor::operator*(const AbstractTensor &other) const {
 			// Check if all indices are distinct
 			for (auto& index : indices) {
 				if (other.indices.ContainsIndex(index)) {
@@ -875,29 +820,16 @@ namespace Construction {
 			);
 		}
 
-		ScaledTensor AbstractTensor::operator*(const Scalar& c) const {
-			return ScaledTensor(
-				std::move(Clone()),
-				c
-			);
-		}
+		*/
 
-		ScaledTensor operator*(const Scalar& c, const AbstractTensor& other) {
-			return other*c;
-		}
-
-		inline ScaledTensor AbstractTensor::operator-() const {
-			return Scalar(-1) * (*this);
-		}
-
-		AddedTensor AbstractTensor::operator+(const AbstractTensor& other) const {
+		/*AddedTensor AbstractTensor::operator+(const AbstractTensor& other) const {
 			// Tensors can only be added if it contains the same indices (but not necessarily in the same slots)
 			if (!indices.IsPermutationOf(other.indices)) throw CannotAddTensorsException();
 			return AddedTensor(
 				std::move(Clone()),
 				std::move(other.Clone())
 			);
-		}
+		}*/
 
 		std::string AddedTensor::ToString() const {
 			std::stringstream ss;
@@ -926,6 +858,8 @@ namespace Construction {
 					throw Exception("The indices have to be a permutation of each other");
 				}
 			}
+
+			virtual ~SubstituteTensor() = default;
 		public:
 			virtual TensorPointer Clone() const override {
 				return TensorPointer(new SubstituteTensor(std::move(A->Clone()), indices));
@@ -1000,6 +934,8 @@ namespace Construction {
 
 				type = TensorType::SCALAR;
 			}
+
+			virtual ~ScalarTensor() = default;
 		public:
 			virtual TensorPointer Clone() const override {
 				return TensorPointer(new ScalarTensor(*this));
@@ -1029,12 +965,6 @@ namespace Construction {
 				Scalar value = *static_cast<Scalar*>(ptr.get());
 
 				return TensorPointer(new ScalarTensor(value));
-			}
-
-			template<class Archive>
-			void serialize(Archive& ar, const unsigned version) {
-				/*ar & boost::serialization::base_object<Tensor>(*this);
-				ar & value;*/
 			}
 		private:
 			Scalar value;
@@ -1137,8 +1067,9 @@ namespace Construction {
 
 				assert(indices[0].GetRange().GetTo()+1 -indices[0].GetRange().GetFrom() == indices.Size());
 				type = TensorType::EPSILON;
-				symmetries.Add({ {0,1,2} , false});
 			}
+
+			virtual ~EpsilonTensor() = default;
 		public:
 			virtual TensorPointer Clone() const override {
 				return TensorPointer(new EpsilonTensor(*this));
@@ -1224,7 +1155,6 @@ namespace Construction {
 
                 type = TensorType::GAMMA;
 				std::vector<unsigned> _indices = {0,1};
-				symmetries.Add(ElementarySymmetry(_indices));
             }
 
 			GammaTensor(const Indices& indices, int p, int q)
@@ -1233,7 +1163,6 @@ namespace Construction {
 
                 type = TensorType::GAMMA;
 				std::vector<unsigned> _indices = {0,1};
-				symmetries.Add(ElementarySymmetry(_indices));
 			}
 
 			GammaTensor(const Indices& indices)
@@ -1242,8 +1171,9 @@ namespace Construction {
 
                 type = TensorType::GAMMA;
 				std::vector<unsigned> _indices = {0,1};
-				symmetries.Add(ElementarySymmetry(_indices));
 			}
+
+			virtual ~GammaTensor() = default;
 		public:
 			virtual TensorPointer Clone() const override {
 				return TensorPointer(new GammaTensor(*this));
@@ -1309,12 +1239,6 @@ namespace Construction {
 
 				return TensorPointer(new GammaTensor(indices, p, q));
 			}
-
-			template<class Archive>
-			void serialize(Archive& ar, const unsigned version) {
-				/*ar & boost::serialization::base_object<Tensor>(*this);
-				ar & signature;*/
-			}
 		private:
 			std::pair<int, int> signature;
 		};
@@ -1340,31 +1264,14 @@ namespace Construction {
 				assert(numEpsilon * 3 + numGamma*2 == indices.Size());
 
 				type = TensorType::EPSILONGAMMA;
-
-				// Introduce all the symmetries
-				unsigned i=0;
-				std::vector<std::pair<unsigned, unsigned>> blocks;
-
-				if (numEpsilon == 1) {
-					std::vector<unsigned> _indices = {0,1,2};
-					symmetries.Add(ElementarySymmetry(_indices, false));
-					i = 3;
-				}
-				for (int j=0; j<numGamma; j++) {
-					std::vector<unsigned> _indices = {i, i+1};
-					symmetries.Add(ElementarySymmetry(_indices));
-					blocks.push_back({i, i+1});
-					i += 2;
-				}
-
-				// Do not forget the block symmetry of the gammas
-				symmetries.Add({ blocks });
 			}
 
 			EpsilonGammaTensor(const EpsilonGammaTensor& other)
 					: AbstractTensor(other), numEpsilon(other.numEpsilon), numGamma(other.numGamma) { }
 			EpsilonGammaTensor(EpsilonGammaTensor&& other)
 					: AbstractTensor(std::move(other)), numEpsilon(std::move(other.numEpsilon)), numGamma(std::move(other.numGamma)) { }
+
+			virtual ~EpsilonGammaTensor() = default;
 		public:
 			EpsilonGammaTensor& operator=(const EpsilonGammaTensor& other) {
 				*this = other;
@@ -1528,8 +1435,6 @@ namespace Construction {
 				}
 			}
 		public:
-			friend class boost::serialization::access;
-
 			static void DoSerialize(std::ostream& os, const EpsilonGammaTensor& tensor) {
 				unsigned numEpsilon = tensor.numEpsilon;
 				unsigned numGamma = tensor.numGamma;
@@ -1548,14 +1453,6 @@ namespace Construction {
 				/*unsigned numEpsilon = (indices.Size() % 2 == 0) ? 0 : 1;
 				unsigned numGamma = (indices.Size() % 2 == 0) ? indices.Size()/2 : (indices.Size()-3)/2;
 				return std::move(TensorPointer(new EpsilonGammaTensor(numEpsilon, numGamma, indices)));*/
-			}
-
-			template<class Archive>
-			void serialize(Archive& ar, const unsigned version) {
-				/*ar & boost::serialization::base_object<Tensor>(*this);
-
-				ar & numEpsilon;
-				ar & numGamma;*/
 			}
 		private:
 			unsigned numEpsilon;
