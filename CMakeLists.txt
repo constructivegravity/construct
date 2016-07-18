@@ -20,7 +20,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "../../bin")
 set(CMAKE_MODULE_PATH "${CONSTRUCTION_MAIN_DIRECTORY}/cmake")
 
 # Use boost
-find_package(Boost COMPONENTS system serialization iostreams REQUIRED)
+find_package(Boost COMPONENTS system filesystem serialization iostreams REQUIRED)
 find_package(Threads REQUIRED)
 find_package(Readline REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})

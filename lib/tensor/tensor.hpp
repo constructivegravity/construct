@@ -103,7 +103,7 @@ namespace Construction {
 				: name(std::move(other.name)), Printable(std::move(other.printed_text)), indices(std::move(other.indices)), type(std::move(other.type)) { }
 
 			// Virtual destructor
-			virtual ~AbstractTensor() = default;
+			virtual ~AbstractTensor() { }
 		public:
 			// Copy assignment
 			AbstractTensor& operator=(const AbstractTensor& other) {
