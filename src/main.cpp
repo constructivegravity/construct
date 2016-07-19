@@ -117,9 +117,10 @@ int main(int argc, char** argv) {
 	}
 
 	// Create path for crashfile
-	auto crashFile = boost::filesystem::system_complete(argv[0]).remove_filename().string();
+	std::string crashFile = ".crashfile";
+	/*auto crashFile = boost::filesystem::system_complete(argv[0]).remove_filename().string();
     if (crashFile[crashFile.size()-1] != '/') crashFile += "/";
-    crashFile += ".crashfile";
+    crashFile += ".crashfile";*/
 
 	// If the file exists
 	if (boost::filesystem::exists( crashFile )) {
