@@ -492,7 +492,7 @@ namespace Construction {
 				for (auto& index : indices) {
 					if (index.GetName() == name) return index;
 				}
-				assert(false);
+				throw IndexOutOfRangeException();
 			}
 
 			Index& operator[](unsigned id) {
@@ -504,7 +504,7 @@ namespace Construction {
 				for (auto& index : indices) {
 					if (index.GetName() == name) return index;
 				}
-				assert(false && "Index not present");
+				throw IndexOutOfRangeException();
 			}
 
 			size_t Size() const { return indices.size(); }
@@ -546,7 +546,7 @@ namespace Construction {
 			std::vector<std::pair<Indices, Indices>> GetAllPartitions(unsigned n) const {
 				// Check if the number of indices we wish to draw from the indices is
 				// smaller than the total number of indices.
-				assert(n <= indices.size());
+				if (n > indices.size()) throw IndexOutOfRangeException();
 
 				std::vector< std::pair<Indices, Indices> > result;
 
