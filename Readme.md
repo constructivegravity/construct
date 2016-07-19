@@ -8,6 +8,7 @@ Software that allows to solve construction equations that determine the Langrang
  * Generate tensors build from the totally antisymmetric tensor and a background metric
  * Apply symmetries to tensors
  * Determine the linear independent terms
+ * Simplify terms
 
 ## Example
 
