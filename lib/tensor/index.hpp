@@ -484,7 +484,7 @@ namespace Construction {
 			std::vector<Index>::const_iterator end() const { return indices.end(); }
 			
 			Index operator[](unsigned id) const {
-				assert(id >= 0 && id < indices.size());
+				if (id >= indices.size()) throw IndexOutOfRangeException();
 				return indices[id];
 			}
 
@@ -496,7 +496,7 @@ namespace Construction {
 			}
 
 			Index& operator[](unsigned id) {
-				assert(id >= 0 && id < indices.size());
+				if (id >= indices.size()) throw IndexOutOfRangeException();
 				return indices[id];
 			}
 
