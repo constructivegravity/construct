@@ -2,6 +2,8 @@
 
 #include <cassert>
 
+#include <common/time_measurement.hpp>
+
 #include <tensor/index.hpp>
 #include <tensor/tensor.hpp>
 #include <tensor/tensor_container.hpp>
@@ -156,12 +158,6 @@ namespace Construction {
                     Tensor::Scalar variable ("e", ++variableCounter);
 
                     result += variable * Tensor::Tensor::EpsilonGamma(numEpsilon, numGammas, newIndices);
-
-                    /*if  (newIndices == indices)
-                        result += variable * Tensor::Tensor::EpsilonGamma(numEpsilon, numGammas, newIndices);
-                    else {
-                        result += variable * Tensor::Tensor::Substitute(std::move(Tensor::Tensor::EpsilonGamma(numEpsilon, numGammas, newIndices)), indices);
-                    }*/
                 }
 
                 return result;
