@@ -1071,6 +1071,9 @@ namespace Construction {
 			// If the number is zero, return the zero tensor to free memory and simplify the evaluation
 			if (c.IsNumeric() && c.ToDouble() == 0) return TensorPointer(new ZeroTensor());
 
+			// If the tensor is zero, return zero
+			if (one.IsZeroTensor()) return std::move(clone);
+
 			// Syntactic sugar for scaling a scaled tensor
 			if (one.IsScaledTensor()) {
 				ScaledTensor* tensor = static_cast<ScaledTensor*>(clone.get());
@@ -2239,39 +2242,151 @@ namespace Construction {
 				if (IsAdded()) {
 					auto summands = GetSummands();
 
-					std::map<unsigned, Tensor> permuted;
-					bool hasScaled=false;
+					std::vector<std::pair<scalar_type,Tensor>> symmetrizedSummands;
+					bool hasSameScale=true;
+					scalar_type overalScale = 0;
 
-					// Permute the summands in parallel
+					// Symmetrize all the summands in parallel
 					{
 						Common::TaskPool pool (8);
+						bool firstEntry = true;
+						std::mutex mutex;
 
-						for (int i=0; i<summands.size(); ++i) {
-							if (summands[i].IsScaled()) hasScaled = true;
+						symmetrizedSummands = pool.Map<std::pair<scalar_type,Tensor>, Tensor>(summands, [&](const Tensor& tensor) {
+							auto result = tensor.Symmetrize(indices).SeparateScalefactor();
 
-							pool.Enqueue([&](const Tensor& tensor, unsigned id) {
-								permuted.insert({ id, std::move(tensor.Symmetrize(indices)) });
-							}, summands[i], i);
-						}
+							// Extract the scale of the first entry
+							{
+								std::unique_lock<std::mutex> lock(mutex);
+								if (firstEntry) {
+									firstEntry = false;
+									overalScale = result.first;
+								}
+							}						
 
-						pool.Wait();
+							// If this has a different scale, remember this
+							if (overalScale != result.first) hasSameScale = false;
+
+							return result;
+						});
 					}
 
 					Tensor result = Tensor::Zero();
 
-					Scalar scale = 1;
-					for (auto& pair : permuted) {
-						if (hasScaled) {
-							if (!pair.second.IsZeroTensor()) result += std::move(pair.second);
-						} else {
-							auto s = pair.second.SeparateScalefactor();
-							scale = s.first;
+					// If all the tensors have the same scale we can collect them
+					if (hasSameScale) {
+						// Collect all summands on the stack
+						std::vector<Tensor> stack;
 
-							if (!s.second.IsZeroTensor()) result += std::move(s.second);
+						for (int i=0; i<symmetrizedSummands.size(); i++) {
+							auto __summands = symmetrizedSummands[i].second.GetSummands();
+							for (auto& s : __summands) {
+								stack.push_back(std::move(s));
+							}
+						}
+
+						std::vector< std::pair<scalar_type, Tensor> > reduced;
+						scalar_type lastScale;
+						bool allTheSameScale=true;
+
+						{
+							bool firstEntry = true;
+
+							while (stack.size() > 0) {
+								// Get the first element from the stack
+								auto s = stack[0].SeparateScalefactor();
+								Tensor current = std::move(s.second);
+								Scalar scale = std::move(s.first);
+
+								// Remove the first element
+								stack.erase(stack.begin());
+
+								// Iterate over all the other summands
+								for (int i=0; i<stack.size(); i++) {
+									auto t = stack[i].SeparateScalefactor();
+									Tensor newTerm = std::move(t.second);
+									Scalar newScale = std::move(t.first);
+
+									// If the tensor is the same after canonicalization modulo scale, 
+									// change the scale of the original tensor and remove the new one 
+									// from the stack.
+									if (newTerm.GetType() == current.GetType() && newTerm.GetIndices() == current.GetIndices()) {
+										scale += newScale;
+										stack.erase(stack.begin() + i);
+										i--;
+									}
+								}
+
+								if (!scale.IsNumeric() || scale.ToDouble() != 0) {
+									if (firstEntry) {
+										firstEntry = false;
+										lastScale = scale;
+									}
+
+									if (lastScale != scale) {
+										allTheSameScale = false;
+									}
+									reduced.push_back({ scale, current });
+								}
+							}
+						}
+
+						for (auto& pair : reduced) {
+							if (allTheSameScale) result += pair.second;
+							else result += pair.first * pair.second;
+						}
+
+						if (allTheSameScale) result *= lastScale;
+
+						return overalScale * result;
+
+					} else {
+						// Iterate over all symmetrized pairs
+						for (auto& pair : symmetrizedSummands) {
+							result += pair.first * pair.second;
+						}
+
+						return result;
+					}
+
+					/*// Set overall scale
+					Scalar overallScale = 1;
+					if (!hasScaled && symmetrizedSummands.size() > 0) overallScale = symmetrizedSummands[0].first;
+
+					while (symmetrizedSummands.size() > 0) {
+						// Get the first element from the stack
+						auto s = symmetrizedSummands[0].second.SeparateScalefactor();
+						Tensor current = std::move(s.second);
+
+						Scalar scale = std::move(s.first);
+						if (hasScaled) scale *= symmetrizedSummands[0].first;
+
+						// Remove the first element
+						symmetrizedSummands.erase(symmetrizedSummands.begin());
+
+						// Iterate over all the other summands
+						for (int i=0; i<symmetrizedSummands.size(); i++) {
+							auto t = symmetrizedSummands[i].second.SeparateScalefactor();
+							Tensor newTerm = std::move(t.second);
+							Scalar newScale = std::move(t.first);
+							if (hasScaled) newScale *= symmetrizedSummands[i].first;
+
+							// If the tensor is the same after canonicalization modulo scale, 
+							// change the scale of the original tensor and remove the new one 
+							// from the stack.
+							if (newTerm.GetType() == current.GetType() && newTerm.GetIndices() == current.GetIndices()) {
+								scale += newScale;
+								symmetrizedSummands.erase(symmetrizedSummands.begin() + i);
+								i--;
+							}
+						}
+
+						if (!scale.IsNumeric() || scale.ToDouble() != 0) {
+							result += overallScale * scale * current;
 						}
 					}
-					
-					return scale * result;
+
+					return result;*/
 				}
 
 				// Handle scales
@@ -2291,21 +2406,59 @@ namespace Construction {
 				// Get the permutation of the tensor
 				auto permutations = PermuteIndices(indices);
 
+				// Prepare result
 				Tensor result = Tensor::Zero();
-				for (auto permutation : permutations) {
-					Tensor clone = *this;
-					clone.SetIndices(permutation);
-					result = result + clone;
+				
+				// Generate permuted summands
+				{
+					std::vector<Tensor> stack;
+
+					// Move the tensors on the stack
+					{
+						Common::TaskPool pool (8);
+						stack = pool.Map<Tensor,Indices>(permutations, [this](const Indices& indices) {
+							Tensor clone = *this;
+							clone.SetIndices(indices);
+							return clone.Canonicalize();
+						});
+					}
+
+					// Iterate over all 
+					while (stack.size() > 0) {
+						// Get the first element from the stack
+						auto s = stack[0].SeparateScalefactor();
+						Tensor current = std::move(s.second);
+						Scalar scale = std::move(s.first);
+
+						// Remove the first element
+						stack.erase(stack.begin());
+
+						// Iterate over all the other summands
+						for (int i=0; i<stack.size(); i++) {
+							auto t = stack[i].SeparateScalefactor();
+							Tensor newTerm = std::move(t.second);
+							Scalar newScale = std::move(t.first);
+
+							// If the tensor is the same after canonicalization modulo scale, 
+							// change the scale of the original tensor and remove the new one 
+							// from the stack.
+							if (newTerm.GetType() == current.GetType() && newTerm.GetIndices() == current.GetIndices()) {
+								scale += newScale;
+								stack.erase(stack.begin() + i);
+								i--;
+							}
+						}
+
+						if (!scale.IsNumeric() || scale.ToDouble() != 0) {
+							result += scale * current;
+						}
+					}
 				}
 
 				// Scale
-				result = Scalar(1,permutations.size()) * result;
-
-				// If the scaled tensor is the original one, return
-				if (IsEqual(result)) return *this;
-
-				// If the tensor is zero, simplify memory
-				if (result.IsZero()) return Tensor::Zero();
+				if (!result.IsZeroTensor()) {
+					result = Scalar(1,permutations.size()) * result;
+				}
 
 				return result;
 			}
@@ -2383,13 +2536,9 @@ namespace Construction {
 				}
 
 				// Scale
-				result = Scalar(1,permutations.size()) * result;
-
-				// If the scaled tensor is the original one, return
-				if (IsEqual(result)) return *this;
-
-				// If the tensor is zero, simplify memory
-				if (result.IsZero()) return Tensor::Zero();
+				if (!result.IsZeroTensor()) {
+					result = Scalar(1,permutations.size()) * result;
+				}
 
 				return result;
 			}
