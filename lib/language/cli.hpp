@@ -135,7 +135,6 @@ namespace Construction {
                     /*if (database.Contains(expandedCmd)) {
                         lastResult = database[expandedCmd];
                         lastCmd = expandedCmd;
-
                         if (!silent) PrintTensor();
                         return;
                     }*/

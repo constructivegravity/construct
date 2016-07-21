@@ -10,32 +10,29 @@ namespace Construction {
         public:
             ProgressBar(unsigned max, unsigned width) : width(width), max(max) {
                 started = false;
+                running = true;
                 pos = 0;
 
-                std::thread thread ([this]() {
+                thread = std::thread([this]() {
                     while (true) {
                         this->Print();
                         std::this_thread::sleep_for(
                                 std::chrono::milliseconds(500)
                         );
+
+                        if (!running) break;
                     }
                 });
-
-                thread.detach();
             }
         public:
             unsigned GetWidth() const { return width; }
             unsigned GetPosition() const { return pos; }
         public:
             void Start() {
-                std::unique_lock<std::mutex> lock(mutex);
-
                 started = true;
             }
 
             void Increase() {
-                std::unique_lock<std::mutex> lock(mutex);
-
                 if (pos < max) pos++;
             }
 
@@ -50,7 +47,10 @@ namespace Construction {
             }
 
             void Print() {
-                std::unique_lock<std::mutex> lock(mutex);
+                if (pos >= max || !running) {
+                    running = false;
+                    return;
+                }
 
                 if (!started) return;
 
@@ -73,12 +73,14 @@ namespace Construction {
                 std::cerr << "\r";
             }
         private:
-            unsigned pos;
-            unsigned max;
-            unsigned width;
+            std::atomic<unsigned> pos;
+            std::atomic<unsigned> max;
+            std::atomic<unsigned> width;
+
+            std::thread thread;
 
             bool started;
-            std::mutex mutex;
+            bool running;
         };
 
     }

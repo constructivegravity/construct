@@ -24,12 +24,12 @@ SCENARIO("Matrix", "[matrix]") {
         }
 
         WHEN(" calculating the row echelon form") {
-            auto echelon = M.GetRowEchelonForm();
+            M.ToRowEchelonForm();
 
-            REQUIRE(echelon.GetColumnVector(0) == Construction::Vector::Vector({1,0,0}));
-            REQUIRE(echelon.GetColumnVector(1) == Construction::Vector::Vector({0,1,0}));
-            REQUIRE(echelon.GetColumnVector(2) == Construction::Vector::Vector({0,0,1}));
-            REQUIRE(echelon.GetColumnVector(3) == Construction::Vector::Vector({-8,1,-2}));
+            REQUIRE(M.GetColumnVector(0) == Construction::Vector::Vector({1,0,0}));
+            REQUIRE(M.GetColumnVector(1) == Construction::Vector::Vector({0,1,0}));
+            REQUIRE(M.GetColumnVector(2) == Construction::Vector::Vector({0,0,1}));
+            REQUIRE(M.GetColumnVector(3) == Construction::Vector::Vector({-8,1,-2}));
         }
 
     }

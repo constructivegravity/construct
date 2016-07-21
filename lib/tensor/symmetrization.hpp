@@ -106,10 +106,12 @@ namespace Construction {
                 Tensor scaled = Scalar(1, tensors.size()) * last;
 
                 // If the symmetrized tensor is different, scale
-                if (!scaled.IsEqual(tensor)) {
+                /*if (!scaled.IsEqual(tensor)) {
                     if (scaledResult) return scaled;
                     else return last;
-                } else return tensor;
+                } else return tensor;*/
+
+                return scaled;
             }
         public:
             std::vector<unsigned>::iterator begin() { return indices.begin(); }
