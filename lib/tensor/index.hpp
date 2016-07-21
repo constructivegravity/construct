@@ -159,6 +159,10 @@ namespace Construction {
 			inline bool IsContravariant() const {
 				return up;
 			}
+
+			inline void SetContravariant(bool value) {
+				up = value;
+			}
 		public:
 			/**
 				Equality operator

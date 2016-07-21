@@ -76,6 +76,7 @@ namespace Construction {
 				EPSILON = 201,
 				GAMMA = 202,
 				EPSILONGAMMA = 203,
+				DELTA = 204,
 
 				SUBSTITUTE = 301,
 
@@ -277,6 +278,7 @@ namespace Construction {
             bool IsEpsilonTensor() const { return type == TensorType::EPSILON; }
             bool IsEpsilonGammaTensor() const { return type == TensorType::EPSILONGAMMA; }
             bool IsGammaTensor() const { return type == TensorType::GAMMA; }
+            bool IsDeltaTensor() const { return type == TensorType::DELTA; }
 
 			std::string TypeToString() const {
 				switch (type) {
@@ -289,6 +291,7 @@ namespace Construction {
 					case TensorType::GAMMA: return "Gamma";
 					case TensorType::EPSILON: return "Epsilon";
 					case TensorType::EPSILONGAMMA: return "EpsilonGamma";
+					case TensorType::DELTA: return "Delta";
 					default: return "Custom";
 				}
 			}
@@ -1094,6 +1097,76 @@ namespace Construction {
 			return TensorPointer(new ScaledTensor(std::move(clone), c));
 		}
 
+		/** 
+			\class DeltaTensor
+
+			\brief Represents the Kronecker delta tensor
+
+			Represents the Kronecker delta tensor. It requires one index up,
+			one down
+		 */
+		class DeltaTensor : public AbstractTensor {
+		public:
+			/** 
+				\brief Constructor of a delta tensor
+
+				Constructor of a delta tensor. It takes a index collection of 
+				two indices. The first one will be made contravariant, the
+				second one stays down.
+
+				\param indices		The two indices of the delta
+			 */
+			DeltaTensor(const Indices& indices) : AbstractTensor("", "", indices) {
+				assert(indices.Size() == 2);
+
+				indices[0].SetContravariant(true);
+				indices[1].SetContravariant(false);	
+
+				SetIndices(indices);
+
+				type = TensorType::DELTA;
+			}
+
+			/** 
+				Virtual destructor to properly release memory
+			 */
+			virtual ~DeltaTensor() = default;
+		public:
+			/** 
+				Returns a clone of the delta tensor
+			 */
+			virtual TensorPointer Clone() const override {
+				return TensorPointer(new DeltaTensor(*this));
+			}
+
+			/** 
+				\brief Canonicalize the Kronecker delta
+
+				Canonicalize the Kronecker delta. Since one index
+				is up, the other one down, there is nothing to do.
+			 */
+			virtual TensorPointer Canonicalize() const override {
+				return std::move(Clone());
+			}
+		public:
+			/** 
+				Evaluate the delta, by checking if the values are equal
+			 */
+			virtual Scalar Evaluate(const std::vector<unsigned>& args) const override {
+				assert(args.size() == 2);
+				return args[0] == args[1];
+			}
+
+			/** 
+				Print the tensor
+			 */
+			virtual std::string ToString() const override {
+				std::stringstream ss;
+				ss << "\\delta" << GetIndices();
+				return ss.str();
+			}
+		};
+
 		/**
 			\class EpsilonTensor
 
@@ -1630,6 +1703,7 @@ namespace Construction {
 			static Tensor One() { return Tensor(TensorPointer(new ScalarTensor(1))); }
 			//static Tensor Scalar(const Scalar& c) { return Tensor(TensorPointer(new ScalarTensor(c))); }
 
+			static Tensor Delta(const Indices& indices) { return Tensor(TensorPointer(new DeltaTensor(indices))); }
 			static Tensor Epsilon(const Indices& indices) { return Tensor(TensorPointer(new EpsilonTensor(indices))); }
 			static Tensor Gamma(const Indices& indices) { return Tensor(TensorPointer(new GammaTensor(indices))); }
 			static Tensor Gamma(const Indices& indices, int p, int q) { return Tensor(TensorPointer(new GammaTensor(indices, p, q))); }
@@ -1671,6 +1745,7 @@ namespace Construction {
 			bool IsEpsilon() const { return pointer->IsEpsilonTensor(); }
 			bool IsGamma() const { return pointer->IsGammaTensor(); }
 			bool IsEpsilonGamma() const { return pointer->IsEpsilonGammaTensor(); }
+			bool IsDelta() const { return pointer->IsDeltaTensor(); }
 
 			std::string TypeToString() const { return pointer->TypeToString(); }
 		public:
@@ -2599,6 +2674,9 @@ namespace Construction {
 
 					case AbstractTensor::TensorType::EPSILONGAMMA:
 						return sizeof(*static_cast<EpsilonGammaTensor*>(pointer.get()));
+
+					case AbstractTensor::TensorType::DELTA:
+						return sizeof(*static_cast<DeltaTensor*>(pointer.get()));
 
 					case AbstractTensor::TensorType::SUBSTITUTE:
 						return sizeof(*static_cast<SubstituteTensor*>(pointer.get()));

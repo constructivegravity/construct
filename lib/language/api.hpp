@@ -35,6 +35,7 @@ namespace Construction {
             Tensor::Tensor Epsilon(const Indices& indices);
             Tensor::Tensor Gamma(const Indices& indices);
             Tensor::Tensor EpsilonGamma(const Indices& indices);
+            Tensor::Tensor Delta(const Indices& indices);
             Tensor::Tensor Coefficient(unsigned, unsigned, unsigned, unsigned);
 
             size_t DegreesOfFreedom(const Tensor::Tensor& tensor);
@@ -90,6 +91,10 @@ namespace Construction {
 
                 // Generate a epsilon gamma Tensor::Tensor
                 return Tensor::Tensor::EpsilonGamma(numEpsilon, numGamma, indices);
+            }
+
+            Tensor::Tensor Delta(const Indices& indices) {
+                return Tensor::Tensor::Delta(indices);
             }
 
             //#include <generator/coefficient.hpp
