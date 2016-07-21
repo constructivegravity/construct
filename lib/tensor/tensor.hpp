@@ -1873,9 +1873,6 @@ namespace Construction {
 				// Get the summands
 				auto summands = GetSummands();
 
-				// If it was no sum, just return a copy of this tensor
-				if (summands.size() == 1) return *this;
-
 				// Initialize
                 std::map<unsigned,Vector::Vector> vectors;
 
@@ -1884,57 +1881,45 @@ namespace Construction {
 				auto combinations = GetAllIndexCombinations();
 
 				unsigned dimension = combinations.size();
-				std::mutex mutex;
 
-				// Helper method
-				auto helper = [&](const Tensor& tensor, unsigned id) {
-					Vector::Vector v (dimension);
-
-					for (int i=0; i<dimension; i++) {
-						IndexAssignments assignment;
-
-						// Convert into index assignment
-                        int j = 0;
-                        for (auto &index : indices) {
-                            assignment[index.GetName()] = combinations[i][j];
-                            j++;
-                        }
-
-                        v[i] = tensor(assignment).ToDouble();
-					}
-
-					{
-						std::unique_lock<std::mutex> lock(mutex);
-						vectors.insert({ id, v });
-					}
-				};
-
-				// Scope
-				{
-					Common::TaskPool task_pool;
-
-					// Iterate over all summands
-					for (int i=0; i<summands.size(); ++i) {
-						// Remove all prefactors (if present) since we will add them add the end anyway
-						Tensor tensor = std::move(summands[i].SeparateScalefactor().second); 
-
-						task_pool.Enqueue(helper, tensor, i);
-					}
-
-					// Wait for all tasks to finish
-					task_pool.Wait();
-				}
-
-				// Create matrix
 				Vector::Matrix M (dimension, summands.size());
 
-				// Update the matrix components
-				for (auto& pair : vectors) {
-					for (int i=0; i<dimension; i++) {
-						M(i, pair.first) = pair.second[i];
-					}
-				}
+				// Insert the values into the matrix
+				{
+					Common::TaskPool pool;
+					std::mutex mutex;
 
+					for (int i=0; i<summands.size(); i++) {
+						pool.Enqueue([&](unsigned id, const Tensor& tensor) {
+
+							for (int j=0; j<dimension; j++) {
+								IndexAssignments assignment;
+
+								// Convert into index assignment
+                        		int k = 0;
+                        		for (auto &index : indices) {
+                            		assignment[index.GetName()] = combinations[j][k];
+                            		k++;
+                        		}
+
+                        		// Calculate the value of the assignment
+                        		float value = tensor(assignment).ToDouble();
+
+                        		// only lock and insert if necessary
+                        		if (value != 0) {
+                        			std::unique_lock<std::mutex> lock(mutex);
+
+                        			// Insert the value into the matrix
+                        			M(j,id) = tensor(assignment).ToDouble();
+                        		}
+							}
+
+						}, i, summands[i].SeparateScalefactor().second);
+					}
+
+					pool.Wait(); 
+				}
+  
                 // Reduce to reduced matrix echelon form
                 M.ToRowEchelonForm();
 

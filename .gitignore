@@ -3,3 +3,7 @@ bin/
 .idea/
 .crashfile
 *.sublime*
+.vscode/
+*.cs
+*.dat
+

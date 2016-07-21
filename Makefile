@@ -1,7 +1,7 @@
 all: build rebuild
 
 build:
-	@mkdir build && mkdir bin && cd build && cmake .. && cd .. && ln -s $PWD/bin/construct /usr/local/bin/construct
+	@mkdir build && mkdir bin && cd build && cmake .. && cd ..
 
 rebuild:
 	@cd build && make && cd ..
@@ -12,9 +12,6 @@ clean:
 update:
 	git pull origin master
 	make
-
-link:
-	@ln -s $PWD/bin/construct /usr/local/bin/construct
 
 test:
 	make && bin/testing
