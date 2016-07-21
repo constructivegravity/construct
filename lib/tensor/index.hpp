@@ -516,9 +516,18 @@ namespace Construction {
  		public:
 			virtual std::string ToString() const {
 				std::stringstream ss;
-				if (indices.size() > 1) ss << "{";
+				if (indices.size() > 1) ss << "_{";
 				
+				bool lastOneWasDown=true;
+
 				for (auto& index : indices) {
+					if (index.IsContravariant() && lastOneWasDown) {
+						lastOneWasDown = false;
+						ss << "}^{";
+					} else if (!index.IsContravariant() && !lastOneWasDown) {
+						lastOneWasDown = true;
+						ss << "}_{";
+					}
 					ss << index;
 				}
 				if (indices.size() > 1) ss << "}";

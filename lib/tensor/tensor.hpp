@@ -187,7 +187,7 @@ namespace Construction {
 			 */
 			virtual std::string ToString() const override {
 				std::stringstream ss;
-				ss << printed_text << "_" << indices;
+				ss << printed_text << indices;
 				return ss.str();
 			}
 		protected:
@@ -1342,12 +1342,12 @@ namespace Construction {
 				unsigned pos = 0;
 
 				for (unsigned i=0; i<numEpsilon; i++) {
-					ss << "\\epsilon_" << indices.Partial({pos,pos+2});
+					ss << "\\epsilon" << indices.Partial({pos,pos+2});
 					pos += 3;
 				}
 
 				for (unsigned i=0; i<numGamma; i++) {
-					ss << "\\gamma_" << indices.Partial({pos, pos+1});
+					ss << "\\gamma" << indices.Partial({pos, pos+1});
 					pos += 2;
 				}
 
@@ -1364,39 +1364,6 @@ namespace Construction {
 				}
 				return result;
 			}
-
-			/*std::vector<std::vector<unsigned>> GetAllInterestingIndexCombinations() const {
-				// Result
-				std::vector<std::vector<unsigned>> result;
-
-				// Helper method to recursively determine the index combinations
-				std::function<void(const std::vector<unsigned>&)> fn = [&](const std::vector<unsigned>& input) -> void {
-					// If all indices are fixed, add the combination to the list
-					if (input.size() == indices.Size()) {
-						result.push_back(input);
-						return;
-					}
-
-					// Get range of next unfixed index
-					auto range = indices[input.size()].GetRange();
-
-					// Iterate over the range
-					for (auto i : range) {
-						// Add the index to the list
-						std::vector<unsigned> newInput = input;
-						newInput.push_back(i);
-
-						// Recursive call to go to next index
-						fn(newInput);
-					}
-				};
-
-				// Start recursion
-				std::vector<unsigned> input;
-				fn({});
-
-				return result;
-			}*/
 
 			virtual Scalar Evaluate(const std::vector<unsigned>& args) const override {
 				Scalar result = 1;
