@@ -1902,13 +1902,15 @@ namespace Construction {
                             		k++;
                         		}
 
-                        		// Scope based locking
-                        		{
+                        		// Calculate the value of the assignment
+                        		float value = tensor(assignment).ToDouble();
+
+                        		// only lock and insert if necessary
+                        		if (value != 0) {
                         			std::unique_lock<std::mutex> lock(mutex);
 
                         			// Insert the value into the matrix
-                        			float value = tensor(assignment).ToDouble();
-                        			if (value != 0) M(j,id) = tensor(assignment).ToDouble();
+                        			M(j,id) = tensor(assignment).ToDouble();
                         		}
 							}
 
@@ -1917,7 +1919,7 @@ namespace Construction {
 
 					pool.Wait(); 
 				}
-
+  
                 // Reduce to reduced matrix echelon form
                 M.ToRowEchelonForm();
 
