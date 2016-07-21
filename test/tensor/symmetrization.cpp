@@ -12,6 +12,8 @@ SCENARIO("Symmetrization", "[symmetrization]") {
 
         REQUIRE(result.ToString() == "1/2 * (\\gamma_{ab}\\gamma_{cd} + \\gamma_{cb}\\gamma_{ad})");
     }
+
+    // 
 }
 
 /*SCENARIO("Block symmetrization", "[block-symmetrization]") {

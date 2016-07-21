@@ -2,6 +2,11 @@
 
 #include <chrono>
 #include <ostream>
+#include <stack>
+#include <string>
+#include <iostream>
+
+#include <common/singleton.hpp>
 
 namespace Construction {
     namespace Common {
@@ -63,5 +68,33 @@ namespace Construction {
             bool stopped;
         };
 
+        class TimeMeasurementManager : public Singleton<TimeMeasurementManager> {
+        public:
+            void Start(const std::string& name) {
+                measurements.push({ name, { measurements.size() , TimeMeasurement() } });
+            }
+
+            void Stop() {
+                // Stop measurement
+                measurements.top().second.second.Stop();
+
+                std::cout << "\033[90m";
+                for (int i=0; i<measurements.top().second.first; i++) {
+                   std::cout << "   "; 
+                } 
+                std::cout << measurements.top().first << " : " << measurements.top().second.second << "\033[0m" << std::endl;
+
+                // Remove the element
+                measurements.pop();
+            }
+        private:
+            std::stack< std::pair<std::string, std::pair<unsigned, TimeMeasurement> > > measurements;
+        };
+
     }
+
+    static Common::TimeMeasurementManager* Profiler() {
+        return Common::TimeMeasurementManager::Instance();
+    }
+
 }

@@ -116,24 +116,11 @@ namespace Construction {
             }
 
             Tensor::Tensor Symmetrize(const Tensor::Tensor& tensor, const Indices& indices) {
-                Common::TimeMeasurement time;
-
-                // Do the symmetrization with the generator
-                Construction::Generator::SymmetrizedTensorGenerator symmetrizer(indices);
-                auto result = symmetrizer(tensor);
-
-                time.Stop();
-                //std::cout << "  \033[90m" << time << "\033[0m" << std::endl;
-
-                return result;
+                return tensor.Symmetrize(indices);
             }
 
             Tensor::Tensor AntiSymmetrize(const Tensor::Tensor& tensor, const Indices& indices) {
-                // Get the original indices
-                Construction::Generator::AntiSymmetrizedTensorGenerator symmetrizer(indices);
-                auto result = symmetrizer(tensor);
-
-                return result;
+                return tensor.AntiSymmetrize(indices);
             }
 
             Tensor::Tensor ExchangeSymmetrize(const Tensor::Tensor& tensor, const Indices& indices) {
@@ -171,13 +158,11 @@ namespace Construction {
             }
 
             bool IsSymmetric(const Tensor::Tensor& tensor, const Indices& indices) {
-                Construction::Generator::SymmetrizedTensorGenerator symmetrizer(indices);
-                return symmetrizer(tensor, true).IsEqual(tensor);
+                return tensor.Symmetrize(indices).IsEqual(tensor);
             }
 
             bool IsAntiSymmetric(const Tensor::Tensor& tensor, const Indices& indices) {
-                Construction::Generator::AntiSymmetrizedTensorGenerator symmetrizer(indices);
-                return symmetrizer(tensor, true).IsEqual(tensor);
+                return tensor.AntiSymmetrize(indices).IsEqual(tensor);
             }
 
             bool HasExchangeSymmetry(const Tensor::Tensor& tensor, const Indices& indices) {

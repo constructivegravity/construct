@@ -3,6 +3,7 @@
 #include <common/error.hpp>
 #include <vector/vector.hpp>
 
+#include <iomanip>
 #include <sstream>
 
 namespace Construction {
@@ -18,6 +19,61 @@ namespace Construction {
             CannotMultiplyMatricesException() : Exception("Cannot multiply these matrices") { }
         };
 
+        class MatrixIndex {
+        public:
+            MatrixIndex(unsigned row, unsigned column) : row(row), column(column) { }
+
+            MatrixIndex(const MatrixIndex& other) : row(other.row), column(other.column) { }
+            MatrixIndex(MatrixIndex&& other) : row(other.row), column(other.column) { }
+        public:
+            MatrixIndex& operator=(const MatrixIndex& other) {
+                row = other.row;
+                column = other.column;
+                return *this;
+            }
+
+            MatrixIndex& operator=(MatrixIndex&& other) {
+                row = std::move(other.row);
+                column = std::move(other.column);
+                return *this;
+            }
+        public:
+            bool operator<(const MatrixIndex& other) const {
+                if (row < other.row) return true;
+                else if (row > other.row) return false;
+                return column < other.column;
+            }
+
+            bool operator<=(const MatrixIndex& other) const {
+                if (row < other.row) return true;
+                else if (row > other.row) return false;
+                return column <= other.column;
+            }
+
+            bool operator>(const MatrixIndex& other) const {
+                if (row > other.row) return true;
+                else if (row < other.row) return false;
+                return column > other.column;
+            }
+
+            bool operator>=(const MatrixIndex& other) const {
+                if (row > other.row) return true;
+                else if (row < other.row) return false;
+                return column >= other.column;
+            }
+
+            bool operator==(const MatrixIndex& other) const {
+                return row == other.row && column == other.column;
+            }
+
+            bool operator!=(const MatrixIndex& other) const {
+                return (row != other.row) || (column != other.column);
+            }
+        private:
+            unsigned row;
+            unsigned column;
+        };
+
         class Matrix {
         public:
             /**
@@ -26,29 +82,24 @@ namespace Construction {
                 \param n    Number of rows
                 \param m    Number of columns
              */
-            Matrix(unsigned n, unsigned m) : n(n), m(m) {
-                data = new float[n*m];
-            }
+            Matrix(unsigned n, unsigned m) : n(n), m(m) { }
 
             /**
                 Destructor of a matrix
              */
-            ~Matrix() {
-                if (data != nullptr) {
-                    delete[] data;
-                }
-            }
+            ~Matrix() { }
 
             Matrix(std::initializer_list<Vector> list) {
                 m = list.size();
                 n = (*list.begin()).GetDimension();
-                data = new float[n*m];
 
                 unsigned i=0;
                 for (auto& r : list) {
                     assert(r.GetDimension() == n);
                     for (int j=0; j<r.GetDimension(); j++) {
-                        At(j,i) = r[j];
+                        if (r[j] != 0) {
+                            values.insert({ MatrixIndex(j,i), r[j] });
+                        }
                     }
                     i++;
                 }
@@ -59,62 +110,32 @@ namespace Construction {
                 if (m == 0) return;
 
                 n = list[0].GetDimension();
-                data = new float[n*m];
 
                 for (unsigned i=0; i<m; i++) {
                     assert(list[i].GetDimension() == n);
                     for (int j=0; j<n; j++) {
-                        At(j,i) = list[i][j];
+                        if (list[i][j] != 0) {
+                            values.insert({ MatrixIndex(j,i), list[i][j] });
+                        }
                     }
                 }
             }
 
-            Matrix(const Matrix& other) {
-                n = other.n;
-                m = other.m;
+            Matrix(const Matrix& other) : n(other.n), m(other.m), values(other.values) { }
 
-                data = new float[n*m];
-                for (int i=0; i<n*m; i++) {
-                    data[i] = other.data[i];
-                }
-            }
-
-            Matrix(Matrix&& other) {
-                n = other.n;
-                m = other.m;
-
-                data = other.data;
-                other.data = nullptr;
-            }
-        private:
-            void FreeData() {
-                if (data != nullptr) {
-                    delete[] data;
-                }
-            }
+            Matrix(Matrix&& other) : n(std::move(other.n)), m(std::move(other.m)), values(std::move(other.values)) { }
         public:
             Matrix& operator=(const Matrix& other) {
-                FreeData();
-
                 n = other.n;
                 m = other.m;
-
-                data = new float[n*m];
-                for (int i=0; i<n*m; i++) {
-                    data[i] = other.data[i];
-                }
+                values = other.values;
                 return *this;
             }
 
             Matrix& operator=(Matrix&& other) {
-                FreeData();
-
-                n = other.n;
-                m = other.m;
-
-                data = other.data;
-                other.data = nullptr;
-
+                n = std::move(other.n);
+                m = std::move(other.m);
+                values = std::move(other.values);
                 return *this;
             }
         public:
@@ -127,23 +148,27 @@ namespace Construction {
             }
         public:
             inline float& At(int i, int j) {
-                if (i >= n || j >= m) throw OutOfBoundariesException();
-                return data[m*i + j];
+                if (i >= n || j >= m || i < 0 || j < 0) throw OutOfBoundariesException();
+                return values[MatrixIndex(i,j)];
             }
 
             inline float At(int i, int j) const {
-                if (i >= n || j >= m) throw OutOfBoundariesException();
-                return data[m*i + j];
+                if (i >= n || j >= m || i < 0 || j < 0) throw OutOfBoundariesException();
+                auto it = values.find(MatrixIndex(i,j));
+                if (it == values.end()) return 0;
+                return it->second;
             }
 
             inline float& operator()(int i, int j) {
-                if (i >= n || j >= m) throw OutOfBoundariesException();
-                return data[m*i + j];
+                if (i >= n || j >= m || i < 0 || j < 0) throw OutOfBoundariesException();
+                return values[MatrixIndex(i,j)];
             }
 
             inline float operator()(int i, int j) const {
-                if (i >= n || j >= m) throw OutOfBoundariesException();
-                return data[m*i + j];
+                if (i >= n || j >= m || i < 0 || j < 0) throw OutOfBoundariesException();
+                auto it = values.find(MatrixIndex(i,j));
+                if (it == values.end()) return 0;
+                return it->second;
             }
         public:
             Vector GetRowVector(int i) const {
@@ -170,14 +195,12 @@ namespace Construction {
                 Matrix result(m,n);
                 for (int i=0; i<m; i++) {
                     for (int j=0; j<n; j++) {
-                        result(i,j) = At(j,i);
+                        if (At(j,i) != 0) {
+                            result(i,j) = At(j,i);
+                        }
                     }
                 }
                 return result;
-            }
-
-            void Transpose() {
-                // TODO: implement
             }
         public:
             bool operator==(const Matrix& other) const {
@@ -202,51 +225,69 @@ namespace Construction {
         public:
             Matrix& operator+=(const Matrix& other) {
                 if (other.n != n || other.m != m) throw DimensionsDoNotMatchException();
-                for (int i=0; i<n*m; i++) {
-                    data[i] += other.data[i];
+                for (int i=0; i<n; i++) {
+                    for (int j=0; j<m; j++) {
+                        float z = other(i,j);
+                        if (z != 0) At(i,j) += z;
+                    }
                 }
                 return *this;
             }
 
             Matrix operator+(const Matrix& other) const {
                 if (other.n != n || other.m != m) throw DimensionsDoNotMatchException();
-                Matrix result = *this;
+                Matrix result (n, m);
 
-                for (int i=0; i<n*m; i++) {
-                    result.data[i] += other.data[i];
+                for (int i=0; i<n; i++) {
+                    for (int j=0; j<m; j++) {
+                        float x = At(i,j);
+                        float y = other(i,j);
+                        if (x != 0 || y != 0) result(n,m) = x + y;
+                    }
                 }
                 return result;
             }
 
             Matrix& operator-=(const Matrix& other) {
                 if (other.n != n || other.m != m) throw DimensionsDoNotMatchException();
-                for (int i=0; i<n*m; i++) {
-                    data[i] -= other.data[i];
+                for (int i=0; i<n; i++) {
+                    for (int j=0; j<m; j++) {
+                        float z = other(i,j);
+                        if (z != 0) At(i,j) -= z;
+                    }
                 }
                 return *this;
             }
 
             Matrix operator-(const Matrix& other) const {
                 if (other.n != n || other.m != m) throw DimensionsDoNotMatchException();
-                Matrix result = *this;
+                Matrix result (n, m);
 
-                for (int i=0; i<n*m; i++) {
-                    result.data[i] -= other.data[i];
+                for (int i=0; i<n; i++) {
+                    for (int j=0; j<m; j++) {
+                        float x = At(i,j);
+                        float y = other(i,j);
+                        if (x != 0 || y != 0) result(n,m) = x - y;
+                    }
                 }
                 return result;
             }
 
             Matrix& operator*=(float c) {
-                for (int i=0; i<m*n; i++) {
-                    data[i] *= c;
+                for (int i=0; i<n; i++) {
+                    for (int j=0; j<m; j++) {
+                        if (At(i,j) != 0) At(i,j) *= c;
+                    }
                 }
                 return *this;
             }
 
             Matrix operator*(float c) const {
-                Matrix result = *this;
-                for (int i=0; i<m*n; i++) {
-                    result.data[i] *= c;
+                Matrix result (n,m);
+                for (int i=0; i<n; i++) {
+                    for (int j=0; j<m; j++) {
+                        if (At(i,j) != 0) result(i,j) = c * At(i,j);
+                    }
                 }
                 return result;
             }
@@ -258,7 +299,8 @@ namespace Construction {
                 for (int i=0; i<n; i++) {
                     for (int j=0; j<other.m; j++) {
                         for (int k=0; k<m; k++) {
-                            result(i,j) = At(i,k)*other(k,j);
+                            float z = At(i,k)*other(k,j);
+                            if (z != 0) result(i,j) = z;
                         }
                     }
                 }
@@ -279,17 +321,21 @@ namespace Construction {
 
             Matrix& operator/=(float c) {
                 c = 1.0/c;
-                for (int i=0; i<m*n; i++) {
-                    data[i] *= c;
+                for (int i=0; i<n; i++) {
+                    for (int j=0; j<m; j++) {
+                        if (At(i,j) != 0) At(i,j) *= c;
+                    }
                 }
                 return *this;
             }
 
             Matrix operator/(float c) const {
                 c = 1.0/c;
-                Matrix result = *this;
-                for (int i=0; i<m*n; i++) {
-                    result.data[i] *= c;
+                Matrix result (n,m);
+                for (int i=0; i<n; i++) {
+                    for (int j=0; j<m; j++) {
+                        if (At(i,j) != 0) result(i,j) = c * At(i,j);
+                    }
                 }
                 return result;
             }
@@ -299,7 +345,7 @@ namespace Construction {
 
                 for (unsigned i=0; i<std::min(n, this->n); i++) {
                     for (unsigned j=0; j<std::min(m, this->m); j++) {
-                        result(i,j) = At(i,j);
+                        if (At(i,j) != 0) result(i,j) = At(i,j);
                     }
                 }
 
@@ -392,20 +438,6 @@ namespace Construction {
                     }
                 }
 
-                /*bool* zeroRow = new bool[GetNumberOfRows()];
-                for (unsigned r=0; r<GetNumberOfColumns(); r++) {
-                    bool isZero = true;
-                    for (unsigned c=0; c<GetNumberOfColumns(); c++) {
-                        if (At(r,c) != 0) {
-                            isZero = false;
-                            break;
-                        }
-                    }
-
-                    if (isZero) zeroRow[r] = true;
-                    else zeroRow[r] = false;
-                }*/
-
                 // Do magic
                 unsigned lead=0;
                 for (unsigned r=0; r<numRows; r++) {
@@ -425,15 +457,18 @@ namespace Construction {
                     // Divide row r through M[r,lead]
                     if (At(r, lead) != 0) {
                         float x = At(r, lead);
-                        for (int k=0; k<GetNumberOfColumns(); k++) At(r, k) /= x;
+                        for (int k=0; k<GetNumberOfColumns(); k++) {
+                            float z = At(r,k);
+                            if (z != 0) At(r,k) = z / x;
+                        }
                     }
 
                     for (unsigned i=0; i<numRows; i++) {
                         if (i != r) {
                             float x = At(i, lead);
                             for (unsigned k=0; k<GetNumberOfColumns(); k++) {
-                                float y = At(r,k);
-                                At(i,k) -= x*At(r,k);
+                                float y = x*At(r,k);
+                                if (y != 0) At(i,k) -= y;
                             }
                         }
                     }
@@ -446,9 +481,16 @@ namespace Construction {
                 if (i == j) return;
 
                 for (int k=0; k<m; k++) {
-                    float r = At(i,k);
-                    At(i,k) = At(j,k);
-                    At(j,k) = r;
+                    auto it1 = values.find(MatrixIndex(i,k));
+                    float value1 = (it1 != values.end()) ? it1->second : 0;
+                    if (it1 != values.end()) values.erase(it1);
+
+                    auto it2 = values.find(MatrixIndex(j,k));
+                    float value2 = (it2 != values.end()) ? it2->second : 0;
+                    if (it2 != values.end()) values.erase(it2);
+
+                    if (value1 != 0) values.insert({ MatrixIndex(j,k), value1 });
+                    if (value2 != 0) values.insert({ MatrixIndex(i,k), value2 });                    
                 }
             }
 
@@ -457,18 +499,26 @@ namespace Construction {
                 if (i == j) return;
 
                 for (int k=0; k<n; k++) {
-                    float r = At(k,i);
-                    At(k,i) = At(k,j);
-                    At(k,j) = r;
+                    auto it1 = values.find(MatrixIndex(k,i));
+                    float value1 = (it1 != values.end()) ? it1->second : 0;
+                    if (it1 != values.end()) values.erase(it1);
+
+                    auto it2 = values.find(MatrixIndex(k,j));
+                    float value2 = (it2 != values.end()) ? it2->second : 0;
+                    if (it2 != values.end()) values.erase(it2);
+
+                    if (value1 != 0) values.insert({ MatrixIndex(k,j), value1 });
+                    if (value2 != 0) values.insert({ MatrixIndex(k,i), value2 });
                 }
             }
         public:
             friend std::ostream& operator<<(std::ostream& os, const Matrix& v) {
                 os << "[";
                 for (int i=0; i<v.n; i++) {
+                    if (i > 0) os << " ";
                     os << "[";
                     for (int j=0; j<v.m; j++) {
-                        os << v(i,j);
+                        os << std::setw(3) << std::setprecision(1) << v(i,j);
                         if (j != v.m-1) os << ", ";
                     }
                     os << "]"; //<< std::endl;
@@ -481,7 +531,7 @@ namespace Construction {
             unsigned n;
             unsigned m;
 
-            float* data;
+            std::map<MatrixIndex, float> values;
         };
 
     }
