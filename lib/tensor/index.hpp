@@ -14,7 +14,7 @@
 
 namespace Construction {
 	namespace Tensor {
-		
+
 		using Common::Printable;
 		using Common::Range;
 		using Common::Serializable;
@@ -92,12 +92,12 @@ namespace Construction {
 				"mu", "nu", "kappa", "lambda", "alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta", "iota", "xi", "omicron", "pi", "rho", "sigma", "tau", "upsilon", "phi", "chi", "psi", "omega",
 				"Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta", "Eta", "Theta", "Iota", "Kappa", "Lambda", "Mu", "Nu", "Xi", "Omicron", "Pi", "Rho", "Sigma", "Tau", "Upsilon", "Phi", "Chi", "Psi", "Omega",
 		};
-		
+
 		/**
 			\class Index
-		
+
 			\brief One single index
-		
+
 			Class for a single index. Note that this is abstractly and
 			just marks a slot to plug a specific combination for the
 			valid range of the index.
@@ -106,22 +106,22 @@ namespace Construction {
 		public:
 			/**
 				\brief Constructor of an index
-			
+
 				Constructor of an index. The (unique) name of an index has to be supplied
-				and a printable version in form of LaTeX code. It is also important to give a 
+				and a printable version in form of LaTeX code. It is also important to give a
 				range to the index.
 			 */
 			Index() : range(1,3) { }
 
-			Index(const std::string& name, const std::string& printable, const Range& range) 
+			Index(const std::string& name, const std::string& printable, const Range& range)
 				: Printable(printable), name(name), range(range) { }
-			
-			Index(const std::string& name, const Range& range) 
+
+			Index(const std::string& name, const Range& range)
 				: Printable(name), name(name), range(range) { }
-			
-			Index(const std::string& name) 
+
+			Index(const std::string& name)
 				: Printable(name), name(name), range(Range::SpaceRange()) { }
-			
+
 			// Copy constructor
 			Index(const Index& other) : name(other.name), Printable(other.GetPrintedText()), range(other.range) { }
 			// Move constructor (TODO)
@@ -137,7 +137,7 @@ namespace Construction {
 				range = other.range;
 				return *this;
 			}
-			
+
 			/**
 				Move assignment operator
 			 */
@@ -170,7 +170,7 @@ namespace Construction {
 			inline bool operator==(const Index& other) const {
 				return name == other.name && printed_text == other.printed_text;
 			}
-			
+
 			/**
 				Inequality operator
 			 */
@@ -264,12 +264,12 @@ namespace Construction {
 		public:
 			/**
 				\brief Application functor
-			
+
 				This functor consists of an assertion that garantuees
 				that the supplied index value is within the range
 				of the index. Otherwise an error is thrown.
 				If the test passes, then the index is returned again.
-			
+
 				\param value	The index that may be applied
 
 			 	\throws IndexOutOfRangeException
@@ -381,24 +381,24 @@ namespace Construction {
 		private:
 			std::map<std::string, unsigned> assignment;
 		};
-		
+
 		/**
 			\class Indices
 		 */
 		class Indices : public Printable, Serializable<Indices> {
 		public:
 			Indices() = default;
-		
+
 			Indices(std::initializer_list<Index> indices) {
 				for (auto index : indices) {
 					this->indices.emplace_back(index);
 				}
 			}
-			
+
 			Indices(const Index& index) {
 				indices.push_back(index);
 			}
-			
+
 			Indices(Index&& index) {
 				indices.push_back(std::move(index));
 			}
@@ -433,7 +433,7 @@ namespace Construction {
 			void Insert(const Index& index) {
 				indices.push_back(index);
 			}
-			
+
 			void Insert(Index&& index) {
 				indices.push_back(std::move(index));
 			}
@@ -458,7 +458,7 @@ namespace Construction {
 				}
 				return true;
 			}
-			
+
 			bool operator!=(const Indices& other) const {
 				if (indices.size() != other.indices.size()) return true;
 				for (unsigned i=0; i < indices.size(); i++) {
@@ -470,13 +470,13 @@ namespace Construction {
 			template<typename T, typename... Args>
 			std::vector<unsigned> operator()(T t, Args... args) const {
 				std::vector<unsigned> result;
-				
+
 				result = Partial(Range(1, indices.size()-1))(args...);
 				result.insert(result.begin(), (indices.at(0))(t));
 
 				return result;
 			}
-			
+
 			std::vector<unsigned> operator()() const {
 				return std::vector<unsigned>();
 			}
@@ -486,7 +486,7 @@ namespace Construction {
 
 			std::vector<Index>::const_iterator begin() const { return indices.begin(); }
 			std::vector<Index>::const_iterator end() const { return indices.end(); }
-			
+
 			Index operator[](unsigned id) const {
 				if (id >= indices.size()) throw IndexOutOfRangeException();
 				return indices[id];
@@ -520,8 +520,21 @@ namespace Construction {
  		public:
 			virtual std::string ToString() const {
 				std::stringstream ss;
-				if (indices.size() > 1) ss << "_{";
-				
+
+				bool lastOneWasDown=true;
+
+                if (indices.size() > 1) {
+                    if (indices[0].IsContravariant()) {
+                        lastOneWasDown=false;
+                        ss << "^{";
+                    } else {
+                        ss << "_{";
+                    }
+                } else if (indices.size() == 1) {
+                    if (indices[0].IsContravariant()) ss << "^";
+                    else ss << "_";
+                }
+
 				bool lastOneWasDown=true;
 
 				for (auto& index : indices) {
@@ -535,7 +548,7 @@ namespace Construction {
 					ss << index;
 				}
 				if (indices.size() > 1) ss << "}";
-	
+
 				return ss.str();
 			}
 
@@ -744,26 +757,26 @@ namespace Construction {
 				for (unsigned i=1; i<=N; i++) {
 					std::string fullName = "";
 					std::string fullPrinted = "";
-					
+
 					// Generate full name
 					{
 						std::stringstream ss;
 						ss << name << "_" << (i+offset);
 						fullName = ss.str();
 					}
-					
+
 					// Generate full printed text
 					{
 						std::stringstream ss;
 						ss << printed << "_" << (i+offset);
 						fullPrinted = ss.str();
 					}
-										
+
 					result.indices.emplace_back(Index(fullName, fullPrinted, range));
 				}
 				return result;
 			}
-			
+
 			static Indices GetGreekSeries(unsigned N, const Range& range, unsigned offset=0) {
 				assert(N+offset <= GreekIndices.size());
 				Indices result;
@@ -774,7 +787,7 @@ namespace Construction {
 				}
 				return result;
 			}
-			
+
 			static Indices GetRomanSeries(unsigned N, const Range& range, unsigned offset=0) {
 				assert(N+offset <= 52);
 				Indices result;
@@ -949,6 +962,6 @@ namespace Construction {
 
 			return result;
 		}
-		
+
 	}
 }
