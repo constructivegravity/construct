@@ -1915,7 +1915,7 @@ namespace Construction {
 				auto summands = GetSummands();
 
 				// Initialize
-        std::map<unsigned,Vector::Vector> vectors;
+                std::map<unsigned,Vector::Vector> vectors;
 
 				// Get the indices of the resulting tensor
 				auto indices = GetIndices();
@@ -1934,7 +1934,7 @@ namespace Construction {
 						pool.Enqueue([&](unsigned id, const Tensor& tensor) {
 
 							for (int j=0; j<dimension; j++) {
-								IndexAssignments assignment;
+                                IndexAssignments assignment;
 
 								// Convert into index assignment
                         		int k = 0;

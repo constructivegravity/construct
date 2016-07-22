@@ -535,8 +535,6 @@ namespace Construction {
                     else ss << "_";
                 }
 
-				bool lastOneWasDown=true;
-
 				for (auto& index : indices) {
 					if (index.IsContravariant() && lastOneWasDown) {
 						lastOneWasDown = false;
