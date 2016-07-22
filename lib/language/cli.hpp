@@ -80,8 +80,8 @@ namespace Construction {
                         else if (arg->IsLiteral()) {
                             auto id = arg->ToString();
                             auto it = definition.find(id);
-                            if (it == definition.end()) throw Exception("The symbol is not known");
-                            result.append(it->second);
+                            if (it == definition.end()) result.append("");
+                            else result.append(it->second);
                         }
                         // If indices, add this
                         else if (arg->IsIndices()) {
@@ -128,8 +128,8 @@ namespace Construction {
                     std::string expandedCmd = GetExpandedCommandString(document);
 
                     // if the expandedCmd is in the database, do not evaluate
-                    // 
-                    // TODO: if the algorithms are out of the experimental stage, 
+                    //
+                    // TODO: if the algorithms are out of the experimental stage,
                     //       add the caching again
                     //
                     /*if (database.Contains(expandedCmd)) {
@@ -376,7 +376,7 @@ namespace Construction {
                 #endif
                     Execute(document, silent);
                     Session::Instance()->GetNotebook().Append(code);
-                #if RECOVER_FROM_EXCEPTIONS == 1    
+                #if RECOVER_FROM_EXCEPTIONS == 1
                 } catch (const std::bad_alloc& e) {
                     Error("Out of memory. :(");
                 } catch (...) {
@@ -455,7 +455,7 @@ namespace Construction {
                 while (std::getline(ss, line)) {
                     std::cout << "   " << line << std::endl;
                 }
-                
+
                 // Change the color back
                 std::cout << "\033[0m";
             }
