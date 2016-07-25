@@ -40,6 +40,14 @@ namespace Construction {
 			CannotMultiplyTensorsException() : Exception("Cannot multiply tensors due to incompatible indices") { }
 		};
 
+        /**
+			\class CannotContractTensorsException
+		 */
+		class CannotContractTensorsException : public Exception {
+		public:
+			CannotContractTensorsException() : Exception("Cannot contract tensors due to incompatible indices") { }
+		};
+
 		// Evaluation function
 		typedef std::function<double(const std::vector<unsigned>&)>	EvaluationFunction;
 
@@ -263,6 +271,19 @@ namespace Construction {
 			virtual std::unique_ptr<AbstractTensor> Canonicalize() const {
 				return std::unique_ptr<AbstractTensor>(new AbstractTensor(*this));
 			}
+
+            /**
+                \brief Method that allows to simplify expressions on contractions
+
+                Method that allows to simplify expressions on contractions.
+                For example, the contraction with a Kronecker delta thus just
+                sets the index on the other one.
+
+                If nothing can be done, it returns nullptr.
+             */
+            virtual std::unique_ptr<AbstractTensor> ContractionHeuristics(const AbstractTensor& other) const {
+                return nullptr;
+            }
         public:
             bool IsCustomTensor() const { return type == TensorType::CUSTOM; }
 
@@ -360,37 +381,7 @@ namespace Construction {
 			 	result.
 			 */
 			std::vector<std::vector<unsigned>> GetAllIndexCombinations() const {
-
-				// Result
-				std::vector<std::vector<unsigned>> result;
-
-				// Helper method to recursively determine the index combinations
-				std::function<void(const std::vector<unsigned>&)> fn = [&](const std::vector<unsigned>& input) -> void {
-					// If all indices are fixed, add the combination to the list
-					if (input.size() == indices.Size()) {
-						result.push_back(input);
-						return;
-					}
-
-					// Get range of next unfixed index
-					auto range = indices[input.size()].GetRange();
-
-					// Iterate over the range
-					for (auto i : range) {
-						// Add the index to the list
-						std::vector<unsigned> newInput = input;
-						newInput.push_back(i);
-
-						// Recursive call to go to next index
-						fn(newInput);
-					}
-				};
-
-				// Start recursion
-				std::vector<unsigned> input;
-				fn({});
-
-				return result;
+                return indices.GetAllIndexCombinations();
 			}
 
 			virtual std::vector<std::vector<unsigned>> GetAllInterestingIndexCombinations() const {
@@ -608,13 +599,8 @@ namespace Construction {
 		class MultipliedTensor : public AbstractTensor {
 		public:
 			MultipliedTensor(TensorPointer A, TensorPointer B)
-				: AbstractTensor("", "", A->GetIndices()), A(std::move(A)), B(std::move(B))
+				: AbstractTensor("", "", A->GetIndices().Contract(B->GetIndices())), A(std::move(A)), B(std::move(B))
 			{
-				// Insert the remaining indices of B
-				for (auto& index : B->GetIndices()) {
-					indices.Insert(index);
-				}
-
 				type = TensorType::MULTIPLICATION;
 			}
 
@@ -661,21 +647,62 @@ namespace Construction {
 					throw IncompleteIndexAssignmentException();
 				}
 
-				// Create index assignments
-				IndexAssignments assignment1;
-				IndexAssignments assignment2;
+                // Find contracted indices
+                Indices contracted;
+                for (auto& index : A->GetIndices()) {
+                    if (!indices.ContainsIndex(index)) {
+                        contracted.Insert(index);
+                    }
+                }
 
-				// First N indices belong to A
-				for (int i=0; i<A->GetIndices().Size(); i++) {
-					assignment1[indices[i].GetName()] = args[i];
-				}
+                // Prepare result
+                Scalar result = 0;
 
-				// Remaining indices belong to B
-				for (int i=A->GetIndices().Size(); i<args.size(); i++) {
-					assignment2[indices[i].GetName()] = args[i];
-				}
+                // Get all the contracted index combinations
+                auto contractedArgs = contracted.GetAllIndexCombinations();
+                bool containsContractions = contractedArgs.size() > 0;
 
-				return (*A)(assignment1) * (*B)(assignment2);
+                // If the tensor does not contain contractions
+                if (!containsContractions) contractedArgs.push_back({0});
+
+                // Merge with the given args
+                for (auto& args_ : contractedArgs) {
+                    IndexAssignments assignment1;
+                    IndexAssignments assignment2;
+
+                    // Set the value of the contracted indices
+                    if (containsContractions) {
+                        for (unsigned i=0; i<contracted.Size(); ++i) {
+                            assignment1[contracted[i].GetName()] = args_[i];
+                            assignment2[contracted[i].GetName()] = args_[i];
+                        }
+                    }
+
+                    // Set the values of the rest
+                    {
+                        unsigned i=0;
+                        auto indicesA = A->GetIndices();
+                        auto indicesB = B->GetIndices();
+
+                        // Iterate over all the indices
+                        for (auto& index : indices) {
+                            if (indicesA.ContainsIndex(index)) {
+                                assignment1[index.GetName()] = args[i];
+                            }
+
+                            if (indicesB.ContainsIndex(index)) {
+                                assignment2[index.GetName()] = args[i];
+                            }
+
+                            i++;
+                        }
+                    }
+
+                    // Add this to the result
+                    result += (*A)(assignment1) * (*B)(assignment2);
+                }
+
+				return result;
 			}
 		public:
 			const TensorPointer& GetFirst() const {
@@ -1047,12 +1074,23 @@ namespace Construction {
 		}
 
 		std::unique_ptr<AbstractTensor> AbstractTensor::Multiply(const AbstractTensor& one, const AbstractTensor& second) {
-			// Check if all indices are distinct
-			for (auto& index : one.indices) {
-				if (second.indices.ContainsIndex(index)) {
-					throw CannotMultiplyTensorsException();
-				}
-			}
+            // Check if it contains contractions
+            bool containsContractions = false;
+            for (auto& index : one.indices) {
+                if (second.indices.ContainsIndex(index)) {
+                    containsContractions = true;
+                    break;
+                }
+            }
+
+            // Try to apply heuristics
+            {
+                auto heuristics = one.ContractionHeuristics(second);
+                if (heuristics != nullptr) return std::move(heuristics);
+
+                heuristics = second.ContractionHeuristics(one);
+                if (heuristics != nullptr) return std::move(heuristics);
+            }
 
 			// If one of the tensors is zero, return zero
 			if (one.IsZeroTensor() || second.IsZeroTensor()) {
@@ -1146,6 +1184,24 @@ namespace Construction {
 			virtual TensorPointer Canonicalize() const override {
 				return std::move(Clone());
 			}
+
+            /**
+                \brief Heuristics for contractions with the Kronecker delta
+             */
+            virtual TensorPointer ContractionHeuristics(const AbstractTensor& other) const override {
+                try {
+                    auto contracted = indices.Contract(other.GetIndices());
+
+                    // Clone the other tensor
+                    auto clone = other.Clone();
+
+                    // Set the indices
+                    clone->SetIndices(contracted);
+                    return std::move(clone);
+                } catch (...) {
+                    return nullptr;
+                }
+            }
 		public:
 			/**
 				Evaluate the delta, by checking if the values are equal
@@ -1711,6 +1767,23 @@ namespace Construction {
 			static Tensor EpsilonGamma(unsigned numEpsilon, unsigned numGamma, const Indices& indices) {
 				return Tensor(TensorPointer(new EpsilonGammaTensor(numEpsilon, numGamma, indices)));
 			}
+
+            static Tensor Contraction(const Tensor& tensor, const Indices& indices) {
+                // Clone
+                auto clone = tensor.pointer->Clone();
+
+                // Set the tensor to the new indices
+                clone->SetIndices(indices);
+
+                // If there are no
+                if (!indices.ContainsContractions()) {
+                    return Tensor(std::move(clone));
+                }
+
+                // Syntactic sugar, just multiply by one, then the evaluation
+                // magic makes everything correct
+                return One() * Tensor(std::move(clone));
+            }
 
 			static Tensor Substitute(const Tensor& tensor, const Indices& indices) {
 				// Syntactic sugar for addition
@@ -2606,6 +2679,11 @@ namespace Construction {
 			inline scalar_type operator()(const std::vector<unsigned>& indices) const {
 				return (*pointer)(indices);
 			}
+
+            inline scalar_type operator()() const {
+                if (pointer->GetIndices().Size() > 0) throw IncompleteIndexAssignmentException();
+                return (*pointer)(std::vector<unsigned>());
+            }
 
 			/** Tensor Arithmetics **/
 			Tensor& operator+=(const Tensor& other) {

@@ -35,6 +35,14 @@ namespace Construction {
 			IndicesIncomparableException() : Exception("The given indices cannot be compared.") { }
 		};
 
+        /**
+			\class CannotContractTensorsException
+		 */
+		class CannotContractIndicesException : public Exception {
+		public:
+			CannotContractIndicesException() : Exception("Cannot contract the indices. One or multiple indices occur more than once in a non-covariant fashion.") { }
+		};
+
 
 		static const std::map<std::string, std::string> GreekSymbols = {
 				{ "alpha", "\\alpha" },
@@ -135,6 +143,7 @@ namespace Construction {
 				name = other.name;
 				printed_text = other.printed_text;
 				range = other.range;
+                up = other.up;
 				return *this;
 			}
 
@@ -145,6 +154,7 @@ namespace Construction {
 				name = std::move(other.name);
 				printed_text = std::move(other.printed_text);
 				range = std::move(other.range);
+                up = std::move(other.up);
 				return *this;
 			}
 		public:
@@ -749,6 +759,48 @@ namespace Construction {
 
 				return result;
 			}
+
+            /**
+				\brief Returns all the possible index combinations for the tensor.
+
+			 	Returns all the possible index combinations for the tensor.
+			 	It uses a recursive inline methods that fixes the indices one by one
+			 	until all indices have a value. In this case the combination is added to the
+			 	result.
+			 */
+			std::vector<std::vector<unsigned>> GetAllIndexCombinations() const {
+
+				// Result
+				std::vector<std::vector<unsigned>> result;
+
+				// Helper method to recursively determine the index combinations
+				std::function<void(const std::vector<unsigned>&)> fn = [&](const std::vector<unsigned>& input) -> void {
+					// If all indices are fixed, add the combination to the list
+					if (input.size() == Size()) {
+						result.push_back(input);
+						return;
+					}
+
+					// Get range of next unfixed index
+					auto range = indices[input.size()].GetRange();
+
+					// Iterate over the range
+					for (auto i : range) {
+						// Add the index to the list
+						std::vector<unsigned> newInput = input;
+						newInput.push_back(i);
+
+						// Recursive call to go to next index
+						fn(newInput);
+					}
+				};
+
+				// Start recursion
+				std::vector<unsigned> input;
+				fn({});
+
+				return result;
+			}
 		public:
 			static Indices GetSeries(unsigned N, const std::string& name, const std::string& printed, const Range& range, unsigned offset=0) {
 				Indices result;
@@ -910,6 +962,93 @@ namespace Construction {
 				// Return the ordered indices
 				return result;
 			}
+        public:
+            /**
+
+             */
+            bool ContainsContractions() const {
+                bool result = false;
+                std::vector<Index> copy = indices;
+                std::vector<Index> duplicates;
+
+                for (int i=0; i<copy.size(); ++i) {
+                    // Already used
+                    if (std::find(duplicates.begin(), duplicates.end(), copy[i]) != duplicates.end()) {
+                        throw CannotContractIndicesException();
+                    }
+
+                    // Is contravariant?
+                    bool isContravariant = copy[i].IsContravariant();
+
+                    for (int j=i+1; j<copy.size(); ++j) {
+                        if (copy[i] == copy[j]) {
+                            if ((isContravariant && !copy[j].IsContravariant()) ||
+                                (!isContravariant && copy[j].IsContravariant()))
+                            {
+                                result = true;
+                                copy.erase(copy.begin() + j);
+                                duplicates.push_back(copy[i]);
+                                break;
+                            } else {
+                                throw CannotContractIndicesException();
+                            }
+                        }
+                    }
+                }
+
+                return result;
+            }
+
+            /**
+                \brief Contract two indices
+
+                Contract two indices. This will return the resulting
+                index structure after the tensors with the given indices are
+                contracted, i.e.
+
+                    Contract(_{abc}, ^{a}_{de}) = _{bcde}
+
+                \throws CannotContractIndicesException
+             */
+            Indices Contract(const Indices& other) const {
+                std::vector<Index> other_ = other.indices;
+                Indices result;
+
+                // Iterate over all indices
+                for (auto& index : indices) {
+                    // Is contravariant?
+                    bool isContravariant = index.IsContravariant();
+
+                    // Look for the index in the other list
+                    auto it = std::find(other_.begin(), other_.end(), index);
+
+                    // If it is not contained, add the index to the result
+                    if (it == other_.end()) {
+                        result.Insert(index);
+                        continue;
+                    }
+
+                    // If the index is contained, it has to has the other orientation
+                    if ((isContravariant && !it->IsContravariant()) ||
+                        (!isContravariant && it->IsContravariant()))
+                    {
+                        // Delete the index from the output
+                        other_.erase(it);
+
+                        continue;
+                    }
+
+                    // Indices have the same orientation => exception
+                    throw CannotContractIndicesException();
+                }
+
+                // Add the remaining indices in the other tensor
+                for (auto& index : other_) {
+                    result.Insert(index);
+                }
+
+                return result;
+            }
 		public:
 			void Serialize(std::ostream& os) const {
 				// Write the size of the indices
