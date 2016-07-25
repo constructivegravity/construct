@@ -5,5 +5,5 @@ bin/
 *.sublime*
 .vscode/
 *.cs
+*.csd
 *.dat
-

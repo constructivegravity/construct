@@ -1,5 +1,6 @@
 #include <array>
 
+#include <language/api.hpp>
 #include <tensor/tensor.hpp>
 
 #include <boost/archive/text_oarchive.hpp>
@@ -33,7 +34,7 @@ SCENARIO("General tensors", "[tensor]") {
         WHEN(" symmetrizing a tensor") {
             auto tensor = Construction::Tensor::Tensor::EpsilonGamma(0,2, Construction::Tensor::Indices::GetRomanSeries(4, {1,3}));
 
-            std::cout << tensor.Symmetrize({ {"a", {1,3}}, {"c", {1,3}} }) << std::endl;
+            REQUIRE(tensor.Symmetrize({ {"a", {1,3}}, {"c", {1,3}} }).ToString() == "1/2 * (\\gamma_{ab}\\gamma_{cd} + \\gamma_{ad}\\gamma_{bc})");
         }
 
         WHEN(" evaluating the tensor components") {
@@ -55,7 +56,7 @@ SCENARIO("General tensors", "[tensor]") {
         }
 
         WHEN(" going out of scope, all memory is freed") {
-            
+
         }
 
         WHEN(" serializing the tensor") {
@@ -64,7 +65,7 @@ SCENARIO("General tensors", "[tensor]") {
             auto tensor = Construction::Tensor::Tensor::EpsilonGamma(1,2, Construction::Tensor::Indices::GetRomanSeries(7, {1,3}));
 
             tensor.Serialize(ss);
-	    
+
 	        std::string content = ss.str();
 
             THEN(" the deserialized tensor is correct") {
@@ -107,6 +108,21 @@ SCENARIO("Epsilon tensor", "[epsilon-tensor]") {
                 REQUIRE(indices.Size() == 3);
             }
 
+        }
+
+        WHEN(" initializing the epsilon with all indices up") {
+            auto indices = Construction::Tensor::Indices::GetRomanSeries(3, {1,3});
+            indices[0].SetContravariant(true);
+            indices[1].SetContravariant(true);
+            indices[2].SetContravariant(true);
+
+            REQUIRE(indices.ToString() == "^{abc}");
+
+            auto epsilon2 = Construction::Tensor::Tensor::Epsilon(indices);
+
+            THEN(" we get the proper result") {
+                REQUIRE(epsilon2.ToString() == "\\epsilon^{abc}");
+            }
         }
 
         // All index combinations
@@ -203,7 +219,7 @@ SCENARIO("Metric tensor", "[gamma-tensor]") {
             }
 
             THEN(" it should print to {ab}") {
-                REQUIRE(indices.ToString() == "{ab}");
+                REQUIRE(indices.ToString() == "_{ab}");
             }
         }
 
@@ -371,12 +387,12 @@ SCENARIO("Addition", "[tensor-addition]") {
             }
 
             THEN(" should be {ab}") {
-                REQUIRE(indices.ToString() == "{ab}");
+                REQUIRE(indices.ToString() == "_{ab}");
             }
         }
 
         WHEN(" serializing an addition of two tensors") {
-            auto tensor = Construction::Tensor::Scalar("x") * Construction::Tensor::Tensor::EpsilonGamma(0, 3, Construction::Tensor::Indices::GetRomanSeries(6, {1,3})) + 
+            auto tensor = Construction::Tensor::Scalar("x") * Construction::Tensor::Tensor::EpsilonGamma(0, 3, Construction::Tensor::Indices::GetRomanSeries(6, {1,3})) +
                      Construction::Tensor::Scalar("y") * Construction::Tensor::Tensor::EpsilonGamma(2, 0, Construction::Tensor::Indices::GetRomanSeries(6, {1,3}));
 
             std::string content;
@@ -395,6 +411,59 @@ SCENARIO("Addition", "[tensor-addition]") {
                 REQUIRE(deserialized);
                 REQUIRE(deserialized->ToString() == tensor.ToString());
             }
+        }
+
+        WHEN(" creating a delta tensor") {
+            auto indices = Construction::Tensor::Indices::GetRomanSeries(2, {1,3});
+            indices[0].SetContravariant(true);
+            indices[1].SetContravariant(false);
+
+            REQUIRE(indices.ToString() == "^{a}_{b}");
+
+            REQUIRE(indices.ContainsIndex({"a", {1,3}}));
+
+            auto delta = Construction::Language::API::Delta(indices);
+
+            REQUIRE(delta.ToString() == "\\delta^{a}_{b}");
+        }
+
+        WHEN(" calculating the trace of delta") {
+            auto delta = Construction::Language::API::Delta({
+                {"a", {1,3}},
+                {"a", {1,3}}
+            });
+
+            REQUIRE(delta.ToString() == "\\delta^{a}_{a}");
+        }
+
+        WHEN(" contracting two indices") {
+            auto A = Construction::Tensor::Indices::GetRomanSeries(2, {1,3});
+            Construction::Tensor::Indices B = { {"a", {1,3}}, {"c", {1,3}}, {"d", {1,3}} };
+            B[0].SetContravariant(true);
+
+            REQUIRE(A.ToString() == "_{ab}");
+            REQUIRE(B.ToString() == "^{a}_{cd}");
+            REQUIRE(A.Contract(B).ToString() == "_{bcd}");
+
+            A[0].SetContravariant(true);
+            REQUIRE_THROWS(A.Contract(B));
+
+            B[0].SetContravariant(false);
+            REQUIRE(A.Contract(B).ToString() == "_{bcd}");
+
+            REQUIRE(A.Contract(Construction::Tensor::Indices::GetRomanSeries(2, {1,3}, 2)).ToString() == "^{a}_{bcd}");
+        }
+
+        WHEN(" contracting with delta") {
+            auto delta = Construction::Language::API::Delta({ {"a", {1,3}}, {"d", {1,3}}});
+            auto epsilon = Construction::Language::API::Epsilon(Construction::Tensor::Indices::GetRomanSeries(3, {1,3}));
+
+            REQUIRE(delta.ToString() == "\\delta^{a}_{d}");
+
+            auto contracted = delta * epsilon;
+
+            REQUIRE(contracted.ToString() == "\\epsilon_{dbc}");
+            //REQUIRE(contracted() == 3);
         }
 
         WHEN(" adding them") {
