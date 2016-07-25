@@ -1119,10 +1119,8 @@ namespace Construction {
 			DeltaTensor(const Indices& indices) : AbstractTensor("", "", indices) {
 				assert(indices.Size() == 2);
 
-				indices[0].SetContravariant(true);
-				indices[1].SetContravariant(false);
-
-				SetIndices(indices);
+				this->indices[0].SetContravariant(true);
+				this->indices[1].SetContravariant(false);
 
 				type = TensorType::DELTA;
 			}
@@ -1166,6 +1164,9 @@ namespace Construction {
 				return ss.str();
 			}
 		};
+
+        // Alias
+		typedef DeltaTensor	KroneckerTensor;
 
 		/**
 			\class EpsilonTensor

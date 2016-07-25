@@ -123,10 +123,10 @@ namespace Construction {
 				: Printable(name), name(name), range(Range::SpaceRange()) { }
 
 			// Copy constructor
-			Index(const Index& other) : name(other.name), Printable(other.GetPrintedText()), range(other.range) { }
+			Index(const Index& other) : name(other.name), Printable(other.GetPrintedText()), range(other.range), up(other.up) { }
 			// Move constructor (TODO)
 			Index(Index&& other)
-			  : name(std::move(other.name)), Printable(std::move(other.printed_text)), range(std::move(other.range)) { }
+			  : name(std::move(other.name)), Printable(std::move(other.printed_text)), range(std::move(other.range)), up(std::move(other.up)) { }
 		public:
 			/**
 				Copy assignment operator
