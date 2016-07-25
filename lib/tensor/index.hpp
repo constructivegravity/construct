@@ -14,7 +14,7 @@
 
 namespace Construction {
 	namespace Tensor {
-		
+
 		using Common::Printable;
 		using Common::Range;
 		using Common::Serializable;
@@ -33,6 +33,14 @@ namespace Construction {
 		class IndicesIncomparableException : public Exception {
 		public:
 			IndicesIncomparableException() : Exception("The given indices cannot be compared.") { }
+		};
+
+        /**
+			\class CannotContractTensorsException
+		 */
+		class CannotContractIndicesException : public Exception {
+		public:
+			CannotContractIndicesException() : Exception("Cannot contract the indices. One or multiple indices occur more than once in a non-covariant fashion.") { }
 		};
 
 
@@ -92,12 +100,12 @@ namespace Construction {
 				"mu", "nu", "kappa", "lambda", "alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta", "iota", "xi", "omicron", "pi", "rho", "sigma", "tau", "upsilon", "phi", "chi", "psi", "omega",
 				"Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta", "Eta", "Theta", "Iota", "Kappa", "Lambda", "Mu", "Nu", "Xi", "Omicron", "Pi", "Rho", "Sigma", "Tau", "Upsilon", "Phi", "Chi", "Psi", "Omega",
 		};
-		
+
 		/**
 			\class Index
-		
+
 			\brief One single index
-		
+
 			Class for a single index. Note that this is abstractly and
 			just marks a slot to plug a specific combination for the
 			valid range of the index.
@@ -106,27 +114,27 @@ namespace Construction {
 		public:
 			/**
 				\brief Constructor of an index
-			
+
 				Constructor of an index. The (unique) name of an index has to be supplied
-				and a printable version in form of LaTeX code. It is also important to give a 
+				and a printable version in form of LaTeX code. It is also important to give a
 				range to the index.
 			 */
 			Index() : range(1,3) { }
 
-			Index(const std::string& name, const std::string& printable, const Range& range) 
+			Index(const std::string& name, const std::string& printable, const Range& range)
 				: Printable(printable), name(name), range(range) { }
-			
-			Index(const std::string& name, const Range& range) 
+
+			Index(const std::string& name, const Range& range)
 				: Printable(name), name(name), range(range) { }
-			
-			Index(const std::string& name) 
+
+			Index(const std::string& name)
 				: Printable(name), name(name), range(Range::SpaceRange()) { }
-			
+
 			// Copy constructor
-			Index(const Index& other) : name(other.name), Printable(other.GetPrintedText()), range(other.range) { }
+			Index(const Index& other) : name(other.name), Printable(other.GetPrintedText()), range(other.range), up(other.up) { }
 			// Move constructor (TODO)
 			Index(Index&& other)
-			  : name(std::move(other.name)), Printable(std::move(other.printed_text)), range(std::move(other.range)) { }
+			  : name(std::move(other.name)), Printable(std::move(other.printed_text)), range(std::move(other.range)), up(std::move(other.up)) { }
 		public:
 			/**
 				Copy assignment operator
@@ -135,9 +143,10 @@ namespace Construction {
 				name = other.name;
 				printed_text = other.printed_text;
 				range = other.range;
+                up = other.up;
 				return *this;
 			}
-			
+
 			/**
 				Move assignment operator
 			 */
@@ -145,6 +154,7 @@ namespace Construction {
 				name = std::move(other.name);
 				printed_text = std::move(other.printed_text);
 				range = std::move(other.range);
+                up = std::move(other.up);
 				return *this;
 			}
 		public:
@@ -159,6 +169,10 @@ namespace Construction {
 			inline bool IsContravariant() const {
 				return up;
 			}
+
+			inline void SetContravariant(bool value) {
+				up = value;
+			}
 		public:
 			/**
 				Equality operator
@@ -166,7 +180,7 @@ namespace Construction {
 			inline bool operator==(const Index& other) const {
 				return name == other.name && printed_text == other.printed_text;
 			}
-			
+
 			/**
 				Inequality operator
 			 */
@@ -260,12 +274,12 @@ namespace Construction {
 		public:
 			/**
 				\brief Application functor
-			
+
 				This functor consists of an assertion that garantuees
 				that the supplied index value is within the range
 				of the index. Otherwise an error is thrown.
 				If the test passes, then the index is returned again.
-			
+
 				\param value	The index that may be applied
 
 			 	\throws IndexOutOfRangeException
@@ -377,24 +391,24 @@ namespace Construction {
 		private:
 			std::map<std::string, unsigned> assignment;
 		};
-		
+
 		/**
 			\class Indices
 		 */
 		class Indices : public Printable, Serializable<Indices> {
 		public:
 			Indices() = default;
-		
+
 			Indices(std::initializer_list<Index> indices) {
 				for (auto index : indices) {
 					this->indices.emplace_back(index);
 				}
 			}
-			
+
 			Indices(const Index& index) {
 				indices.push_back(index);
 			}
-			
+
 			Indices(Index&& index) {
 				indices.push_back(std::move(index));
 			}
@@ -429,7 +443,7 @@ namespace Construction {
 			void Insert(const Index& index) {
 				indices.push_back(index);
 			}
-			
+
 			void Insert(Index&& index) {
 				indices.push_back(std::move(index));
 			}
@@ -454,7 +468,7 @@ namespace Construction {
 				}
 				return true;
 			}
-			
+
 			bool operator!=(const Indices& other) const {
 				if (indices.size() != other.indices.size()) return true;
 				for (unsigned i=0; i < indices.size(); i++) {
@@ -466,13 +480,13 @@ namespace Construction {
 			template<typename T, typename... Args>
 			std::vector<unsigned> operator()(T t, Args... args) const {
 				std::vector<unsigned> result;
-				
+
 				result = Partial(Range(1, indices.size()-1))(args...);
 				result.insert(result.begin(), (indices.at(0))(t));
 
 				return result;
 			}
-			
+
 			std::vector<unsigned> operator()() const {
 				return std::vector<unsigned>();
 			}
@@ -482,7 +496,7 @@ namespace Construction {
 
 			std::vector<Index>::const_iterator begin() const { return indices.begin(); }
 			std::vector<Index>::const_iterator end() const { return indices.end(); }
-			
+
 			Index operator[](unsigned id) const {
 				if (id >= indices.size()) throw IndexOutOfRangeException();
 				return indices[id];
@@ -516,13 +530,33 @@ namespace Construction {
  		public:
 			virtual std::string ToString() const {
 				std::stringstream ss;
-				if (indices.size() > 1) ss << "{";
-				
+
+				bool lastOneWasDown=true;
+
+                if (indices.size() > 1) {
+                    if (indices[0].IsContravariant()) {
+                        lastOneWasDown=false;
+                        ss << "^{";
+                    } else {
+                        ss << "_{";
+                    }
+                } else if (indices.size() == 1) {
+                    if (indices[0].IsContravariant()) ss << "^";
+                    else ss << "_";
+                }
+
 				for (auto& index : indices) {
+					if (index.IsContravariant() && lastOneWasDown) {
+						lastOneWasDown = false;
+						ss << "}^{";
+					} else if (!index.IsContravariant() && !lastOneWasDown) {
+						lastOneWasDown = true;
+						ss << "}_{";
+					}
 					ss << index;
 				}
 				if (indices.size() > 1) ss << "}";
-	
+
 				return ss.str();
 			}
 
@@ -725,32 +759,74 @@ namespace Construction {
 
 				return result;
 			}
+
+            /**
+				\brief Returns all the possible index combinations for the tensor.
+
+			 	Returns all the possible index combinations for the tensor.
+			 	It uses a recursive inline methods that fixes the indices one by one
+			 	until all indices have a value. In this case the combination is added to the
+			 	result.
+			 */
+			std::vector<std::vector<unsigned>> GetAllIndexCombinations() const {
+
+				// Result
+				std::vector<std::vector<unsigned>> result;
+
+				// Helper method to recursively determine the index combinations
+				std::function<void(const std::vector<unsigned>&)> fn = [&](const std::vector<unsigned>& input) -> void {
+					// If all indices are fixed, add the combination to the list
+					if (input.size() == Size()) {
+						result.push_back(input);
+						return;
+					}
+
+					// Get range of next unfixed index
+					auto range = indices[input.size()].GetRange();
+
+					// Iterate over the range
+					for (auto i : range) {
+						// Add the index to the list
+						std::vector<unsigned> newInput = input;
+						newInput.push_back(i);
+
+						// Recursive call to go to next index
+						fn(newInput);
+					}
+				};
+
+				// Start recursion
+				std::vector<unsigned> input;
+				fn({});
+
+				return result;
+			}
 		public:
 			static Indices GetSeries(unsigned N, const std::string& name, const std::string& printed, const Range& range, unsigned offset=0) {
 				Indices result;
 				for (unsigned i=1; i<=N; i++) {
 					std::string fullName = "";
 					std::string fullPrinted = "";
-					
+
 					// Generate full name
 					{
 						std::stringstream ss;
 						ss << name << "_" << (i+offset);
 						fullName = ss.str();
 					}
-					
+
 					// Generate full printed text
 					{
 						std::stringstream ss;
 						ss << printed << "_" << (i+offset);
 						fullPrinted = ss.str();
 					}
-										
+
 					result.indices.emplace_back(Index(fullName, fullPrinted, range));
 				}
 				return result;
 			}
-			
+
 			static Indices GetGreekSeries(unsigned N, const Range& range, unsigned offset=0) {
 				assert(N+offset <= GreekIndices.size());
 				Indices result;
@@ -761,7 +837,7 @@ namespace Construction {
 				}
 				return result;
 			}
-			
+
 			static Indices GetRomanSeries(unsigned N, const Range& range, unsigned offset=0) {
 				assert(N+offset <= 52);
 				Indices result;
@@ -886,6 +962,93 @@ namespace Construction {
 				// Return the ordered indices
 				return result;
 			}
+        public:
+            /**
+
+             */
+            bool ContainsContractions() const {
+                bool result = false;
+                std::vector<Index> copy = indices;
+                std::vector<Index> duplicates;
+
+                for (int i=0; i<copy.size(); ++i) {
+                    // Already used
+                    if (std::find(duplicates.begin(), duplicates.end(), copy[i]) != duplicates.end()) {
+                        throw CannotContractIndicesException();
+                    }
+
+                    // Is contravariant?
+                    bool isContravariant = copy[i].IsContravariant();
+
+                    for (int j=i+1; j<copy.size(); ++j) {
+                        if (copy[i] == copy[j]) {
+                            if ((isContravariant && !copy[j].IsContravariant()) ||
+                                (!isContravariant && copy[j].IsContravariant()))
+                            {
+                                result = true;
+                                copy.erase(copy.begin() + j);
+                                duplicates.push_back(copy[i]);
+                                break;
+                            } else {
+                                throw CannotContractIndicesException();
+                            }
+                        }
+                    }
+                }
+
+                return result;
+            }
+
+            /**
+                \brief Contract two indices
+
+                Contract two indices. This will return the resulting
+                index structure after the tensors with the given indices are
+                contracted, i.e.
+
+                    Contract(_{abc}, ^{a}_{de}) = _{bcde}
+
+                \throws CannotContractIndicesException
+             */
+            Indices Contract(const Indices& other) const {
+                std::vector<Index> other_ = other.indices;
+                Indices result;
+
+                // Iterate over all indices
+                for (auto& index : indices) {
+                    // Is contravariant?
+                    bool isContravariant = index.IsContravariant();
+
+                    // Look for the index in the other list
+                    auto it = std::find(other_.begin(), other_.end(), index);
+
+                    // If it is not contained, add the index to the result
+                    if (it == other_.end()) {
+                        result.Insert(index);
+                        continue;
+                    }
+
+                    // If the index is contained, it has to has the other orientation
+                    if ((isContravariant && !it->IsContravariant()) ||
+                        (!isContravariant && it->IsContravariant()))
+                    {
+                        // Delete the index from the output
+                        other_.erase(it);
+
+                        continue;
+                    }
+
+                    // Indices have the same orientation => exception
+                    throw CannotContractIndicesException();
+                }
+
+                // Add the remaining indices in the other tensor
+                for (auto& index : other_) {
+                    result.Insert(index);
+                }
+
+                return result;
+            }
 		public:
 			void Serialize(std::ostream& os) const {
 				// Write the size of the indices
@@ -936,6 +1099,6 @@ namespace Construction {
 
 			return result;
 		}
-		
+
 	}
 }

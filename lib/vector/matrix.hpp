@@ -170,6 +170,20 @@ namespace Construction {
                 if (it == values.end()) return 0;
                 return it->second;
             }
+
+            inline void Set(int i, int j, float value) {
+                if (i >= n || j >= m || i < 0 || j < 0) throw OutOfBoundariesException();
+                auto it = values.find(MatrixIndex(i,j));
+
+                // If the new value is zero, delete the entry if necessary
+                if (value == 0) {
+                    if (it == values.end()) return;
+                    values.erase(it);
+                } else {
+                    if (it == values.end()) values.insert({ MatrixIndex(i,j), value });
+                    else it->second = value;
+                }
+            }
         public:
             Vector GetRowVector(int i) const {
                 if (i >= n) throw OutOfBoundariesException();
@@ -351,6 +365,17 @@ namespace Construction {
 
                 return result;
             }
+
+            float GetDensity() const {
+                size_t value = 0;
+                for (int r=0; r<GetNumberOfRows(); r++) {
+                    for (int c=0; c<GetNumberOfColumns(); c++) {
+                        if (At(r,c) != 0) value++;
+                    }
+                }
+
+                return (static_cast<float>(value) / GetNumberOfRows()) / GetNumberOfColumns();
+            }
         public:
             /**
                 \brief Returns the reduced row echelon form of the matrix
@@ -358,7 +383,6 @@ namespace Construction {
             Matrix GetRowEchelonForm() const {
                 Matrix result = *this;
 
-                // Find rows that are completely zero
                 bool* zeroRow = new bool[result.GetNumberOfRows()];
                 for (unsigned r=0; r<result.GetNumberOfColumns(); r++) {
                     bool isZero = true;
@@ -414,8 +438,10 @@ namespace Construction {
                 \brief Returns the row echelon form of the matrix
              */
             void ToRowEchelonForm() {
-                // Find rows that are completely zero
+                // Get the number of rows
                 unsigned numRows = GetNumberOfRows();
+
+                // Find rows that are completely zero
                 for (unsigned r=0; r<numRows; r++) {
                     bool isZero = true;
                     for (unsigned c=0; c<GetNumberOfColumns(); c++) {
@@ -459,7 +485,10 @@ namespace Construction {
                         float x = At(r, lead);
                         for (int k=0; k<GetNumberOfColumns(); k++) {
                             float z = At(r,k);
-                            if (z != 0) At(r,k) = z / x;
+
+                            // Update the value, remove zeros from the memory
+                            // automatically
+                            Set(r,k, z / x);
                         }
                     }
 
@@ -468,7 +497,10 @@ namespace Construction {
                             float x = At(i, lead);
                             for (unsigned k=0; k<GetNumberOfColumns(); k++) {
                                 float y = x*At(r,k);
-                                if (y != 0) At(i,k) -= y;
+
+                                // Update the value, remove zeros from the memory
+                                // automatically
+                                Set(i,k, At(i,k) - y);
                             }
                         }
                     }
@@ -490,7 +522,7 @@ namespace Construction {
                     if (it2 != values.end()) values.erase(it2);
 
                     if (value1 != 0) values.insert({ MatrixIndex(j,k), value1 });
-                    if (value2 != 0) values.insert({ MatrixIndex(i,k), value2 });                    
+                    if (value2 != 0) values.insert({ MatrixIndex(i,k), value2 });
                 }
             }
 

@@ -134,7 +134,7 @@ int main(int argc, char** argv) {
 				Construction::Language::Session::Instance()->LoadFromFile(crashFile);
 				break;
 			} else if (input == "n") break;
-			else 
+			else
 				std::cout << "Construction can restore the previous session. Should it? [Y/n]: ";
 		}
 	}

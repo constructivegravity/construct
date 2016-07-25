@@ -40,6 +40,14 @@ namespace Construction {
 			CannotMultiplyTensorsException() : Exception("Cannot multiply tensors due to incompatible indices") { }
 		};
 
+        /**
+			\class CannotContractTensorsException
+		 */
+		class CannotContractTensorsException : public Exception {
+		public:
+			CannotContractTensorsException() : Exception("Cannot contract tensors due to incompatible indices") { }
+		};
+
 		// Evaluation function
 		typedef std::function<double(const std::vector<unsigned>&)>	EvaluationFunction;
 
@@ -76,6 +84,7 @@ namespace Construction {
 				EPSILON = 201,
 				GAMMA = 202,
 				EPSILONGAMMA = 203,
+				DELTA = 204,
 
 				SUBSTITUTE = 301,
 
@@ -187,7 +196,7 @@ namespace Construction {
 			 */
 			virtual std::string ToString() const override {
 				std::stringstream ss;
-				ss << printed_text << "_" << indices;
+				ss << printed_text << indices;
 				return ss.str();
 			}
 		protected:
@@ -262,6 +271,19 @@ namespace Construction {
 			virtual std::unique_ptr<AbstractTensor> Canonicalize() const {
 				return std::unique_ptr<AbstractTensor>(new AbstractTensor(*this));
 			}
+
+            /**
+                \brief Method that allows to simplify expressions on contractions
+
+                Method that allows to simplify expressions on contractions.
+                For example, the contraction with a Kronecker delta thus just
+                sets the index on the other one.
+
+                If nothing can be done, it returns nullptr.
+             */
+            virtual std::unique_ptr<AbstractTensor> ContractionHeuristics(const AbstractTensor& other) const {
+                return nullptr;
+            }
         public:
             bool IsCustomTensor() const { return type == TensorType::CUSTOM; }
 
@@ -277,6 +299,7 @@ namespace Construction {
             bool IsEpsilonTensor() const { return type == TensorType::EPSILON; }
             bool IsEpsilonGammaTensor() const { return type == TensorType::EPSILONGAMMA; }
             bool IsGammaTensor() const { return type == TensorType::GAMMA; }
+            bool IsDeltaTensor() const { return type == TensorType::DELTA; }
 
 			std::string TypeToString() const {
 				switch (type) {
@@ -289,6 +312,7 @@ namespace Construction {
 					case TensorType::GAMMA: return "Gamma";
 					case TensorType::EPSILON: return "Epsilon";
 					case TensorType::EPSILONGAMMA: return "EpsilonGamma";
+					case TensorType::DELTA: return "Delta";
 					default: return "Custom";
 				}
 			}
@@ -307,7 +331,7 @@ namespace Construction {
 
 			 	\throws CannotMultiplyTensorsException
 			 */
-			static std::unique_ptr<AbstractTensor> Multiply(const AbstractTensor& one, const AbstractTensor& second); 	
+			static std::unique_ptr<AbstractTensor> Multiply(const AbstractTensor& one, const AbstractTensor& second);
 
 			/**
 				\brief Multiplication of a tensor by a real number
@@ -357,37 +381,7 @@ namespace Construction {
 			 	result.
 			 */
 			std::vector<std::vector<unsigned>> GetAllIndexCombinations() const {
-
-				// Result
-				std::vector<std::vector<unsigned>> result;
-
-				// Helper method to recursively determine the index combinations
-				std::function<void(const std::vector<unsigned>&)> fn = [&](const std::vector<unsigned>& input) -> void {
-					// If all indices are fixed, add the combination to the list
-					if (input.size() == indices.Size()) {
-						result.push_back(input);
-						return;
-					}
-
-					// Get range of next unfixed index
-					auto range = indices[input.size()].GetRange();
-
-					// Iterate over the range
-					for (auto i : range) {
-						// Add the index to the list
-						std::vector<unsigned> newInput = input;
-						newInput.push_back(i);
-
-						// Recursive call to go to next index
-						fn(newInput);
-					}
-				};
-
-				// Start recursion
-				std::vector<unsigned> input;
-				fn({});
-
-				return result;
+                return indices.GetAllIndexCombinations();
 			}
 
 			virtual std::vector<std::vector<unsigned>> GetAllInterestingIndexCombinations() const {
@@ -605,13 +599,8 @@ namespace Construction {
 		class MultipliedTensor : public AbstractTensor {
 		public:
 			MultipliedTensor(TensorPointer A, TensorPointer B)
-				: AbstractTensor("", "", A->GetIndices()), A(std::move(A)), B(std::move(B))
+				: AbstractTensor("", "", A->GetIndices().Contract(B->GetIndices())), A(std::move(A)), B(std::move(B))
 			{
-				// Insert the remaining indices of B
-				for (auto& index : B->GetIndices()) {
-					indices.Insert(index);
-				}
-
 				type = TensorType::MULTIPLICATION;
 			}
 
@@ -627,7 +616,7 @@ namespace Construction {
 			virtual void SetIndices(const Indices& newIndices) override {
 				/*
 
-				// 
+				//
 				auto permutationA = Permutation::From(indices, A->GetIndices());
 				auto permutationB = Permutation::From(indices, B->GetIndices());
 
@@ -658,21 +647,62 @@ namespace Construction {
 					throw IncompleteIndexAssignmentException();
 				}
 
-				// Create index assignments
-				IndexAssignments assignment1;
-				IndexAssignments assignment2;
+                // Find contracted indices
+                Indices contracted;
+                for (auto& index : A->GetIndices()) {
+                    if (!indices.ContainsIndex(index)) {
+                        contracted.Insert(index);
+                    }
+                }
 
-				// First N indices belong to A
-				for (int i=0; i<A->GetIndices().Size(); i++) {
-					assignment1[indices[i].GetName()] = args[i];
-				}
+                // Prepare result
+                Scalar result = 0;
 
-				// Remaining indices belong to B
-				for (int i=A->GetIndices().Size(); i<args.size(); i++) {
-					assignment2[indices[i].GetName()] = args[i];
-				}
+                // Get all the contracted index combinations
+                auto contractedArgs = contracted.GetAllIndexCombinations();
+                bool containsContractions = contractedArgs.size() > 0;
 
-				return (*A)(assignment1) * (*B)(assignment2);
+                // If the tensor does not contain contractions
+                if (!containsContractions) contractedArgs.push_back({0});
+
+                // Merge with the given args
+                for (auto& args_ : contractedArgs) {
+                    IndexAssignments assignment1;
+                    IndexAssignments assignment2;
+
+                    // Set the value of the contracted indices
+                    if (containsContractions) {
+                        for (unsigned i=0; i<contracted.Size(); ++i) {
+                            assignment1[contracted[i].GetName()] = args_[i];
+                            assignment2[contracted[i].GetName()] = args_[i];
+                        }
+                    }
+
+                    // Set the values of the rest
+                    {
+                        unsigned i=0;
+                        auto indicesA = A->GetIndices();
+                        auto indicesB = B->GetIndices();
+
+                        // Iterate over all the indices
+                        for (auto& index : indices) {
+                            if (indicesA.ContainsIndex(index)) {
+                                assignment1[index.GetName()] = args[i];
+                            }
+
+                            if (indicesB.ContainsIndex(index)) {
+                                assignment2[index.GetName()] = args[i];
+                            }
+
+                            i++;
+                        }
+                    }
+
+                    // Add this to the result
+                    result += (*A)(assignment1) * (*B)(assignment2);
+                }
+
+				return result;
 			}
 		public:
 			const TensorPointer& GetFirst() const {
@@ -1044,16 +1074,27 @@ namespace Construction {
 		}
 
 		std::unique_ptr<AbstractTensor> AbstractTensor::Multiply(const AbstractTensor& one, const AbstractTensor& second) {
-			// Check if all indices are distinct
-			for (auto& index : one.indices) {
-				if (second.indices.ContainsIndex(index)) {
-					throw CannotMultiplyTensorsException();
-				}
-			}
+            // Check if it contains contractions
+            bool containsContractions = false;
+            for (auto& index : one.indices) {
+                if (second.indices.ContainsIndex(index)) {
+                    containsContractions = true;
+                    break;
+                }
+            }
+
+            // Try to apply heuristics
+            {
+                auto heuristics = one.ContractionHeuristics(second);
+                if (heuristics != nullptr) return std::move(heuristics);
+
+                heuristics = second.ContractionHeuristics(one);
+                if (heuristics != nullptr) return std::move(heuristics);
+            }
 
 			// If one of the tensors is zero, return zero
 			if (one.IsZeroTensor() || second.IsZeroTensor()) {
-				return TensorPointer(new ZeroTensor()); 
+				return TensorPointer(new ZeroTensor());
 			}
 
 			return TensorPointer(new MultipliedTensor(
@@ -1089,10 +1130,99 @@ namespace Construction {
 					std::move(Multiply(*static_cast<SubstituteTensor*>(one.Clone().get())->GetTensor(), c)),
 					one.GetIndices()
 				));
-			}			
+			}
 
 			return TensorPointer(new ScaledTensor(std::move(clone), c));
 		}
+
+		/**
+			\class DeltaTensor
+
+			\brief Represents the Kronecker delta tensor
+
+			Represents the Kronecker delta tensor. It requires one index up,
+			one down
+		 */
+		class DeltaTensor : public AbstractTensor {
+		public:
+			/**
+				\brief Constructor of a delta tensor
+
+				Constructor of a delta tensor. It takes a index collection of
+				two indices. The first one will be made contravariant, the
+				second one stays down.
+
+				\param indices		The two indices of the delta
+			 */
+			DeltaTensor(const Indices& indices) : AbstractTensor("", "", indices) {
+				assert(indices.Size() == 2);
+
+				this->indices[0].SetContravariant(true);
+				this->indices[1].SetContravariant(false);
+
+				type = TensorType::DELTA;
+			}
+
+			/**
+				Virtual destructor to properly release memory
+			 */
+			virtual ~DeltaTensor() = default;
+		public:
+			/**
+				Returns a clone of the delta tensor
+			 */
+			virtual TensorPointer Clone() const override {
+				return TensorPointer(new DeltaTensor(*this));
+			}
+
+			/**
+				\brief Canonicalize the Kronecker delta
+
+				Canonicalize the Kronecker delta. Since one index
+				is up, the other one down, there is nothing to do.
+			 */
+			virtual TensorPointer Canonicalize() const override {
+				return std::move(Clone());
+			}
+
+            /**
+                \brief Heuristics for contractions with the Kronecker delta
+             */
+            virtual TensorPointer ContractionHeuristics(const AbstractTensor& other) const override {
+                try {
+                    auto contracted = indices.Contract(other.GetIndices());
+
+                    // Clone the other tensor
+                    auto clone = other.Clone();
+
+                    // Set the indices
+                    clone->SetIndices(contracted);
+                    return std::move(clone);
+                } catch (...) {
+                    return nullptr;
+                }
+            }
+		public:
+			/**
+				Evaluate the delta, by checking if the values are equal
+			 */
+			virtual Scalar Evaluate(const std::vector<unsigned>& args) const override {
+				assert(args.size() == 2);
+				return args[0] == args[1];
+			}
+
+			/**
+				Print the tensor
+			 */
+			virtual std::string ToString() const override {
+				std::stringstream ss;
+				ss << "\\delta" << GetIndices();
+				return ss.str();
+			}
+		};
+
+        // Alias
+		typedef DeltaTensor	KroneckerTensor;
 
 		/**
 			\class EpsilonTensor
@@ -1342,12 +1472,12 @@ namespace Construction {
 				unsigned pos = 0;
 
 				for (unsigned i=0; i<numEpsilon; i++) {
-					ss << "\\epsilon_" << indices.Partial({pos,pos+2});
+					ss << "\\epsilon" << indices.Partial({pos,pos+2});
 					pos += 3;
 				}
 
 				for (unsigned i=0; i<numGamma; i++) {
-					ss << "\\gamma_" << indices.Partial({pos, pos+1});
+					ss << "\\gamma" << indices.Partial({pos, pos+1});
 					pos += 2;
 				}
 
@@ -1364,39 +1494,6 @@ namespace Construction {
 				}
 				return result;
 			}
-
-			/*std::vector<std::vector<unsigned>> GetAllInterestingIndexCombinations() const {
-				// Result
-				std::vector<std::vector<unsigned>> result;
-
-				// Helper method to recursively determine the index combinations
-				std::function<void(const std::vector<unsigned>&)> fn = [&](const std::vector<unsigned>& input) -> void {
-					// If all indices are fixed, add the combination to the list
-					if (input.size() == indices.Size()) {
-						result.push_back(input);
-						return;
-					}
-
-					// Get range of next unfixed index
-					auto range = indices[input.size()].GetRange();
-
-					// Iterate over the range
-					for (auto i : range) {
-						// Add the index to the list
-						std::vector<unsigned> newInput = input;
-						newInput.push_back(i);
-
-						// Recursive call to go to next index
-						fn(newInput);
-					}
-				};
-
-				// Start recursion
-				std::vector<unsigned> input;
-				fn({});
-
-				return result;
-			}*/
 
 			virtual Scalar Evaluate(const std::vector<unsigned>& args) const override {
 				Scalar result = 1;
@@ -1663,6 +1760,7 @@ namespace Construction {
 			static Tensor One() { return Tensor(TensorPointer(new ScalarTensor(1))); }
 			//static Tensor Scalar(const Scalar& c) { return Tensor(TensorPointer(new ScalarTensor(c))); }
 
+			static Tensor Delta(const Indices& indices) { return Tensor(TensorPointer(new DeltaTensor(indices))); }
 			static Tensor Epsilon(const Indices& indices) { return Tensor(TensorPointer(new EpsilonTensor(indices))); }
 			static Tensor Gamma(const Indices& indices) { return Tensor(TensorPointer(new GammaTensor(indices))); }
 			static Tensor Gamma(const Indices& indices, int p, int q) { return Tensor(TensorPointer(new GammaTensor(indices, p, q))); }
@@ -1670,7 +1768,24 @@ namespace Construction {
 				return Tensor(TensorPointer(new EpsilonGammaTensor(numEpsilon, numGamma, indices)));
 			}
 
-			static Tensor Substitute(const Tensor& tensor, const Indices& indices) { 
+            static Tensor Contraction(const Tensor& tensor, const Indices& indices) {
+                // Clone
+                auto clone = tensor.pointer->Clone();
+
+                // Set the tensor to the new indices
+                clone->SetIndices(indices);
+
+                // If there are no
+                if (!indices.ContainsContractions()) {
+                    return Tensor(std::move(clone));
+                }
+
+                // Syntactic sugar, just multiply by one, then the evaluation
+                // magic makes everything correct
+                return One() * Tensor(std::move(clone));
+            }
+
+			static Tensor Substitute(const Tensor& tensor, const Indices& indices) {
 				// Syntactic sugar for addition
 				if (tensor.IsAdded()) {
 					Tensor result = Tensor::Zero();
@@ -1687,11 +1802,11 @@ namespace Construction {
 					return tensor.As<ScaledTensor>()->GetScale() * Substitute(Tensor(tensor.As<ScaledTensor>()->GetTensor()->Clone()), indices);
 				}
 
-				return Tensor(TensorPointer(new SubstituteTensor(std::move(tensor.pointer->Clone()), indices))); 
+				return Tensor(TensorPointer(new SubstituteTensor(std::move(tensor.pointer->Clone()), indices)));
 			}
 		public:
 			bool IsCustom() const { return pointer->IsCustomTensor(); }
-			
+
 			bool IsAdded() const { return pointer->IsAddedTensor(); }
 			bool IsMultiplied() const { return pointer->IsMultipliedTensor(); }
 			bool IsScaled() const { return pointer->IsScaledTensor(); }
@@ -1704,6 +1819,7 @@ namespace Construction {
 			bool IsEpsilon() const { return pointer->IsEpsilonTensor(); }
 			bool IsGamma() const { return pointer->IsGammaTensor(); }
 			bool IsEpsilonGamma() const { return pointer->IsEpsilonGammaTensor(); }
+			bool IsDelta() const { return pointer->IsDeltaTensor(); }
 
 			std::string TypeToString() const { return pointer->TypeToString(); }
 		public:
@@ -1755,7 +1871,7 @@ namespace Construction {
 						}
 					} else if (tensor->IsMultipliedTensor()) {
 						helper(static_cast<const MultipliedTensor*>(tensor)->GetFirst().get());
-						helper(static_cast<const MultipliedTensor*>(tensor)->GetSecond().get());	
+						helper(static_cast<const MultipliedTensor*>(tensor)->GetSecond().get());
 					}
 				};
 
@@ -1764,7 +1880,7 @@ namespace Construction {
 				return result;
 			}
 
-			/** 
+			/**
 				\brief Splits the tensor in its summands
 
 				\returns {std::vector<Tensor>}		List of all the tensors
@@ -1783,7 +1899,7 @@ namespace Construction {
 				}
 			}
 
-			/** 
+			/**
 				\brief Expands the tensorial expression
 
 				Expands the tensorial expression, but keeps brackets of scalars, i.e.
@@ -1807,7 +1923,7 @@ namespace Construction {
 				// Iterate over all summands
 				for (auto& tensor : summands) {
 					// If the tensor is scaled
-					// 
+					//
 					if (tensor.IsScaled()) {
 						ScaledTensor* _tensor = static_cast<ScaledTensor*>(tensor.pointer.get());
 						scalar_type c = _tensor->GetScale();
@@ -1841,7 +1957,7 @@ namespace Construction {
 				return result;
 			}
 
-			/** 
+			/**
 				\brief Simplify the expression
 
 				Simplifies the expression by factorizing it into a sum of the linear independent
@@ -1866,7 +1982,6 @@ namespace Construction {
 
 				// If the tensor is not added, check if it is zero, otherwise no further simplification possible
 				if (!IsAdded()) {
-					if (IsZero()) return Tensor::Zero();
 					return *this;
 				}
 
@@ -1910,16 +2025,16 @@ namespace Construction {
                         			std::unique_lock<std::mutex> lock(mutex);
 
                         			// Insert the value into the matrix
-                        			M(j,id) = tensor(assignment).ToDouble();
+                        			M(j,id) = value;
                         		}
 							}
 
 						}, i, summands[i].SeparateScalefactor().second);
 					}
 
-					pool.Wait(); 
+					pool.Wait();
 				}
-  
+
                 // Reduce to reduced matrix echelon form
                 M.ToRowEchelonForm();
 
@@ -1932,7 +2047,7 @@ namespace Construction {
                 std::vector<Tensor> _map_tensors;
 
                 // Iterate over the rows
-                unsigned max = std::min(static_cast<unsigned>(M.GetNumberOfRows()), static_cast<unsigned>(summands.size())); 
+                unsigned max = std::min(static_cast<unsigned>(M.GetNumberOfRows()), static_cast<unsigned>(summands.size()));
 
                 for (int currentRow=0; currentRow < max; currentRow++) {
                 	// Initialize the next tensor
@@ -1941,28 +2056,32 @@ namespace Construction {
 
                 	bool foundBase=false;
 
-                	for (int i=k; i<summands.size(); i++) {
-                		if (M(currentRow,i) == 0) continue;
-                		else if (M(currentRow,i) == 1 && !foundBase) {
-                			// switch mode
-                			foundBase = true;
-                			k = i+1;
+                    for (int i=k; i<summands.size(); i++) {
+                        if (M(currentRow,i) == 0) continue;
+                        else if (M(currentRow,i) == 1 && !foundBase) {
+                            // switch mode
+                            foundBase = true;
+                            k = i+1;
 
-                			// Found a new base vector
-                			scalar = summands[i].SeparateScalefactor().first;
-                			tensor = summands[i].SeparateScalefactor().second.Simplify();
-                		} else if (foundBase) {
-                			if (std::fmod(M(currentRow,i),1) == 0) {
-                				scalar += summands[i].SeparateScalefactor().first * Scalar(M(currentRow,i),1);
-                			} else {
-                				scalar += summands[i].SeparateScalefactor().first * M(currentRow,i);
-                			}
-                		} else {
-                			// SOMETHING WENT WRONG!!!
-                			// TODO: throw exception
-                			return Tensor::Zero();
-                		}
-                	}
+                            // Found a new base vector
+                            scalar = summands[i].SeparateScalefactor().first;
+                            tensor = summands[i].SeparateScalefactor().second;//.Simplify();
+                        } else if (foundBase) {
+                            if (std::fmod(M(currentRow,i),1) == 0) {
+                                scalar += summands[i].SeparateScalefactor().first * Scalar(M(currentRow,i),1);
+                            } else {
+                                scalar += summands[i].SeparateScalefactor().first * M(currentRow,i);
+                            }
+                        } else if (i == summands.size()-1 && !foundBase) {
+                            // If all the values were zero, no further information
+                            // can be found in the matrix, thus break the loop
+                            break;
+                        } else {
+                            // SOMETHING WENT WRONG!!!
+                            // TODO: throw exception
+                            return Tensor::Zero();
+                        }
+                    }
 
                 	// Add to the tensor map
                 	auto it = std::find(_map_scalars.begin(), _map_scalars.end(), scalar);
@@ -2070,23 +2189,23 @@ namespace Construction {
 							} else {
 								result_tensors[it - result_scalars.begin()] += tensor;
 							}
-						} 
+						}
 						// if the scalar is a number, just add the tensor to the inhomogeneous part
 						else if (v.IsNumeric()) {
 							if (inhomogeneousPart != nullptr) (*inhomogeneousPart) += _tensor;
-						} 
+						}
 						// if the scalar is a multiplication, we knwo that at least one of both
 						// factors is a variable
 						else if (v.IsMultiplied()) {
 							auto first = v.As<MultipliedScalar>()->GetFirst()->Clone();
 							auto second = v.As<MultipliedScalar>()->GetSecond()->Clone();
-								
+
 							bool a1 = v.As<MultipliedScalar>()->GetFirst()->IsVariable();
 							bool a2 = v.As<MultipliedScalar>()->GetFirst()->IsNumeric();
 
 							bool b1 = v.As<MultipliedScalar>()->GetSecond()->IsVariable();
 							bool b2 = v.As<MultipliedScalar>()->GetSecond()->IsNumeric();
-						
+
 							if (a1 && b2) {
 								scalar_type s = scalar_type(std::move(first));
 								Tensor newTensor = scalar_type(std::move(second)) * tensor;
@@ -2126,7 +2245,7 @@ namespace Construction {
 				return result;
 			}
 
-			/** 
+			/**
 				\brief Convert the tensorial equation into a homogeneous linear system
 
 
@@ -2247,7 +2366,7 @@ namespace Construction {
 									firstEntry = false;
 									overalScale = result.first;
 								}
-							}						
+							}
 
 							// If this has a different scale, remember this
 							if (overalScale != result.first) hasSameScale = false;
@@ -2292,8 +2411,8 @@ namespace Construction {
 									Tensor newTerm = std::move(t.second);
 									Scalar newScale = std::move(t.first);
 
-									// If the tensor is the same after canonicalization modulo scale, 
-									// change the scale of the original tensor and remove the new one 
+									// If the tensor is the same after canonicalization modulo scale,
+									// change the scale of the original tensor and remove the new one
 									// from the stack.
 									if (newTerm.GetType() == current.GetType() && newTerm.GetIndices() == current.GetIndices()) {
 										scale += newScale;
@@ -2356,8 +2475,8 @@ namespace Construction {
 							Scalar newScale = std::move(t.first);
 							if (hasScaled) newScale *= symmetrizedSummands[i].first;
 
-							// If the tensor is the same after canonicalization modulo scale, 
-							// change the scale of the original tensor and remove the new one 
+							// If the tensor is the same after canonicalization modulo scale,
+							// change the scale of the original tensor and remove the new one
 							// from the stack.
 							if (newTerm.GetType() == current.GetType() && newTerm.GetIndices() == current.GetIndices()) {
 								scale += newScale;
@@ -2369,6 +2488,23 @@ namespace Construction {
 						if (!scale.IsNumeric() || scale.ToDouble() != 0) {
 							result += overallScale * scale * current;
 						}
+
+						for (auto& pair : reduced) {
+							if (allTheSameScale) result += pair.second;
+							else result += pair.first * pair.second;
+						}
+
+						if (allTheSameScale) result *= lastScale;
+
+						return overalScale * result;
+
+					} else {
+						// Iterate over all symmetrized pairs
+						for (auto& pair : symmetrizedSummands) {
+							result += pair.first * pair.second;
+						}
+
+						return result;
 					}
 
 					return result;*/
@@ -2393,7 +2529,7 @@ namespace Construction {
 
 				// Prepare result
 				Tensor result = Tensor::Zero();
-				
+
 				// Generate permuted summands
 				{
 					std::vector<Tensor> stack;
@@ -2408,7 +2544,7 @@ namespace Construction {
 						});
 					}
 
-					// Iterate over all 
+					// Iterate over all
 					while (stack.size() > 0) {
 						// Get the first element from the stack
 						auto s = stack[0].SeparateScalefactor();
@@ -2424,8 +2560,8 @@ namespace Construction {
 							Tensor newTerm = std::move(t.second);
 							Scalar newScale = std::move(t.first);
 
-							// If the tensor is the same after canonicalization modulo scale, 
-							// change the scale of the original tensor and remove the new one 
+							// If the tensor is the same after canonicalization modulo scale,
+							// change the scale of the original tensor and remove the new one
 							// from the stack.
 							if (newTerm.GetType() == current.GetType() && newTerm.GetIndices() == current.GetIndices()) {
 								scale += newScale;
@@ -2486,7 +2622,7 @@ namespace Construction {
 							result += std::move(s.second);
 						}
 					}
-					
+
 					return scale * result;
 				}
 
@@ -2516,7 +2652,7 @@ namespace Construction {
 
 					if (sign > 0)
 						result = result + clone;
-					else 
+					else
 						result = result - clone;
 				}
 
@@ -2545,7 +2681,7 @@ namespace Construction {
 
 			inline bool operator!=(const Tensor& other) const {
 				return (*pointer) != (*other.pointer);
-			}			
+			}
 
 			/** Evaluation **/
 			template<typename T, typename... Args>
@@ -2560,6 +2696,11 @@ namespace Construction {
 			inline scalar_type operator()(const std::vector<unsigned>& indices) const {
 				return (*pointer)(indices);
 			}
+
+            inline scalar_type operator()() const {
+                if (pointer->GetIndices().Size() > 0) throw IncompleteIndexAssignmentException();
+                return (*pointer)(std::vector<unsigned>());
+            }
 
 			/** Tensor Arithmetics **/
 			Tensor& operator+=(const Tensor& other) {
@@ -2632,6 +2773,9 @@ namespace Construction {
 
 					case AbstractTensor::TensorType::EPSILONGAMMA:
 						return sizeof(*static_cast<EpsilonGammaTensor*>(pointer.get()));
+
+					case AbstractTensor::TensorType::DELTA:
+						return sizeof(*static_cast<DeltaTensor*>(pointer.get()));
 
 					case AbstractTensor::TensorType::SUBSTITUTE:
 						return sizeof(*static_cast<SubstituteTensor*>(pointer.get()));

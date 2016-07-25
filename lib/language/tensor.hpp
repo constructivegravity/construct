@@ -93,6 +93,25 @@ namespace Construction {
         REGISTER_ARGUMENT(EpsilonGamma, 0, ArgumentType::INDEX);
 
         /**
+            \class DeltaCommand
+
+            Command that generates one tensor for given indices out of
+            epsilons. It uses the API function.
+         */
+        CLI_COMMAND(Delta)
+            std::string Help() const {
+                return "Delta(<Indices>)";
+            }
+
+            Expression Execute() const {
+                return API::Delta(GetIndices(0));
+            }
+        };
+
+        REGISTER_COMMAND(Delta);
+        REGISTER_ARGUMENT(Delta, 0, ArgumentType::INDEX);
+
+        /**
             \class Coefficient
 
             std:string Help
