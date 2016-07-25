@@ -33,7 +33,9 @@ namespace Construction {
             // Tensor::Tensor generation
             Tensor::Tensor Arbitrary(const Indices& indices);
             Tensor::Tensor Epsilon(const Indices& indices);
+            Tensor::Tensor InverseEpsilon(const Indices& indices);
             Tensor::Tensor Gamma(const Indices& indices);
+            Tensor::Tensor InverseGamma(const Indices& indices);
             Tensor::Tensor EpsilonGamma(const Indices& indices);
             Tensor::Tensor Delta(const Indices& indices);
             Tensor::Tensor Coefficient(unsigned, unsigned, unsigned, unsigned);
@@ -79,8 +81,30 @@ namespace Construction {
                 return Tensor::Tensor::Epsilon(indices);
             }
 
+            Tensor::Tensor InverseEpsilon(const Indices& indices) {
+                // Assert that we have as many indices as the dimension
+                assert(indices.Size() == indices[0].GetRange().GetDimension());
+
+                auto clone = indices;
+
+                clone[0].SetContravariant(true);
+                clone[1].SetContravariant(true);
+                clone[2].SetContravariant(true);
+
+                return Epsilon(clone);
+            }
+
             Tensor::Tensor Gamma(const Indices& indices) {
                 return Tensor::Tensor::Gamma(indices);
+            }
+
+            Tensor::Tensor InverseGamma(const Indices& indices) {
+                auto clone = indices;
+
+                clone[0].SetContravariant(true);
+                clone[1].SetContravariant(true);
+
+                return Gamma(clone);
             }
 
             Tensor::Tensor EpsilonGamma(const Indices& indices) {

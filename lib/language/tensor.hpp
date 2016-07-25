@@ -26,7 +26,7 @@ namespace Construction {
                 return "Arbitrary(<Indices>)";
             }
 
-            Expression Execute() const {                
+            Expression Execute() const {
                 auto indices = GetArgument<IndexArgument>(0)->GetIndices();
                 return API::Arbitrary(indices);
             }
@@ -55,6 +55,25 @@ namespace Construction {
         REGISTER_ARGUMENT(Epsilon, 0, ArgumentType::INDEX);
 
         /**
+            \class InverseEpsilonCommand
+
+            Command that generates one tensor for given indices out of
+            epsilons. It uses the API function.
+         */
+        CLI_COMMAND(InverseEpsilon)
+            std::string Help() const {
+                return "InverseEpsilon(<Indices>)";
+            }
+
+            Expression Execute() const {
+                return API::InverseEpsilon(GetIndices(0));
+            }
+        };
+
+        REGISTER_COMMAND(InverseEpsilon);
+        REGISTER_ARGUMENT(InverseEpsilon, 0, ArgumentType::INDEX);
+
+        /**
             \class GammaCommand
 
             Command that generates one tensor for given indices out of
@@ -72,6 +91,25 @@ namespace Construction {
 
         REGISTER_COMMAND(Gamma);
         REGISTER_ARGUMENT(Gamma, 0, ArgumentType::INDEX);
+
+        /**
+            \class GammaCommand
+
+            Command that generates one tensor for given indices out of
+            epsilons. It uses the API function.
+         */
+        CLI_COMMAND(InverseGamma)
+            std::string Help() const {
+                return "InverseGamma(<Indices>)";
+            }
+
+            Expression Execute() const {
+                return API::InverseGamma(GetIndices(0));
+            }
+        };
+
+        REGISTER_COMMAND(InverseGamma);
+        REGISTER_ARGUMENT(InverseGamma, 0, ArgumentType::INDEX);
 
         /**
             \class EpsilonGammaCommand
@@ -148,7 +186,7 @@ namespace Construction {
 
             Expression Execute() const {
                 auto t = GetTensors(0);
-                
+
                 auto result = Tensor::Tensor::Zero();
 
                 for (auto i=0; i<Size(); i++) {
@@ -224,7 +262,7 @@ namespace Construction {
             }
 
             Expression Execute() const {
-                // TODO: 
+                // TODO:
                 //std::cout << "  \033[32m" << API::DegreesOfFreedom(GetTensors(0)) << "\033[0m" << std::endl;
                 return Tensor::Scalar(static_cast<int>(API::DegreesOfFreedom(GetTensors(0))));
             }
@@ -284,7 +322,7 @@ namespace Construction {
             \class Simplify
 
             std:string Help
-         */        
+         */
         CLI_COMMAND(Simplify)
             std::string Help() const {
                 return "Simplify(<Tensor>)";
@@ -302,7 +340,7 @@ namespace Construction {
             \class RedefineVariables
 
             std:string Help
-         */        
+         */
         CLI_COMMAND(RedefineVariables)
             std::string Help() const {
                 return "RedefineVariables(<Tensor>)";
@@ -320,7 +358,7 @@ namespace Construction {
             \class HomogeneousSystem
 
             std:string Help
-         */ 
+         */
         CLI_COMMAND(HomogeneousSystem)
             std::string Help() const {
                 return "HomogeneousSystem(<Tensor>)";
@@ -338,7 +376,7 @@ namespace Construction {
             \class Substitute
 
             std:string Help
-         */ 
+         */
         CLI_COMMAND(Substitute)
             std::string Help() const {
                 return "Substitute(<Tensor>, <Substitution>)";
