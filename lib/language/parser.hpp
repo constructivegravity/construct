@@ -24,6 +24,9 @@ namespace Construction {
                 INDICES,
                 STRING,
                 NUMERIC,
+                PLUS,
+                MINUS,
+                ASTERISK,
                 EOL
             };
         public:
@@ -47,6 +50,9 @@ namespace Construction {
             bool IsString() const { return type == STRING; }
             bool IsNumeric() const { return type == NUMERIC; }
             bool IsEndOfLine() const { return type == EOL; }
+            bool IsPlus() const { return type == PLUS; }
+            bool IsMinus() const { return type == MINUS; }
+            bool IsAsterisk() const { return type == ASTERISK; }
 
             std::string TypeToString() const {
                 switch (type) {
@@ -55,6 +61,9 @@ namespace Construction {
                     case LBRACKET: return "LBracket";
                     case RBRACKET: return "RBracket";
                     case COMMA: return "Comma";
+                    case PLUS: return "Plus";
+                    case MINUS: return "Minus";
+                    case ASTERISK: return "Asterisk";
                     case ASSIGNMENT: return "Assignment";
                     case INDICES: return "Indices";
                     case STRING: return "String";
@@ -87,7 +96,8 @@ namespace Construction {
                 INDICES,
                 STRING,
                 NUMERIC,
-                PREVIOUS
+                PREVIOUS,
+                BINARY
             };
         public:
             Node(const std::string& name, Type type) : name(name), type(type) { }
@@ -95,6 +105,7 @@ namespace Construction {
             std::string GetName() const { return name; }
         public:
             bool IsLiteral() const { return type == Node::LITERAL; }
+            bool IsBinary() const { return type == Node::BINARY; }
             bool IsCommand() const { return type == Node::COMMAND; }
             bool IsArguments() const { return type == Node::ARGUMENTS; }
             bool IsAssignment() const { return type == Node::ASSIGNMENT; }
@@ -119,6 +130,7 @@ namespace Construction {
         // Forward declaration
         class LiteralNode;
         class ArgumentsNode;
+        class BinaryNode;
         class IndicesNode;
         class StringNode;
         class NumericNode;
@@ -197,6 +209,30 @@ namespace Construction {
             }
         private:
             std::string text;
+        };
+
+        class BinaryNode : public Node {
+        public:
+            BinaryNode(std::shared_ptr<Node> lhs, std::shared_ptr<Node> rhs, char op) : Node("Binary", Node::BINARY), lhs(std::move(lhs)), rhs(std::move(rhs)), op(op) { }
+        public:
+            std::shared_ptr<Node> GetLeft() { return lhs; }
+            std::shared_ptr<Node> GetRight() { return rhs; }
+
+            char GetOperator() const { return op; }
+
+            bool IsAddition() const { return op == '+'; }
+            bool IsSubtraction() const { return op == '-'; }
+            bool IsMultiplication() const { return op == '*'; }
+
+            virtual std::string ToString() const {
+                std::stringstream ss;
+                ss << lhs->ToString() << " " << op << " " << rhs->ToString();
+                return ss.str();
+            }
+        private:
+            std::shared_ptr<Node> lhs;
+            std::shared_ptr<Node> rhs;
+            char op;
         };
 
         class StringNode : public Node {
@@ -404,6 +440,30 @@ namespace Construction {
                         if (current.length() > 0)
                             tokens.push_back(Token(Token::LITERAL, i-current.length(),current));
                         tokens.push_back(Token(Token::PREVIOUS, i, c));
+                        current = "";
+                        continue;
+                    }
+
+                    if (c == "+") {
+                        if (current.length() > 0)
+                            tokens.push_back(Token(Token::LITERAL, i-current.length(),current));
+                        tokens.push_back(Token(Token::PLUS, i, c));
+                        current = "";
+                        continue;
+                    }
+
+                    if (c == "-") {
+                        if (current.length() > 0)
+                            tokens.push_back(Token(Token::LITERAL, i-current.length(),current));
+                        tokens.push_back(Token(Token::MINUS, i, c));
+                        current = "";
+                        continue;
+                    }
+
+                    if (c == "*") {
+                        if (current.length() > 0)
+                            tokens.push_back(Token(Token::LITERAL, i-current.length(),current));
+                        tokens.push_back(Token(Token::ASTERISK, i, c));
                         current = "";
                         continue;
                     }
