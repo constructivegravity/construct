@@ -454,11 +454,12 @@ namespace Construction {
 				summands.push_back(std::move(B));
 			}
 
-			AddedTensor(std::vector<TensorPointer>&& vec) {
+			AddedTensor(std::vector<TensorPointer>&& vec, const Indices& indices) {
 				type = TensorType::ADDITION;
 				summands = std::move(vec);
+                this->indices = indices;
 
-				if (summands.size() > 0) indices = summands[0]->GetIndices();
+				//if (summands.size() > 0) indices = summands[0]->GetIndices();
 			}
 		public:
 			void AddFromRight(TensorPointer A) {
@@ -478,7 +479,7 @@ namespace Construction {
 					newSummands.push_back(std::move(tensor->Clone()));
 				}
 
-				return std::move(TensorPointer(new AddedTensor(std::move(newSummands))));
+				return std::move(TensorPointer(new AddedTensor(std::move(newSummands), indices)));
 			}
 		public:
 			/**
@@ -514,7 +515,7 @@ namespace Construction {
 					summands.push_back(std::move(tensor));
 				}
 
-				return TensorPointer(new AddedTensor(std::move(summands)));
+				return TensorPointer(new AddedTensor(std::move(summands), indices));
 			}
 		public:
 			/**
@@ -577,7 +578,7 @@ namespace Construction {
 					newSummands.push_back(std::move(tensor->Canonicalize()));
 				}
 
-				return std::move(TensorPointer(new AddedTensor(std::move(newSummands))));
+				return std::move(TensorPointer(new AddedTensor(std::move(newSummands), indices)));
 			}
 		private:
 			std::vector<TensorPointer> summands;
@@ -2758,7 +2759,7 @@ namespace Construction {
 
                 Exchange symmetrizes the tensor
              */
-            Tensor ExchangeSymmetrize(const Indices& indices) const {
+            Tensor ExchangeSymmetrize(const Indices& from, const Indices& indices) const {
                 if (IsAdded()) {
                     auto summands = GetSummands();
 
@@ -2768,16 +2769,25 @@ namespace Construction {
 
 					// Symmetrize all the summands in parallel
 					{
-						Common::TaskPool pool (8);
+						Common::TaskPool pool (1);
 						bool firstEntry = true;
 						std::mutex mutex;
+                        auto originalIndices = GetIndices();
+
+                        // Generate tensor mapping
+                        std::map<Index, Index> mapping;
+                        for (int i=0; i<indices.Size(); ++i) {
+                            mapping[from[i]] = indices[i];
+                        }
 
 						symmetrizedSummands = pool.Map<std::pair<scalar_type,Tensor>, Tensor>(summands, [&](const Tensor& tensor) {
-							auto result = tensor.ExchangeSymmetrize(indices).SeparateScalefactor();
+                            // Call exchange symmetrization on the summand
+							auto result = tensor.ExchangeSymmetrize(tensor.GetIndices(), tensor.GetIndices().Shuffle(mapping)).SeparateScalefactor();
 
 							// Extract the scale of the first entry
 							{
 								std::unique_lock<std::mutex> lock(mutex);
+
 								if (firstEntry) {
 									firstEntry = false;
 									overalScale = result.first;
@@ -2879,7 +2889,7 @@ namespace Construction {
 
                 if (IsScaled()) {
                     auto s = SeparateScalefactor();
-                    return s.first * s.second.ExchangeSymmetrize(indices);
+                    return s.first * s.second.ExchangeSymmetrize(from, indices);
                 }
 
                 // Do not waste time on zero tensor

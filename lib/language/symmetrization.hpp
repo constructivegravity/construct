@@ -78,7 +78,7 @@ namespace Construction {
             }
 
             Expression Execute() const {
-                return API::ExchangeSymmetrize(GetTensors(0), GetIndices(1));
+                return API::ExchangeSymmetrize(GetTensors(0), GetIndices(1), GetIndices(2));
             }
 
         };
@@ -86,6 +86,7 @@ namespace Construction {
         REGISTER_COMMAND(ExchangeSymmetrize);
         REGISTER_ARGUMENT(ExchangeSymmetrize, 0, ArgumentType::TENSOR);
         REGISTER_ARGUMENT(ExchangeSymmetrize, 1, ArgumentType::INDEX);
+        REGISTER_ARGUMENT(ExchangeSymmetrize, 2, ArgumentType::INDEX);
 
         CLI_COMMAND(BlockSymmetrize)
 

@@ -77,7 +77,7 @@ Tensor GenerateTensor(const Coefficient& coeff, std::mutex& mutex, std::string& 
         if (printSteps) std::cerr << previous << std::endl;
 
         tensors = Construction::Language::API::Symmetrize(tensors, block3);
-        
+
         // Simplify the expression
         tensors.Simplify();
         tensors.RedefineVariables("e");
@@ -87,7 +87,7 @@ Tensor GenerateTensor(const Coefficient& coeff, std::mutex& mutex, std::string& 
         if (printSteps) std::cerr << previous << std::endl;
 
         tensors = Construction::Language::API::Symmetrize(tensors, block4);
-        
+
         // Simplify the expression
         tensors.Simplify();
         tensors.RedefineVariables("e");
@@ -102,7 +102,7 @@ Tensor GenerateTensor(const Coefficient& coeff, std::mutex& mutex, std::string& 
     previous = "ExchangeSymmetrize(" + previous + "," + newIndices.ToCommand() + ")";
     if (printSteps) std::cerr << previous << std::endl;
 
-    tensors = Construction::Language::API::ExchangeSymmetrize(tensors, newIndices);
+    tensors = Construction::Language::API::ExchangeSymmetrize(tensors, indices, newIndices);
 
     // Simplify the expression
     tensors.Simplify();

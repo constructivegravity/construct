@@ -849,6 +849,21 @@ namespace Construction {
 				}
 				return result;
 			}
+        public:
+            Indices Shuffle(std::map<Index, Index> transformation) const {
+                Indices result;
+
+                for (auto& index : indices) {
+                    if (transformation.find(index) == transformation.end()) {
+                        // TODO: throw exception
+                        return *this;
+                    }
+
+                    result.Insert(transformation[index]);
+                }
+
+                return result;
+            }
 		public:
 			/**
 				\brief Returns if the given indices are a permutation of the given ones

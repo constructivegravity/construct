@@ -22,11 +22,11 @@ namespace Construction {
 			IsNoPermutationException(const std::string& error) : Exception(error) { }
 			IsNoPermutationException() : Exception("The given combination is no permutation") {}
 		};
-		
+
 		class BinaryPermutation {
 		public:
 			BinaryPermutation() = default;
-			
+
 			BinaryPermutation(unsigned a, unsigned b) : a(a), b(b) { }
 			BinaryPermutation(const BinaryPermutation& other)
 				: a(other.a), b(other.b) { }
@@ -34,44 +34,44 @@ namespace Construction {
 			bool operator==(const BinaryPermutation& other) const {
 				return a == other.a && b == other.b;
 			}
-			
+
 			bool operator!=(const BinaryPermutation& other) const {
 				return a != other.a || b != other.b;
 			}
 		public:
 			Indices operator()(const Indices& indices) const {
 				assert(a > 0 && b > 0 && indices.Size() >= a && indices.Size() >= b);
-				
+
 				Indices result;
-				
+
 				for (unsigned i=0; i < indices.Size(); ++i) {
 					if (i == a-1) result.Insert(indices[b-1]);
 					else if (i == b-1) result.Insert(indices[a-1]);
 					else result.Insert(indices[i]);
 				}
-					
+
 				return result;
 			}
-			
+
 			std::vector<int> operator()(std::vector<int> list) const {
 				assert(a > 0 && b > 0 && list.size() >= a && list.size() >= b);
-				
+
 				std::vector<int> result;
-				
+
 				for (unsigned i=0; i < list.size(); ++i) {
 					if (i == a-1) result.push_back(list[b-1]);
 					else if (i == b-1) result.push_back(list[a-1]);
 					else result.push_back(list[i]);
 				}
-					
+
 				return result;
 			}
-			
+
 			template<typename... Args>
 			std::vector<int> operator()(Args... args) const {
 				return (*this)({ args... });
 			}
-			
+
 			/*Tensor operator()(const Tensor& tensor) const {
 				return Tensor
 			}*/
@@ -92,27 +92,27 @@ namespace Construction {
 			unsigned a;
 			unsigned b;
 		};
-		
+
 		/**
 			\class Permutation
-		
+
 			Allows arbitrary permutation of an index combination
 		 */
 		class Permutation {
 		public:
 			Permutation() = default;
-			
+
 			Permutation(unsigned a, unsigned b) {
 				this->permute.emplace_back(BinaryPermutation(a,b));
 			}
-			
+
 			Permutation(const BinaryPermutation& permute) {
 				this->permute.push_back(permute);
 			}
-			
+
 			Permutation(std::vector<BinaryPermutation> permute)
 				: permute(permute) { }
-			
+
 			// Copy constructor
 			Permutation(const Permutation& other)
 				: permute(other.permute) { }
@@ -121,21 +121,21 @@ namespace Construction {
 				this->permute = permute;
 				return *this;
 			}*/
-			
+
 			Permutation& operator=(const Permutation& other) {
 				permute = other.permute;
 				return *this;
 			}
-			
+
 			Permutation& operator=(Permutation&& other) {
 				permute = std::move(other.permute);
 				return *this;
 			}
 		public:
 			void Insert(const BinaryPermutation& p) {
-				permute.push_back(p); 
+				permute.push_back(p);
 			}
-			
+
 			void Insert(unsigned a, unsigned b) {
 				permute.emplace_back(BinaryPermutation(a,b));
 			}
@@ -147,7 +147,7 @@ namespace Construction {
 				}
 				return result;
 			}
-			
+
 			std::vector<int> operator()(const std::vector<int>& indices) const {
 				std::vector<int> result = indices;
 				for (auto& p : permute) {
@@ -155,7 +155,7 @@ namespace Construction {
 				}
 				return result;
 			}
-			
+
 			template<typename... Args>
 			std::vector<unsigned> operator()(Args... args) const {
 				return (*this)({args...});
@@ -164,18 +164,18 @@ namespace Construction {
 			bool IsEven() const {
 				return permute.size() % 2 == 0;
 			}
-			
+
 			bool IsOdd() const {
 				return permute.size() % 2 != 0;
 			}
-			
+
 			int Sign() const {
 				return IsOdd() ? -1 : 1;
 			}
 		public:
 			/**
 				\brief A cyclic permutation of the indices
-			
+
 				{abcd} => {bcda}
 			 */
 			static Indices Cyclic(const Indices& indices) {
@@ -185,7 +185,7 @@ namespace Construction {
 				}
 				return p(indices);
 			}
-			
+
 			static std::vector<int> Cyclic(const std::vector<int>& indices) {
 				Permutation p;
 				for (int i=1; i<indices.size(); i++) {
@@ -193,7 +193,7 @@ namespace Construction {
 				}
 				return p(indices);
 			}
-			
+
 			template<typename... Args>
 			static std::vector<int> Cyclic(Args... args) {
 				return Cyclic({ args... });
@@ -290,6 +290,31 @@ namespace Construction {
 
 				return result;
 			}
+
+            static Permutation From(Indices indices, std::map<Index, Index> transformation) {
+                Permutation result;
+
+                for (unsigned i=0; i<indices.Size(); ++i) {
+                    auto it = transformation.find(indices[i]);
+                    if (it == transformation.end()) throw IsNoPermutationException();
+
+                    unsigned pos=0;
+                    bool found=false;
+                    for (unsigned j=0; j<indices.Size(); ++j) {
+                        if (it->second == indices[j]) { pos = j; found=true; break; }
+                    }
+
+                    if (!found) throw IsNoPermutationException();
+
+                    result.Insert({ i+1, pos+1 });
+                }
+
+                return result;
+            }
+
+            inline static Indices Shuffle(Indices indices, std::map<Index, Index> transformation) {
+                return From(indices, transformation)(indices);
+            }
 		public:
 			friend std::ostream& operator<<(std::ostream& os, const Permutation& permutation) {
 				os << "[";
@@ -310,6 +335,6 @@ namespace Construction {
 		private:
 			std::vector<BinaryPermutation> permute;
 		};
-		
+
 	}
 }

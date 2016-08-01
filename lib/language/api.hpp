@@ -123,9 +123,50 @@ namespace Construction {
             //#include <generator/coefficient.hpp
 
             Tensor::Tensor Coefficient(unsigned l, unsigned ld, unsigned r, unsigned rd) {
-                return Tensor::Tensor::Zero();
-                /*Generator::CoefficientGenerator generator(nullptr);
-                return generator.Generate(l,ld,r,rd);*/
+                // Get index blocks
+                auto block1 = Construction::Tensor::Indices::GetRomanSeries(l, {1,3});
+                auto block2 = Construction::Tensor::Indices::GetRomanSeries(ld, {1,3}, 15);
+                auto block3 = Construction::Tensor::Indices::GetRomanSeries(r, {1,3}, l);
+                auto block4 = Construction::Tensor::Indices::GetRomanSeries(rd, {1,3}, ld+15);
+
+                auto indices = block1;
+                indices.Append(block2);
+                indices.Append(block3);
+                indices.Append(block4);
+
+                // Generate the tensor
+                auto tensor = API::Arbitrary(indices);
+
+                // Symmetrize the tensor
+                if (l > 1) {
+                    tensor = std::move(tensor.Symmetrize(block1));
+                }
+
+                if (ld > 1) {
+                    tensor = std::move(tensor.Symmetrize(block2));
+                }
+
+                if (r > 1) {
+                    tensor = std::move(tensor.Symmetrize(block3));
+                }
+
+                if (rd > 1) {
+                    tensor = std::move(tensor.Symmetrize(block4));
+                }
+
+                // Build indices for block symmetries
+                auto block = block3;
+                block.Append(block4);
+                block.Append(block1);
+                block.Append(block2);
+
+                // Exchange symmetrize
+                tensor = tensor.ExchangeSymmetrize(indices, block);
+
+                // Collect terms
+                tensor = tensor.Simplify().RedefineVariables("e");
+
+                return tensor;
             }
 
             /*Tensor::TensorContainer Append(const Tensor::TensorContainer& first, const Tensor::TensorContainer& second) {
@@ -151,19 +192,8 @@ namespace Construction {
                 return tensor.AntiSymmetrize(indices);
             }
 
-            Tensor::Tensor ExchangeSymmetrize(const Tensor::Tensor& tensor, const Indices& indices) {
-                return tensor.ExchangeSymmetrize(indices);
-
-                /*Common::TimeMeasurement time;
-
-                // Get the original indices
-                Construction::Generator::ExchangeSymmetrizedTensorGenerator symmetrizer(indices);
-                auto result = symmetrizer(tensor);
-
-                time.Stop();
-                //std::cout << "  \033[90m" << time << "\033[0m" << std::endl;
-
-                return result;*/
+            Tensor::Tensor ExchangeSymmetrize(const Tensor::Tensor& tensor, const Indices& from, const Indices& indices) {
+                return tensor.ExchangeSymmetrize(from, indices);
             }
 
             Tensor::Tensor BlockSymmetrize(const Tensor::Tensor& tensors, const std::vector<Indices>& blocks) {
