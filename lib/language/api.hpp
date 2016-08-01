@@ -153,7 +153,9 @@ namespace Construction {
             }
 
             Tensor::Tensor ExchangeSymmetrize(const Tensor::Tensor& tensor, const Indices& indices) {
-                Common::TimeMeasurement time;
+                return tensor.ExchangeSymmetrize(indices);
+                
+                /*Common::TimeMeasurement time;
 
                 // Get the original indices
                 Construction::Generator::ExchangeSymmetrizedTensorGenerator symmetrizer(indices);
@@ -162,7 +164,7 @@ namespace Construction {
                 time.Stop();
                 //std::cout << "  \033[90m" << time << "\033[0m" << std::endl;
 
-                return result;
+                return result;*/
             }
 
             Tensor::Tensor BlockSymmetrize(const Tensor::Tensor& tensors, const std::vector<Indices>& blocks) {

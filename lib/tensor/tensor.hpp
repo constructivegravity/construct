@@ -2752,7 +2752,161 @@ namespace Construction {
 
 				return result;
 			}
-		public:
+
+            /**
+                \brief Exchange symmetrize a tensor in the given indices
+
+                Exchange symmetrizes the tensor
+             */
+            Tensor ExchangeSymmetrize(const Indices& indices) const {
+                if (IsAdded()) {
+                    auto summands = GetSummands();
+
+                    std::vector<std::pair<scalar_type,Tensor>> symmetrizedSummands;
+					bool hasSameScale=true;
+					scalar_type overalScale = 0;
+
+					// Symmetrize all the summands in parallel
+					{
+						Common::TaskPool pool (8);
+						bool firstEntry = true;
+						std::mutex mutex;
+
+						symmetrizedSummands = pool.Map<std::pair<scalar_type,Tensor>, Tensor>(summands, [&](const Tensor& tensor) {
+							auto result = tensor.ExchangeSymmetrize(indices).SeparateScalefactor();
+
+							// Extract the scale of the first entry
+							{
+								std::unique_lock<std::mutex> lock(mutex);
+								if (firstEntry) {
+									firstEntry = false;
+									overalScale = result.first;
+								}
+							}
+
+							// If this has a different scale, remember this
+                            if (overalScale != result.first && overalScale != -result.first) hasSameScale = false;
+
+							return result;
+						});
+					}
+
+					Tensor result = Tensor::Zero();
+
+                    if (hasSameScale) {
+                        // Collect all summands on the stack
+						std::vector<Tensor> stack;
+
+						for (int i=0; i<symmetrizedSummands.size(); i++) {
+							auto __summands = symmetrizedSummands[i].second.GetSummands();
+							for (auto& s : __summands) {
+                                if (symmetrizedSummands[i].first == overalScale)
+								    stack.push_back(std::move(s));
+                                else
+                                    stack.push_back(-s);
+							}
+						}
+
+						std::vector< std::pair<scalar_type, Tensor> > reduced;
+						scalar_type lastScale;
+						bool allTheSameScale=true;
+
+						{
+							bool firstEntry = true;
+
+							while (stack.size() > 0) {
+								// Get the first element from the stack
+								auto s = stack[0].SeparateScalefactor();
+								Tensor current = std::move(s.second);
+								Scalar scale = std::move(s.first);
+
+								// Remove the first element
+								stack.erase(stack.begin());
+
+								// Iterate over all the other summands
+								for (int i=0; i<stack.size(); i++) {
+									auto t = stack[i].SeparateScalefactor();
+									Tensor newTerm = std::move(t.second);
+									Scalar newScale = std::move(t.first);
+
+									// If the tensor is the same after canonicalization modulo scale,
+									// change the scale of the original tensor and remove the new one
+									// from the stack.
+									if (newTerm.GetType() == current.GetType() && newTerm.GetIndices() == current.GetIndices()) {
+										scale += newScale;
+										stack.erase(stack.begin() + i);
+										i--;
+									}
+								}
+
+								if (!scale.IsNumeric() || scale.ToDouble() != 0) {
+									if (firstEntry) {
+										firstEntry = false;
+										lastScale = scale;
+									}
+
+									if (lastScale != scale && lastScale != -scale) {
+										allTheSameScale = false;
+									}
+									reduced.push_back({ scale, current });
+								}
+							}
+						}
+
+						for (auto& pair : reduced) {
+							if (allTheSameScale) {
+                                if (pair.first == lastScale)
+                                    result += pair.second;
+                                else
+                                    result += -pair.second;
+                            }
+							else result += pair.first * pair.second;
+						}
+
+						if (allTheSameScale) result *= lastScale;
+
+						return overalScale * result;
+
+                    } else {
+                        // Iterate over all symmetrized pairs
+						for (auto& pair : symmetrizedSummands) {
+							result += pair.first * pair.second;
+						}
+
+						return result;
+                    }
+                }
+
+                if (IsScaled()) {
+                    auto s = SeparateScalefactor();
+                    return s.first * s.second.ExchangeSymmetrize(indices);
+                }
+
+                // Do not waste time on zero tensor
+				if (IsZeroTensor()) return *this;
+
+                // Make the new tensor
+                auto clone = *this;
+                clone.SetIndices(indices);
+                clone = clone.Canonicalize();
+
+                // Check if the tensors are equal modulo scale
+                if (clone.GetIndices() == GetIndices()) {
+                    // Get the scales of the tensors
+                    auto s_ = SeparateScalefactor();
+                    auto scale1 = s_.first;
+                    auto scale2 = clone.SeparateScalefactor().first;
+
+                    // Add the two scales (will most certainly be 1 or 0)
+                    auto newScale = Scalar(1,2) * (scale1 + scale2);
+
+                    // Return the exchange symmetrized tensor
+                    return newScale * s_.second;
+                } else {
+                    return Scalar(1,2) * ( *this + clone );
+                }
+            }
+        public:
 			void Serialize(std::ostream& os) const override {
 				pointer->Serialize(os);
 			}
