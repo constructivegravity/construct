@@ -18,7 +18,7 @@ namespace Construction {
         CLI_COMMAND(Symmetrize)
 
             std::string Help() const {
-                return "Symmetrize(<Tensors>, <Indices>)";
+                return "Symmetrize(<Tensors>, <Indices>, ...)";
             }
 
             static bool Cachable() {
@@ -44,7 +44,7 @@ namespace Construction {
         CLI_COMMAND(AntiSymmetrize)
 
             std::string Help() const {
-                return "AntiSymmetrize(<Tensors>, <Indices>)";
+                return "AntiSymmetrize(<Tensors>, <Indices>, ...)";
             }
 
             static bool Cachable() {
@@ -52,14 +52,20 @@ namespace Construction {
             }
 
             Expression Execute() const {
-                return API::AntiSymmetrize(GetTensors(0), GetIndices(1));
+                auto result = GetTensors(0);
+
+                for (int i=1; i<Size(); i++) {
+                    result = API::AntiSymmetrize(result, GetIndices(i));
+                }
+
+                return result;
             }
 
         };
 
         REGISTER_COMMAND(AntiSymmetrize);
         REGISTER_ARGUMENT(AntiSymmetrize, 0, ArgumentType::TENSOR);
-        REGISTER_ARGUMENT(AntiSymmetrize, 1, ArgumentType::INDEX);
+        REGISTER_REPEATED_ARGUMENT(AntiSymmetrize, 1, ArgumentType::INDEX);
 
         CLI_COMMAND(ExchangeSymmetrize)
 
