@@ -17,8 +17,6 @@
 //#include <vector/linear_system.hpp>
 
 #include <generator/base_tensor.hpp>
-#include <generator/basis_selector.hpp>
-#include <generator/symmetrized_tensor.hpp>
 
 #include <iostream>
 #include <iomanip>

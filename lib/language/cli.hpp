@@ -14,9 +14,6 @@
 #include <language/linear_dependent.hpp>
 
 #include <tensor/expression.hpp>
-#include <generator/basis_selector.hpp>
-#include <generator/linear_dependent_selector.hpp>
-#include <generator/symmetrized_tensor.hpp>
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>

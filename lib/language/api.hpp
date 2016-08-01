@@ -7,7 +7,6 @@
 #include <common/time_measurement.hpp>
 
 #include <generator/base_tensor.hpp>
-#include <generator/symmetrized_tensor.hpp>
 
 using Construction::Tensor::Tensor;
 using Construction::Tensor::Scalar;
@@ -154,7 +153,7 @@ namespace Construction {
 
             Tensor::Tensor ExchangeSymmetrize(const Tensor::Tensor& tensor, const Indices& indices) {
                 return tensor.ExchangeSymmetrize(indices);
-                
+
                 /*Common::TimeMeasurement time;
 
                 // Get the original indices
