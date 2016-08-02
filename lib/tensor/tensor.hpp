@@ -522,11 +522,12 @@ namespace Construction {
 				Set the indices to the new order
 			 */
 			virtual void SetIndices(const Indices& newIndices) override {
+                auto oldIndices = indices;
 				indices = newIndices;
 
 				// Need to permute indices in all the summands
 				for (auto& tensor : summands) {
-					auto permutation = Permutation::From(indices, tensor->GetIndices());
+					auto permutation = Permutation::From(oldIndices, tensor->GetIndices());
 					tensor->SetIndices(permutation(newIndices));
 				}
 			}
