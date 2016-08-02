@@ -391,5 +391,21 @@ namespace Construction {
         REGISTER_ARGUMENT(Substitute, 0, ArgumentType::TENSOR);
         REGISTER_ARGUMENT(Substitute, 1, ArgumentType::SUBSTITUTION);
 
+        CLI_COMMAND(RenameIndices)
+            std::string Help() const {
+                return "RenameIndices(<Tensor>, <Indices>)";
+            }
+
+            Expression Execute() const {
+                auto tensor = GetTensors(0);
+                tensor.SetIndices(GetIndices(1));
+                return tensor;
+            }
+        };
+
+        REGISTER_COMMAND(RenameIndices);
+        REGISTER_ARGUMENT(RenameIndices, 0, ArgumentType::TENSOR);
+        REGISTER_ARGUMENT(RenameIndices, 1, ArgumentType::INDEX);
+
     }
 }
