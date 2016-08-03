@@ -616,15 +616,15 @@ namespace Construction {
 			}
 		public:
 			virtual void SetIndices(const Indices& newIndices) override {
-				/*
+                // Generate mapping
+                std::map<Index, Index> mapping;
+                for (int i=0; i<indices.Size(); ++i) {
+                    mapping[indices[i]] = newIndices[i];
+                }
 
-				//
-				auto permutationA = Permutation::From(indices, A->GetIndices());
-				auto permutationB = Permutation::From(indices, B->GetIndices());
-
-				indices = newIndices;
-				A->SetIndices(permutationA(newIndices));
-				B->SetIndices(permutationB(newIndices));*/
+                indices = newIndices;
+                A->SetIndices(A->GetIndices().Shuffle(mapping));
+                B->SetIndices(B->GetIndices().Shuffle(mapping));
 			}
 		public:
 			virtual std::string ToString() const override {
