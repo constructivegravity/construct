@@ -2115,6 +2115,49 @@ namespace Construction {
 				}
 			}
 
+            Tensor CollectByVariables() const {
+                // Expand first
+                auto expanded = Expand();
+
+                auto summands = expanded.GetSummands();
+
+                std::vector<Scalar> variables;
+                std::vector<Tensor> tensors;
+                Tensor rest = Tensor::Zero();
+
+                // Iterate over all the summands
+                for (auto& t : summands) {
+                    auto s = t.SeparateScalefactor();
+                    auto u = s.first.SeparateVariablesFromRest();
+
+                    // Iterate over the variable/scalar pairs
+                    for (auto& v : u.first) {
+                        // Check if the variable has already ocurred once
+                        auto it = std::find(variables.begin(), variables.end(), v.first);
+
+                        // If no, add to the map, otherwise add the tensor
+                        if (it == variables.end()) {
+                            variables.push_back(v.first);
+                            tensors.push_back(v.second * s.second);
+                        } else {
+                            tensors[it - variables.begin()] += v.second * s.second;
+                        }
+                    }
+
+                    // Add the rest
+                    rest += s.second * u.second;
+                }
+
+                // Combine
+                Tensor result = Tensor::Zero();
+
+                for (int i=0; i<variables.size(); ++i) {
+                    result += variables[i] * tensors[i];
+                }
+
+                return result;
+            }
+
 			Tensor SubstituteVariable(const scalar_type& variable, const scalar_type& expression) const {
 				auto summands = GetSummands();
 
@@ -2135,15 +2178,15 @@ namespace Construction {
 					result = std::move(result.SubstituteVariable(substitution.first, substitution.second));
 				}
 
-				return result;
+				return result.CollectByVariables();
 			}
 
-			Tensor RedefineVariables(const std::string& name) const {
+			Tensor RedefineVariables(const std::string& name, int offset=0) const {
 				// Separate the summands, if available
 				auto summands = GetSummands();
 
 				Tensor result = Tensor::Zero();
-				unsigned variableCount = 1;
+				unsigned variableCount = 1 + offset;
 
 				for (auto& tensor : summands) {
 					// If the tensor is scaled, redefine the free variable in front (if present)
