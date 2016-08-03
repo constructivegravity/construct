@@ -51,6 +51,11 @@ namespace Construction {
                 // Parse the code
                 Parse(code);
             }
+
+            ~Equation() {
+                // Join the thread of the calculation
+                thread.join();
+            }
         public:
             bool IsWaiting() const { return state == WAITING; }
             bool IsSolving() const { return state == SOLVING; }
@@ -120,9 +125,12 @@ namespace Construction {
                         ref->RegisterObserver(std::bind(&Equation::OnCoefficientCalculated, this, std::placeholders::_1));
 
                         // Replace the coefficient with a dummy name
-                        current += "RenameIndices(" + ref->GetName() + ", " +
-                                    Indices::GetRomanSeries(l+ld+r+rd, {1,3}).ToString().substr(1) +
-                                    "}, {" + temp + "})";
+                        {
+                            std::stringstream ss;
+                            ss << "RenameIndices(" << ref->GetName() << ", " << temp << ")";
+
+                            current += ss.str();
+                        }
 
                         temp = "";
 
@@ -134,7 +142,7 @@ namespace Construction {
                     temp += c;
                 }
 
-                eq = "subst = HomogeneousSystem(" + current + ")";
+                eq = "subst = HomogeneousSystem(" + current + "):";
             }
         public:
             /**
@@ -181,7 +189,7 @@ namespace Construction {
                 //  IV. Substitute the result into the coefficients
                 // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
                 for (auto& coeff : coefficients) {
-                    (*coeff->GetAsync()) = subst(*coeff->GetAsync());
+                    coeff->SetTensor(subst(*coeff->GetAsync()));
                 }
 
                 //   V. Release locks
@@ -194,6 +202,19 @@ namespace Construction {
                 state = SOLVED;
 
                 variable.notify_all();
+                Notify();
+            }
+        public:
+            typedef std::function<void(const Equation& eq)>     ObserverFunction;
+
+            void RegisterObserver(ObserverFunction observer) {
+                observers.push_back(observer);
+            }
+
+            void Notify() const {
+                for (auto& observer : observers) {
+                    observer(*this);
+                }
             }
         public:
             void Wait() {
@@ -210,6 +231,8 @@ namespace Construction {
 
             std::string eq;
             std::vector<CoefficientReference> coefficients;
+
+            std::vector<ObserverFunction> observers;
 
             State state;
         };

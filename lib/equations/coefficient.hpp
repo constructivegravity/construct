@@ -45,7 +45,16 @@ namespace Construction {
         public:
             // Constructor
             Coefficient(unsigned l, unsigned ld, unsigned r, unsigned rd, const std::string& id)
-                : l(l), ld(ld), r(r), rd(rd), id(id), state(DEFERRED) { }
+                : l(l), ld(ld), r(r), rd(rd), id(id), state(DEFERRED)
+            {
+                // Generate random name
+                name = id + GetRandomString(4);
+            }
+
+            ~Coefficient() {
+                // Join the thread
+                thread.join();
+            }
         public:
             // Is the coefficient calculation deferred, i.e. not started yet?
             bool IsDeferred() const { return state == DEFERRED; }
@@ -108,7 +117,7 @@ namespace Construction {
                 });
             }
         public:
-            std::string GetName() const { return id; }
+            std::string GetName() const { return name; }
         public:
             /**
                 Returns the tensor if it was calculated, otherwise it blocks
@@ -119,8 +128,6 @@ namespace Construction {
                 // Wait to be finished
                 Wait();
 
-                std::unique_lock<std::mutex> lock(readMutex);
-
                 return (state == FINISHED) ? tensor : nullptr;
             }
 
@@ -129,9 +136,11 @@ namespace Construction {
                 without blocking the main thread
              */
             std::shared_ptr<Tensor::Tensor> GetAsync() {
-                std::unique_lock<std::mutex> lock(readMutex);
-
                 return (state == FINISHED) ? tensor : nullptr;
+            }
+
+            inline void SetTensor(Tensor::Tensor tensor) {
+                this->tensor = std::make_shared<Tensor::Tensor>(tensor);
             }
 
             void Lock() {
@@ -178,7 +187,7 @@ namespace Construction {
                     std::string currentCmd = "Arbitrary({" + indices.ToString().substr(1) + ")";
 
                     // Generate the tensors
-                    *tensor = std::move(Construction::Language::API::Arbitrary(indices));
+                    tensor = std::make_shared<Construction::Tensor::Tensor>(Construction::Language::API::Arbitrary(indices));
 
                     // Update the session of the coefficient
                     //session.SetCurrent(currentCmd, *tensor);
@@ -186,7 +195,7 @@ namespace Construction {
                     // Symmetrize first block if necessary
                     if (block1.Size() > 1) {
                         currentCmd = "Symmetrize(%, " + block1.ToString().substr(1) + "})";
-                        *tensor = tensor->Symmetrize(block1);
+                        tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Symmetrize(block1));
 
                         //session.SetCurrent(currentCmd, *tensor);
                     }
@@ -194,7 +203,7 @@ namespace Construction {
                     // Symmetrize second block if necessary
                     if (block2.Size() > 1) {
                         currentCmd = "Symmetrize(%, " + block2.ToString().substr(1) + "})";
-                        *tensor = tensor->Symmetrize(block2);
+                        tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Symmetrize(block2));
 
                         //session.SetCurrent(currentCmd, *tensor);
                     }
@@ -202,7 +211,7 @@ namespace Construction {
                     // Symmetrize first block if necessary
                     if (block3.Size() > 1) {
                         currentCmd = "Symmetrize(%, " + block3.ToString().substr(1) + "})";
-                        *tensor = tensor->Symmetrize(block3);
+                        tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Symmetrize(block3));
 
                         //session.SetCurrent(currentCmd, *tensor);
                     }
@@ -210,7 +219,7 @@ namespace Construction {
                     // Symmetrize first block if necessary
                     if (block4.Size() > 1) {
                         currentCmd = "Symmetrize(%, " + block4.ToString().substr(1) + "})";
-                        *tensor = tensor->Symmetrize(block4);
+                        tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Symmetrize(block4));
 
                         //session.SetCurrent(currentCmd, *tensor);
                     }
@@ -222,15 +231,15 @@ namespace Construction {
                     exchanged.Append(block2);
 
                     currentCmd = "ExchangeSymmetrize(%, " + indices.ToString().substr(1) + "}, " + exchanged.ToString().substr(1) +"})";
-                    *tensor = tensor->ExchangeSymmetrize(indices, exchanged);
+                    tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->ExchangeSymmetrize(indices, exchanged));
 
                     //session.SetCurrent(currentCmd, *tensor);
 
                     // Simplify and redefine variables
                     currentCmd = "LinearIndependent(%)";
-                    *tensor = tensor->Simplify().RedefineVariables(GetRandomString());
+                    tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Simplify().RedefineVariables(GetRandomString()));
 
-                    Session::Instance()->Get(id) = *tensor;
+                    Session::Instance()->Get(name) = *tensor;
                     //session.SetCurrent(currentCmd, *tensor);
                 } catch(...) {
                     // In case of exception, just set the calculation to aborted
@@ -288,6 +297,7 @@ namespace Construction {
 
             unsigned l, ld, r, rd;
             std::string id;
+            std::string name;
 
             std::shared_ptr<Tensor::Tensor> tensor;
         };
@@ -350,6 +360,14 @@ namespace Construction {
                     }
                 }
             }
+
+            size_t Size() const { return map.size(); }
+        public:
+            std::unordered_map<Definition, CoefficientReference, DefinitionHasher>::iterator begin() { return map.begin(); }
+            std::unordered_map<Definition, CoefficientReference, DefinitionHasher>::iterator end() { return map.end(); }
+
+            std::unordered_map<Definition, CoefficientReference, DefinitionHasher>::const_iterator begin() const { return map.begin(); }
+            std::unordered_map<Definition, CoefficientReference, DefinitionHasher>::const_iterator end() const { return map.end(); }
         private:
             std::unordered_map<Definition, CoefficientReference, DefinitionHasher> map;
         };
