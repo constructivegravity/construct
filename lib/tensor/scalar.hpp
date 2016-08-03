@@ -201,7 +201,7 @@ namespace Construction {
             }
 
             inline const ScalarPointer& GetFirst() const { return A; }
-            inline const ScalarPointer& GetSecond() const { return B; }            
+            inline const ScalarPointer& GetSecond() const { return B; }
 
             /*inline ConstScalarPointer GetFirst() const { return A; }
             inline ConstScalarPointer GetSecond() const { return B; }*/
@@ -246,7 +246,7 @@ namespace Construction {
             }
         public:
             inline const ScalarPointer& GetFirst() const { return A; }
-            inline const ScalarPointer& GetSecond() const { return B; } 
+            inline const ScalarPointer& GetSecond() const { return B; }
         public:
             virtual ScalarPointer Clone() const override {
                 return std::move(ScalarPointer(new MultipliedScalar(
@@ -274,7 +274,7 @@ namespace Construction {
             ScalarPointer B;
         };
 
-        /** 
+        /**
             \class Scalar
 
             Syntactic sugar class for scalars. This allows to really just add, multiply etc.
@@ -295,7 +295,7 @@ namespace Construction {
 
             Scalar(const Scalar& other) : AbstractExpression(SCALAR), pointer(std::move(other.pointer->Clone())) { }
             Scalar(Scalar&& other) : AbstractExpression(SCALAR), pointer(std::move(other.pointer)) { }
- 
+
             Scalar(std::unique_ptr<AbstractScalar> pointer) : AbstractExpression(SCALAR), pointer(std::move(pointer)) { }
 
             virtual ~Scalar() = default;
@@ -437,7 +437,7 @@ namespace Construction {
                 return helper(pointer.get());
             }
 
-            /** 
+            /**
                 \brief Substitute variables in a scalar expression
 
                 Substitutes a variable with an arbitrary scalar expression. Since
@@ -465,15 +465,81 @@ namespace Construction {
                     // If it is just a number or the searched variable, just add the result
                     if (s.IsVariable()) result += (s == variable) ? other : s;
                     if (s.IsNumeric()) result += s;
-                    
+
                     // If it is a multiplication, substite in each factor recursively
                     if (s.IsMultiplied()) {
-                        result += Scalar(static_cast<MultipliedScalar*>(s.pointer.get())->GetFirst()->Clone()).Substitute(variable, other) * 
+                        result += Scalar(static_cast<MultipliedScalar*>(s.pointer.get())->GetFirst()->Clone()).Substitute(variable, other) *
                                   Scalar(static_cast<MultipliedScalar*>(s.pointer.get())->GetSecond()->Clone()).Substitute(variable, other);
                     }
                 }
 
                 return result;
+            }
+
+            std::pair<std::vector<std::pair<Scalar, Scalar>>, Scalar> SeparateVariablesFromRest() const {
+                Scalar rest = 0;
+
+                // Get the summands
+                auto summands = GetSummands();
+
+                std::vector<Scalar> keys;
+                std::vector<Scalar> values;
+
+                for (auto& s : summands) {
+                    // If s is a variable
+                    if (s.IsNumeric()) {
+                        rest += s;
+                        continue;
+                    }
+
+                    if (s.IsVariable()) {
+                        auto it = std::find(keys.begin(), keys.end(), s);
+                        if (it == keys.end()) {
+                            keys.push_back(s);
+                            values.push_back(Scalar(1));
+                        } else {
+                            values[it - keys.begin()] += Scalar(1);
+                        }
+
+                        continue;
+                    }
+
+                    if (s.IsMultiplied()) {
+                        auto first = Scalar(static_cast<MultipliedScalar*>(s.pointer.get())->GetFirst()->Clone());
+                        auto second = Scalar(static_cast<MultipliedScalar*>(s.pointer.get())->GetSecond()->Clone());
+
+                        if (first.IsVariable()) {
+                            auto it = std::find(keys.begin(), keys.end(), first);
+                            if (it == keys.end()) {
+                                keys.push_back(first);
+                                values.push_back(second);
+                            } else {
+                                values[it - keys.begin()] += second;
+                            }
+
+                            continue;
+                        }
+
+                        if (second.IsVariable()) {
+                            auto it = std::find(keys.begin(), keys.end(), second);
+                            if (it == keys.end()) {
+                                keys.push_back(second);
+                                values.push_back(first);
+                            } else {
+                                values[it - keys.begin()] += first;
+                            }
+
+                            continue;
+                        }
+                    }
+                }
+
+                std::vector<std::pair<Scalar, Scalar>> result;
+                for (int i=0; i<keys.size(); ++i) {
+                    result.push_back({ keys[i], values[i] });
+                }
+
+                return { result, rest };
             }
         public:
             void Serialize(std::ostream& os) const override;
