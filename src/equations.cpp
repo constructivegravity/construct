@@ -33,7 +33,9 @@ int main(int argc, char** argv) {
     }
 
     // Print the result
-    // TODO: print the result
+    for (auto it = Construction::Equations::Coefficients::Instance()->begin(); it != Construction::Equations::Coefficients::Instance()->end(); ++it) {
+        std::cout << "  #<" << it->first.id << ":" << it->first.l << ":" << it->first.ld << ":" << it->first.r << ":" << it->first.rd << ">" << " = " << it->second->Get()->ToString() << std::endl << std::endl;
+    }
 
     std::cout << "Finished." << std::endl;
 }
