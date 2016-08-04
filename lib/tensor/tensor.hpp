@@ -525,10 +525,15 @@ namespace Construction {
                 auto oldIndices = indices;
 				indices = newIndices;
 
+                // Generate mapping
+                std::map<Index, Index> mapping;
+                for (int i=0; i<oldIndices.Size(); i++) {
+                    mapping[oldIndices[i]] = indices[i];
+                }
+
 				// Need to permute indices in all the summands
 				for (auto& tensor : summands) {
-					auto permutation = Permutation::From(oldIndices, tensor->GetIndices());
-					tensor->SetIndices(permutation(newIndices));
+					tensor->SetIndices(tensor->GetIndices().Shuffle(mapping));
 				}
 			}
 		public:
@@ -1843,6 +1848,9 @@ namespace Construction {
 			inline bool IsZero() const { return pointer->IsZero(); }
 		public:
 			virtual std::string ToString() const override {
+                // Has variables?
+                bool vars = HasVariables();
+
 				// One summand per line
 				auto summands = GetSummands();
 
@@ -1856,30 +1864,20 @@ namespace Construction {
 				std::stringstream ss;
 				for (unsigned i=0; i<summands.size(); i++) {
 					ss << summands[i];
-					if (i < summands.size() - 1) ss << " + " << std::endl;
+					if (i < summands.size() - 1) ss << " + ";
+                    if (vars) ss << std::endl;
 				}
 				return ss.str();
 			}
 		public:
 			bool HasVariables() const {
-				bool result = false;
+                auto summands = GetSummands();
 
-				// Helper method
-				std::function<void(AbstractTensor* tensor)> helper = [&](const AbstractTensor* tensor) {
-					if (tensor->IsScaledTensor()) result = result || As<ScaledTensor>()->GetScale().HasVariables();
-					else if (tensor->IsAddedTensor()) {
-						for (int i=0; i<static_cast<const AddedTensor*>(tensor)->Size(); ++i) {
-							helper(static_cast<const AddedTensor*>(tensor)->At(i).get());
-						}
-					} else if (tensor->IsMultipliedTensor()) {
-						helper(static_cast<const MultipliedTensor*>(tensor)->GetFirst().get());
-						helper(static_cast<const MultipliedTensor*>(tensor)->GetSecond().get());
-					}
-				};
+                for (auto& t : summands) {
+                    if (t.IsScaled() && t.SeparateScalefactor().first.HasVariables()) return true;
+                }
 
-				helper(pointer.get());
-
-				return result;
+                return false;
 			}
 
 			/**
