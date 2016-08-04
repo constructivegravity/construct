@@ -24,6 +24,10 @@ namespace Construction {
                     }
                 });
             }
+
+            ~ProgressBar() {
+                thread.join();
+            }
         public:
             unsigned GetWidth() const { return width; }
             unsigned GetPosition() const { return pos; }
@@ -44,6 +48,13 @@ namespace Construction {
             inline ProgressBar& operator++(int) {
                 Increase();
                 return *this;
+            }
+
+            void Clean() {
+                for (int i=0; i<width + 100; i++) {
+                    std::cerr << " ";
+                }
+                std::cerr << "\r";
             }
 
             void Print() {
