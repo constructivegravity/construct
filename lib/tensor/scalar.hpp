@@ -4,6 +4,7 @@
 #include <sstream>
 #include <vector>
 #include <memory>
+#include <algorithm>
 
 #include <common/printable.hpp>
 #include <common/serializable.hpp>

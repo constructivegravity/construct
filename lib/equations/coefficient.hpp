@@ -5,6 +5,7 @@
 #include <thread>
 #include <functional>
 #include <random>
+#include <memory>
 
 #include <common/uuid.hpp>
 #include <language/session.hpp>
