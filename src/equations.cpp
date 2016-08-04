@@ -22,6 +22,13 @@ int main(int argc, char** argv) {
     // Read line per line and add them as equations
     std::string line;
     while (std::getline(file, line)) {
+        // Ignore empty lines
+        if (line == "") continue;
+
+        // Ignore comments
+        if (line[0] == '#') continue;
+
+        // Add the equation
         equations.push_back(
             std::unique_ptr<Construction::Equations::Equation>(new Construction::Equations::Equation(line))
         );

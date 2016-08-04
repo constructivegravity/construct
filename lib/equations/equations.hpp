@@ -117,6 +117,7 @@ namespace Construction {
 
                     if (c == '>') {
                         inCoeff = false;
+                        mode = 0;
 
                         // Get the coefficient reference
                         auto ref = Coefficients::Instance()->Get(l, ld, r, rd, id);
@@ -154,11 +155,13 @@ namespace Construction {
                 // Check if all coefficients are calculated
                 for (auto& c : coefficients) {
                     // If not finished, do nothing
-                    if (!c->IsFinished()) return;
+                    if (!c->IsFinished()) {
+                        return;
+                    }
                 }
 
                 // Solve the equation in a new thread#
-                thread = std::thread(&Equation::Solve, this);
+                this->thread = std::thread(&Equation::Solve, this);
             }
 
             void Solve() {
@@ -190,6 +193,9 @@ namespace Construction {
                 // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
                 for (auto& coeff : coefficients) {
                     coeff->SetTensor(subst(*coeff->GetAsync()));
+
+                    // Overwrite the tensor in the session
+                    Session::Instance()->Get(coeff->GetName()) = *coeff->GetAsync();
                 }
 
                 //   V. Release locks

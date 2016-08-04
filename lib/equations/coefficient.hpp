@@ -51,9 +51,9 @@ namespace Construction {
                 name = id + GetRandomString(4);
             }
 
-            ~Coefficient() {
+            virtual ~Coefficient() {
                 // Join the thread
-                thread.join();
+                //thread.join();
             }
         public:
             // Is the coefficient calculation deferred, i.e. not started yet?
@@ -246,8 +246,8 @@ namespace Construction {
                     state = ABORTED;
 
                     // Notify all observers
-                    variable.notify_all();
                     Notify();
+                    variable.notify_all();
 
                     return;
                 }
@@ -255,8 +255,8 @@ namespace Construction {
                 // Finished
                 state = FINISHED;
 
-                variable.notify_all();
                 Notify();
+                variable.notify_all();
             }
         public:
             /**
@@ -282,6 +282,17 @@ namespace Construction {
                 }
 
                 return output;
+            }
+        public:
+            std::string ToString() const {
+                std::stringstream ss;
+                ss << "#<" << id << ":" << l << ":" << ld << ":" << ":" << r << ":" << rd << ">";
+
+                if (state == FINISHED) {
+                    ss << " = " << tensor->ToString();
+                }
+
+                return ss.str();
             }
         private:
             std::mutex mutex;
