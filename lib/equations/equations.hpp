@@ -129,7 +129,16 @@ namespace Construction {
                         // Replace the coefficient with a dummy name
                         {
                             std::stringstream ss;
-                            ss << "RenameIndices(" << ref->GetName() << ", " << temp << ")";
+                            ss << "RenameIndices(" << ref->GetName() << ", " ;
+
+                            auto indices = Construction::Tensor::Indices::GetRomanSeries(l+ld+r+rd, {1,3});
+                            ss << "{";
+                            for (int i=0; i<indices.Size(); ++i) {
+                                ss << indices[i];
+                                if (i < indices.Size()-1) ss << " ";
+                            }
+                            ss << "}, ";
+                            ss << temp << ")";
 
                             current += ss.str();
                         }

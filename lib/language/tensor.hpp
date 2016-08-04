@@ -393,19 +393,24 @@ namespace Construction {
 
         CLI_COMMAND(RenameIndices)
             std::string Help() const {
-                return "RenameIndices(<Tensor>, <Indices>)";
+                return "RenameIndices(<Tensor>, <Indices>, <Indices>)";
             }
 
             Expression Execute() const {
                 auto tensor = GetTensors(0);
-                tensor.SetIndices(GetIndices(1));
-                return tensor;
+
+                // If the tensor is zero, return
+                if (tensor.IsZeroTensor()) return tensor;
+
+                tensor.SetIndices(Tensor::Permutation::From(GetIndices(1), tensor.GetIndices())(GetIndices(2)));
+                return tensor.Canonicalize();
             }
         };
 
         REGISTER_COMMAND(RenameIndices);
         REGISTER_ARGUMENT(RenameIndices, 0, ArgumentType::TENSOR);
         REGISTER_ARGUMENT(RenameIndices, 1, ArgumentType::INDEX);
+        REGISTER_ARGUMENT(RenameIndices, 2, ArgumentType::INDEX);
 
     }
 }

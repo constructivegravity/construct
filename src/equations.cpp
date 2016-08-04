@@ -1,4 +1,4 @@
-#define RECOVER_FROM_EXCEPTIONS 	1
+#define RECOVER_FROM_EXCEPTIONS 	0
 
 #include <equations/equations.hpp>
 #include <common/progressbar.hpp>
@@ -24,9 +24,6 @@ int main(int argc, char** argv) {
     while (std::getline(file, line)) {
         // Ignore empty lines
         if (line == "") continue;
-
-        // Ignore comments
-        if (line[0] == '#') continue;
 
         // Add the equation
         equations.push_back(
@@ -80,11 +77,36 @@ int main(int argc, char** argv) {
         //auto tensor = it->second->Get()->RedefineVariables("e", offset);
         auto tensor = *it->second->Get();
 
+        auto summands = tensor.GetSummands();
+
         if (!tensor.IsZeroTensor()) {
-            offset += tensor.GetSummands().size();
+            offset += summands.size();
         }
 
-        std::cout << "  #<" << it->first.id << ":" << it->first.l << ":" << it->first.ld << ":" << it->first.r << ":" << it->first.rd << ">" << " = " << tensor << std::endl << std::endl;
+        std::cout << "  \033[36m#<" << it->first.id << ":" << it->first.l << ":" << it->first.ld << ":" << it->first.r << ":" << it->first.rd << ">" << "\033[0m = " << std::endl;
+
+        for (int i=0; i<summands.size(); ++i) {
+            auto t = summands[i];
+
+            if (t.IsScaled()) {
+                auto s = t.SeparateScalefactor();
+                std::cout << "     \033[32m" << s.first << "\033[0m * \033[33m";
+
+                if (s.second.IsAdded()) {
+                    std::cout << "(" << s.second << ")";
+                } else std::cout << s.second;
+            } else {
+                std::cout << "     \033[33m" << t.ToString();
+            }
+
+            std::cout << "\033[0m";
+
+            if (i < summands.size()-1) std::cout << " + ";
+
+            std::cout << std::endl;
+        }
+
+        std::cout << std::endl;
     }
 
     std::cerr << "Finished." << std::endl;
