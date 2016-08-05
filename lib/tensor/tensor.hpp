@@ -1197,13 +1197,26 @@ namespace Construction {
              */
             virtual TensorPointer ContractionHeuristics(const AbstractTensor& other) const override {
                 try {
-                    auto contracted = indices.Contract(other.GetIndices());
+                    auto otherIndices = other.GetIndices();
+
+                    // Make mapping
+                    std::map<Index, Index> mapping;
+                    for (auto& index : otherIndices) {
+                        mapping[index] = index;
+                    }
+
+                    // Check if the tensor contains the index
+                    if (otherIndices.ContainsIndex(indices[0])) {
+                        mapping[indices[0]] = indices[1];
+                    } else if (otherIndices.ContainsIndex(indices[1])) {
+                        mapping[indices[1]] = indices[0];
+                    } else return nullptr;
 
                     // Clone the other tensor
                     auto clone = other.Clone();
 
                     // Set the indices
-                    clone->SetIndices(contracted);
+                    clone->SetIndices(otherIndices.Shuffle(mapping));
                     return std::move(clone);
                 } catch (...) {
                     return nullptr;
