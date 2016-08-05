@@ -123,9 +123,6 @@ namespace Construction {
                         // Get the coefficient reference
                         auto ref = Coefficients::Instance()->Get(l, ld, r, rd, id);
 
-                        // Add the notification method
-                        ref->RegisterObserver(std::bind(&Equation::OnCoefficientCalculated, this, std::placeholders::_1));
-
                         // Replace the coefficient with a dummy name
                         {
                             std::stringstream ss;
@@ -143,10 +140,23 @@ namespace Construction {
                             current += ss.str();
                         }
 
-                        temp = "";
+                        bool found=false;
+                        for (auto& ref_ : coefficients) {
+                            if (ref_ == ref) {
+                                found = true;
+                                break;
+                            }
+                        }
 
-                        // Put on the list
-                        coefficients.push_back(std::move(ref));
+                        if (!found) {
+                            // Add the notification method
+                            ref->RegisterObserver(std::bind(&Equation::OnCoefficientCalculated, this, std::placeholders::_1));
+
+                            // Put on the list
+                            coefficients.push_back(std::move(ref));
+                        }
+
+                        temp = "";
                         continue;
                     }
 
