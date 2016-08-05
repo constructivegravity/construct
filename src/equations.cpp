@@ -32,7 +32,7 @@ int main(int argc, char** argv) {
     }
 
     // Calculate number of coefficients and equations
-    int numberOfSteps = equations.size() + Construction::Equations::Coefficients::Instance()->Size();
+    int numberOfSteps = equations.size() + 8 * Construction::Equations::Coefficients::Instance()->Size();
 
     // Create progress bar
     Construction::Common::ProgressBar progress (numberOfSteps, 100);

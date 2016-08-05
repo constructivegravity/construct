@@ -190,6 +190,8 @@ namespace Construction {
                     // Generate the tensors
                     tensor = std::make_shared<Construction::Tensor::Tensor>(Construction::Language::API::Arbitrary(indices));
 
+                    Notify();
+
                     // Update the session of the coefficient
                     //session.SetCurrent(currentCmd, *tensor);
 
@@ -201,6 +203,8 @@ namespace Construction {
                         //session.SetCurrent(currentCmd, *tensor);
                     }
 
+                    Notify();
+
                     // Symmetrize second block if necessary
                     if (block2.Size() > 1) {
                         currentCmd = "Symmetrize(%, " + block2.ToString().substr(1) + "})";
@@ -208,6 +212,8 @@ namespace Construction {
 
                         //session.SetCurrent(currentCmd, *tensor);
                     }
+
+                    Notify();
 
                     // Symmetrize first block if necessary
                     if (block3.Size() > 1) {
@@ -217,6 +223,8 @@ namespace Construction {
                         //session.SetCurrent(currentCmd, *tensor);
                     }
 
+                    Notify();
+
                     // Symmetrize first block if necessary
                     if (block4.Size() > 1) {
                         currentCmd = "Symmetrize(%, " + block4.ToString().substr(1) + "})";
@@ -224,6 +232,8 @@ namespace Construction {
 
                         //session.SetCurrent(currentCmd, *tensor);
                     }
+
+                    Notify();
 
                     // Do the block exchange
                     auto exchanged = block3;
@@ -234,11 +244,14 @@ namespace Construction {
                     currentCmd = "ExchangeSymmetrize(%, " + indices.ToString().substr(1) + "}, " + exchanged.ToString().substr(1) +"})";
                     tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->ExchangeSymmetrize(indices, exchanged));
 
+                    Notify();
                     //session.SetCurrent(currentCmd, *tensor);
 
                     // Simplify and redefine variables
                     currentCmd = "LinearIndependent(%)";
                     tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Simplify().RedefineVariables(GetRandomString()));
+
+                    Notify();
 
                     Session::Instance()->Get(name) = *tensor;
                     //session.SetCurrent(currentCmd, *tensor);
