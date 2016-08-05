@@ -120,6 +120,20 @@ namespace Construction {
                         inCoeff = false;
                         mode = 0;
 
+                        // Bring the coefficients into canonical order.
+                        // Since we have the exchange symmetry, this is of course
+                        // always possible.
+                        if (r < l || (r == l && rd < ld)) {
+                            // Swap the blocks
+                            auto tmp = l;
+                            l = r;
+                            r = tmp;
+
+                            tmp = ld;
+                            ld = rd;
+                            rd = tmp;
+                        }
+
                         // Get the coefficient reference
                         auto ref = Coefficients::Instance()->Get(l, ld, r, rd, id);
 
