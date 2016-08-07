@@ -179,6 +179,39 @@ namespace Construction {
 
                 return std::move(std::unique_ptr<AbstractScalar>(new Fraction(numerator, denominator)));
             }
+        public:
+            static Fraction FromDouble(double f) {
+                if (f < 0) return -FromDouble(-f);
+
+                std::vector<int> values;
+
+                int integer = static_cast<int>(f);
+                double rest = f - integer;
+
+                values.push_back(integer);
+
+                while (rest != 0 && rest > 1e-8) {
+                    double x = 1.0/rest;
+
+                    integer = static_cast<int>(x);
+                    rest = x - integer;
+
+                    values.push_back(integer);
+                }
+
+                // Put together
+                Fraction result (values[values.size()-1],1);
+
+                for (int i=values.size()-2; i>=0; --i) {
+                    // Invert the value
+                    result = Fraction(1,1) / result;
+
+                    // Add the current value
+                    result += Fraction(values[i],1);
+                }
+
+                return result;
+            }
         private:
             int numerator;
             unsigned int denominator;

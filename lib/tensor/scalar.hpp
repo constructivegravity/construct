@@ -304,6 +304,7 @@ namespace Construction {
             // Syntactic sugar
             inline static Scalar Integer(int v) { return Scalar(v); }
             inline static Scalar Fraction(int numerator, unsigned denominator) { return Scalar(numerator, denominator); }
+            static Scalar Fraction(float f);
             inline static Scalar FloatingPoint(double v) { return Scalar(v); }
 
             inline static Scalar Variable(const std::string& name) { return Scalar(name); }

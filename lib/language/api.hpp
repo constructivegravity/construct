@@ -310,7 +310,7 @@ namespace Construction {
                             lhs = system.second[j];
                             isZero = false;
                         } else if (vec[j] != 0) {
-                            rhs += (-system.second[j] * vec[j]);
+                            rhs += (-system.second[j] * Tensor::Scalar::Fraction(vec[j]));
                         }
                     }
 

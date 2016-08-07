@@ -16,7 +16,11 @@ Scalar::Scalar(const std::string& name, const std::string& printed_text) : Abstr
 Scalar::Scalar(const std::string& name, unsigned id) : AbstractExpression(SCALAR) {
     std::stringstream ss;
     ss << name << "_" << id;
-    pointer = ScalarPointer(new Tensor::Variable(ss.str()));   
+    pointer = ScalarPointer(new Tensor::Variable(ss.str()));
+}
+
+Scalar Scalar::Fraction(float f) {
+    return Scalar(ScalarPointer(new Tensor::Fraction(std::move(Tensor::Fraction::FromDouble(f)))));
 }
 
 Scalar& Scalar::operator=(double d) {
@@ -71,7 +75,7 @@ ScalarPointer AbstractScalar::Add(const AbstractScalar& one, const AbstractScala
         if (other.IsMultiplied() && static_cast<MultipliedScalar*>(second.get())->B->IsVariable() && static_cast<MultipliedScalar*>(second.get())->B->ToString() == v->ToString()) {
             return std::move(Multiply(
                 *Add(
-                    *static_cast<MultipliedScalar*>(first.get())->A->Clone(), 
+                    *static_cast<MultipliedScalar*>(first.get())->A->Clone(),
                     *static_cast<MultipliedScalar*>(second.get())->A->Clone(),
                 ),
 
@@ -197,9 +201,9 @@ bool Scalar::operator==(const Scalar& other) const {
         Scalar firstB = Scalar(static_cast<AddedScalar*>(pointer.get())->GetSecond()->Clone());
 
         Scalar secondA = Scalar(static_cast<AddedScalar*>(other.pointer.get())->GetFirst()->Clone());
-        Scalar secondB = Scalar(static_cast<AddedScalar*>(other.pointer.get())->GetSecond()->Clone()); 
+        Scalar secondB = Scalar(static_cast<AddedScalar*>(other.pointer.get())->GetSecond()->Clone());
 
-        return ((firstA == secondA && firstB == secondB) || (firstA == secondB && firstB == secondA));                   
+        return ((firstA == secondA && firstB == secondB) || (firstA == secondB && firstB == secondA));
     }
 
     if (IsMultiplied() && other.IsMultiplied()) {
@@ -207,10 +211,10 @@ bool Scalar::operator==(const Scalar& other) const {
         Scalar firstB = Scalar(static_cast<MultipliedScalar*>(pointer.get())->GetSecond()->Clone());
 
         Scalar secondA = Scalar(static_cast<MultipliedScalar*>(other.pointer.get())->GetFirst()->Clone());
-        Scalar secondB = Scalar(static_cast<MultipliedScalar*>(other.pointer.get())->GetSecond()->Clone()); 
+        Scalar secondB = Scalar(static_cast<MultipliedScalar*>(other.pointer.get())->GetSecond()->Clone());
 
-        return ((firstA == secondA && firstB == secondB) || (firstA == secondB && firstB == secondA));                   
-    }            
+        return ((firstA == secondA && firstB == secondB) || (firstA == secondB && firstB == secondA));
+    }
 
     return false;
 }
@@ -263,7 +267,7 @@ bool AbstractScalar::HasVariables() const {
 
     fn(this);
     return hasVariables;
-}   
+}
 
 void Scalar::Serialize(std::ostream& os) const {
     switch (pointer->GetType()) {
@@ -285,8 +289,8 @@ void Scalar::Serialize(std::ostream& os) const {
 
         case AbstractScalar::MULTIPLIED:
             static_cast<MultipliedScalar*>(pointer.get())->Serialize(os);
-            break;  
-    } 
+            break;
+    }
 }
 
 std::unique_ptr<AbstractExpression> Scalar::Deserialize(std::istream& is) {

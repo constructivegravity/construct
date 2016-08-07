@@ -904,9 +904,13 @@ namespace Construction {
 			ss << summands[0]->ToString();
 
 			for (int i=1; i<summands.size(); i++) {
-				if (summands[i]->IsScaledTensor() && static_cast<const ScaledTensor*>(summands[i].get())->GetScale() == Scalar(-1)) {
-					ss << " - " << static_cast<const ScaledTensor*>(summands[i].get())->GetTensor()->ToString();
-				} else ss << " + " << summands[i]->ToString();
+                auto str = summands[i]->ToString();
+
+                if (str[0] == '-') {
+                    ss << " - " << str.substr(1);
+                } else {
+                    ss << " + " << str;
+                }
 			}
 
 			return ss.str();
@@ -1876,10 +1880,20 @@ namespace Construction {
 
 				// Else, iterate over all summands
 				std::stringstream ss;
+                bool first = true;
 				for (unsigned i=0; i<summands.size(); i++) {
-					ss << summands[i];
-					if (i < summands.size() - 1) ss << " + ";
-                    if (vars) ss << std::endl;
+                    auto str = summands[i].ToString();
+
+                    if (!first) {
+                        if (str[0] == '-') ss << " - " << ((vars) ? "\n" : "") << str.substr(1);
+                        else ss << " + " << ((vars) ? "\n" : "") << str;
+                    }
+
+                    if (first) {
+                        first = false;
+
+                        ss << str;
+                    }
 				}
 				return ss.str();
 			}
@@ -2062,23 +2076,6 @@ namespace Construction {
                 // Iterate over the rows
                 unsigned max = std::min(static_cast<unsigned>(M.GetNumberOfRows()), static_cast<unsigned>(summands.size()));
 
-                // Add some fractions
-                static std::map<float, scalar_type> fractions_heuristics = {
-                    { 0.5, scalar_type(1,2) },
-                    { 0.25, scalar_type(1,4) },
-                    { 0.2, scalar_type(1,5) },
-                    { 0.125, scalar_type(1,8) },
-                    { 1.0/3, scalar_type(1,3) },
-                    { 1.0/6, scalar_type(1,6) },
-                    { 1.0/9, scalar_type(1,9) },
-                    { 0.1, scalar_type(1,10) },
-
-                    { 1.0/12, scalar_type(1,12) },
-                    { 1.0/24, scalar_type(1,24) },
-                    { 1.0/32, scalar_type(1,32) },
-                    { 1.0/36, scalar_type(1,36) }
-                };
-
                 for (int currentRow=0; currentRow < max; currentRow++) {
                 	// Initialize the next tensor
                 	scalar_type scalar = 0;
@@ -2097,13 +2094,7 @@ namespace Construction {
                             scalar = summands[i].SeparateScalefactor().first;
                             tensor = summands[i].SeparateScalefactor().second;//.Simplify();
                         } else if (foundBase) {
-                            if (std::fmod(M(currentRow,i),1) == 0) {
-                                scalar += summands[i].SeparateScalefactor().first * Scalar(M(currentRow,i),1);
-                            } else if (fractions_heuristics.find(M(currentRow,i)) != fractions_heuristics.end()) {
-                                scalar += summands[i].SeparateScalefactor().first * fractions_heuristics[M(currentRow,i)];
-                            } else {
-                                scalar += summands[i].SeparateScalefactor().first * M(currentRow,i);
-                            }
+                            scalar += summands[i].SeparateScalefactor().first * Scalar::Fraction(M(currentRow,i));
                         } else if (i == summands.size()-1 && !foundBase) {
                             // If all the values were zero, no further information
                             // can be found in the matrix, thus break the loop
