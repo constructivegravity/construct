@@ -2062,6 +2062,23 @@ namespace Construction {
                 // Iterate over the rows
                 unsigned max = std::min(static_cast<unsigned>(M.GetNumberOfRows()), static_cast<unsigned>(summands.size()));
 
+                // Add some fractions
+                static std::map<float, scalar_type> fractions_heuristics = {
+                    { 0.5, scalar_type(1,2) },
+                    { 0.25, scalar_type(1,4) },
+                    { 0.2, scalar_type(1,5) },
+                    { 0.125, scalar_type(1,8) },
+                    { 1.0/3, scalar_type(1,3) },
+                    { 1.0/6, scalar_type(1,6) },
+                    { 1.0/9, scalar_type(1,9) },
+                    { 0.1, scalar_type(1,10) },
+
+                    { 1.0/12, scalar_type(1,12) },
+                    { 1.0/24, scalar_type(1,24) },
+                    { 1.0/32, scalar_type(1,32) },
+                    { 1.0/36, scalar_type(1,36) }
+                };
+
                 for (int currentRow=0; currentRow < max; currentRow++) {
                 	// Initialize the next tensor
                 	scalar_type scalar = 0;
@@ -2082,6 +2099,8 @@ namespace Construction {
                         } else if (foundBase) {
                             if (std::fmod(M(currentRow,i),1) == 0) {
                                 scalar += summands[i].SeparateScalefactor().first * Scalar(M(currentRow,i),1);
+                            } else if (fractions_heuristics.find(M(currentRow,i)) != fractions_heuristics.end()) {
+                                scalar += summands[i].SeparateScalefactor().first * fractions_heuristics[M(currentRow,i)];
                             } else {
                                 scalar += summands[i].SeparateScalefactor().first * M(currentRow,i);
                             }
