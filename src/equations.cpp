@@ -26,9 +26,12 @@ int main(int argc, char** argv) {
         if (line == "") continue;
 
         // Add the equation
-        equations.push_back(
-            std::unique_ptr<Construction::Equations::Equation>(new Construction::Equations::Equation(line))
-        );
+        auto eq = std::unique_ptr<Construction::Equations::Equation>(new Construction::Equations::Equation(line));
+
+        // If the equation isn't empty, add it
+        if (!eq->IsEmpty()) {
+            equations.push_back(std::move(eq));
+        }
     }
 
     // Calculate number of coefficients and equations
