@@ -6,6 +6,7 @@
 #include <numeric>
 #include <cmath>
 #include <memory>
+#include <unordered_map>
 
 #include <common/task_pool.hpp>
 #include <tensor/permutation.hpp>
@@ -772,7 +773,7 @@ namespace Construction {
 				\throws IncompleteIndexAssignmentException
 			 */
 			virtual Scalar Evaluate(const std::vector<unsigned>& args) const override {
-				return A->Evaluate(args) * c;
+                return A->Evaluate(args) * c;
 			}
 
 			TensorPointer Canonicalize() const override {
@@ -2056,8 +2057,7 @@ namespace Construction {
 
                 int k=0;
 
-                std::vector<scalar_type> _map_scalars;
-                std::vector<Tensor> _map_tensors;
+                std::unordered_map<scalar_type, Tensor> map;
 
                 // Iterate over the rows
                 unsigned max = std::min(static_cast<unsigned>(M.GetNumberOfRows()), static_cast<unsigned>(summands.size()));
@@ -2097,19 +2097,17 @@ namespace Construction {
                     }
 
                 	// Add to the tensor map
-                	auto it = std::find(_map_scalars.begin(), _map_scalars.end(), scalar);
-                	if (it == _map_scalars.end()) {
-                		_map_scalars.push_back(scalar);
-                		_map_tensors.push_back(tensor);
+                	auto it = map.find(scalar);
+                	if (it == map.end()) {
+                        map.insert({ scalar, tensor });
                 	} else {
-                		auto id = it - _map_scalars.begin();
-                		_map_tensors[id] += tensor;
+                        it->second += tensor;
                 	}
                 }
 
                 // Add everything to the result
-                for (unsigned i=0; i<_map_scalars.size(); i++) {
-                	result += _map_scalars[i] * _map_tensors[i];
+                for (auto& pair : map) {
+                    result += pair.first * pair.second;
                 }
 
 				return result;
@@ -2220,11 +2218,10 @@ namespace Construction {
 
 			std::vector<std::pair<scalar_type, Tensor>> ExtractVariables(Tensor* inhomogeneousPart = nullptr) const {
 				// First expand and get summands
-				auto summands = GetSummands();
+				auto summands = Expand().GetSummands();
 
 				// Start result
-				std::vector<scalar_type> result_scalars;
-				std::vector<Tensor> result_tensors;
+                std::unordered_map<scalar_type, Tensor> map;
 
 				// Iterate over all the summands
 				for (auto& _tensor : summands) {
@@ -2233,70 +2230,37 @@ namespace Construction {
 					auto scalar = tmp.first;
 					auto tensor = tmp.second;
 
-					// Expand scalar part
-					auto scalarSummands = scalar.GetSummands();
-					for (auto& v : scalarSummands) {
-						// If the scalar is a variable
-						if (v.IsVariable()) {
-							auto it = std::find(result_scalars.begin(), result_scalars.end(), v);
-							if (it == result_scalars.end()) {
-								result_scalars.push_back(v);
-								result_tensors.push_back(tensor);
-							} else {
-								result_tensors[it - result_scalars.begin()] += tensor;
-							}
-						}
-						// if the scalar is a number, just add the tensor to the inhomogeneous part
-						else if (v.IsNumeric()) {
-							if (inhomogeneousPart != nullptr) (*inhomogeneousPart) += _tensor;
-						}
-						// if the scalar is a multiplication, we knwo that at least one of both
-						// factors is a variable
-						else if (v.IsMultiplied()) {
-							auto first = v.As<MultipliedScalar>()->GetFirst()->Clone();
-							auto second = v.As<MultipliedScalar>()->GetSecond()->Clone();
+                    auto s = scalar.SeparateVariablesFromRest();
 
-							bool a1 = v.As<MultipliedScalar>()->GetFirst()->IsVariable();
-							bool a2 = v.As<MultipliedScalar>()->GetFirst()->IsNumeric();
+                    // Add inhomogeneous part
+                    if (!(s.second.IsNumeric() && s.second.ToDouble() == 0) && inhomogeneousPart != nullptr) {
+                        (*inhomogeneousPart) += _tensor;
+                    }
 
-							bool b1 = v.As<MultipliedScalar>()->GetSecond()->IsVariable();
-							bool b2 = v.As<MultipliedScalar>()->GetSecond()->IsNumeric();
+                    for (auto& ss : s.first) {
+                        auto variable = ss.first;
+                        auto factor = ss.second;
 
-							if (a1 && b2) {
-								scalar_type s = scalar_type(std::move(first));
-								Tensor newTensor = scalar_type(std::move(second)) * tensor;
+                        // Throw exception, do not support quadratic terms
+                        if (factor.HasVariables()) {
+                            assert(false);
+                        }
 
-								auto it = std::find(result_scalars.begin(), result_scalars.end(), s);
-								if (it == result_scalars.end()) {
-									result_scalars.push_back(s);
-									result_tensors.push_back(newTensor);
-								} else {
-									result_tensors[it - result_scalars.begin()] += newTensor;
-								}
-							} else if (a2 && b1) {
-								scalar_type s = scalar_type(std::move(second));
-								Tensor newTensor = scalar_type(std::move(first)) * tensor;
+                        auto it = map.find(variable);
 
-								auto it = std::find(result_scalars.begin(), result_scalars.end(), s);
-								if (it == result_scalars.end()) {
-									result_scalars.push_back(s);
-									result_tensors.push_back(newTensor);
-								} else {
-									result_tensors[it - result_scalars.begin()] += newTensor;
-								}
-							} else {
-								// Throw exception, do not support quadratic terms
-								assert(false);
-							}
-						}
-					}
+                        if (it == map.end()) {
+                            map.insert({ variable, factor * tensor });
+                        } else {
+                            it->second += factor * tensor;
+                        }
+                    }
 				}
 
 				// Turn this into the result
 				std::vector< std::pair<scalar_type, Tensor> > result;
-				for (unsigned i=0; i<result_scalars.size(); i++) {
-					result.push_back({ result_scalars[i], result_tensors[i] });
-				}
+                for (auto& pair : map) {
+                    result.push_back(pair);
+                }
 
 				return result;
 			}

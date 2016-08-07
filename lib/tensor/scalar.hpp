@@ -551,3 +551,17 @@ namespace Construction {
 
     }
 }
+
+namespace std {
+
+    /**
+        Hash function for scalars to use std::unordered_map
+     */
+    template<>
+    struct hash<Construction::Tensor::Scalar> {
+        std::size_t operator()(const Construction::Tensor::Scalar& scalar) const {
+            return std::hash<std::string>()(scalar.ToString());
+        }
+    };
+
+}
