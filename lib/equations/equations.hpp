@@ -55,12 +55,16 @@ namespace Construction {
 
             ~Equation() {
                 // Join the thread of the calculation
-                thread.join();
+                if (!isEmpty) {
+                    thread.join();
+                }
             }
         public:
             bool IsWaiting() const { return state == WAITING; }
             bool IsSolving() const { return state == SOLVING; }
             bool IsSolved() const { return state == SOLVED; }
+
+            bool IsEmpty() const { return isEmpty; }
         public:
             /**
                 \brief Parses the expression
@@ -85,6 +89,11 @@ namespace Construction {
                 // Recognize a coefficient
                 for (int i=0; i<code.size(); ++i) {
                     char c = code[i];
+
+                    // Ignore comments
+                    if (c == '/' && i<code.size()-1 && code[i+1] == '/' ) {
+                        break;
+                    }
 
                     if (!inCoeff) {
                         if (c == '#' && i < code.size()-1 & code[i+1] == '<') {
@@ -177,6 +186,17 @@ namespace Construction {
                     temp += c;
                 }
 
+                // Check if the equation is trivial
+                {
+                    isEmpty = true;
+                    for (auto& c : current) {
+                        if (c != ' ') {
+                            isEmpty = false;
+                            break;
+                        }
+                    }
+                }
+
                 eq = "subst = HomogeneousSystem(" + current + "):";
             }
         public:
@@ -225,16 +245,28 @@ namespace Construction {
 
                 //  IV. Substitute the result into the coefficients
                 // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-                for (auto& coeff : coefficients) {
+                for (auto it = Coefficients::Instance()->begin(); it != Coefficients::Instance()->end(); ++it) {
+                    // Get the coefficient
+                    auto coeff = it->second;
+
+                    bool fromOtherEq= false;
+
+                    // If the coefficient is not from this equation, lock
+                    if (std::find(coefficients.begin(), coefficients.end(), coeff) == coefficients.end()) {
+                        // Check if the coefficient is finished
+                        if (!coeff->IsFinished()) continue;
+
+                        coeff->Lock();
+                        fromOtherEq = true;
+                    }
+
+                    // Substitute the results into the coefficient
                     coeff->SetTensor(subst(*coeff->GetAsync()));
 
                     // Overwrite the tensor in the session
                     Session::Instance()->Get(coeff->GetName()) = *coeff->GetAsync();
-                }
 
-                //   V. Release locks
-                // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-                for (auto& coeff : coefficients) {
+                    // Release the lock from the coefficient
                     coeff->Unlock();
                 }
 
@@ -268,6 +300,8 @@ namespace Construction {
             std::thread thread;
             std::mutex mutex;
             std::condition_variable variable;
+
+            bool isEmpty;
 
             std::string eq;
             std::vector<CoefficientReference> coefficients;
