@@ -314,6 +314,11 @@ namespace Construction {
                         }
                     }
 
+                    // If the left hand side is not a variable, throw exception
+                    if (lhs.IsNumeric() && lhs.ToDouble() == 0) {
+                        throw Tensor::InvalidSubstitutionException();
+                    }
+
                     // Add to the result
                     result.Insert(lhs, rhs);
                 }

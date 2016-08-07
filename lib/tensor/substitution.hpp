@@ -1,5 +1,6 @@
 #pragma once
 
+#include <common/error.hpp>
 #include <tensor/scalar.hpp>
 #include <tensor/tensor.hpp>
 
@@ -8,12 +9,17 @@ namespace Construction {
 
 		class Tensor;
 
+        class InvalidSubstitutionException : public Exception {
+        public:
+            InvalidSubstitutionException() : Exception("The substitution is invalid") { }
+        };
+
 		class Substitution : public AbstractExpression {
 		public:
 			Substitution() : AbstractExpression(AbstractExpression::SUBSTITUTION, 36) { }
 
 			Substitution(const Scalar& variable, const Scalar& other) : AbstractExpression(AbstractExpression::SUBSTITUTION, 36) {
-				substitutions.push_back({variable,other}); 
+				substitutions.push_back({variable,other});
 			}
 		public:
 			void Insert(const Scalar& variable, const Scalar& expression) {
