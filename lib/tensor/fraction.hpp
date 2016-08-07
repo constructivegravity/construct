@@ -72,6 +72,7 @@ namespace Construction {
                 int n = numerator * other.denominator + other.numerator * denominator;
                 denominator = d;
                 numerator = n;
+                Reduce();
                 return *this;
             }
 
@@ -102,7 +103,9 @@ namespace Construction {
             Fraction operator+(const Fraction& other) const {
                 unsigned int d = denominator * other.denominator;
                 int n = numerator * other.denominator + other.numerator * denominator;
-                return Fraction(n,d);
+                Fraction result (n,d);
+                result.Reduce();
+                return result;
             }
 
             inline Fraction operator+(int i) const { return *this + Fraction(i); }
@@ -110,19 +113,25 @@ namespace Construction {
             Fraction operator-(const Fraction& other) const {
                 unsigned int d = denominator * other.denominator;
                 int n = numerator * other.denominator - other.numerator * denominator;
-                return Fraction(n,d);
+                Fraction result (n,d);
+                result.Reduce();
+                return result;
             }
 
             inline Fraction operator-(int i) const { return *this - Fraction(i); }
 
             Fraction operator*(const Fraction& other) const {
-                return Fraction(numerator * other.numerator, denominator * other.denominator);
+                Fraction result (numerator * other.numerator, denominator * other.denominator);
+                result.Reduce();
+                return result;
             }
 
             inline Fraction operator*(int i) const { return Fraction(numerator * i, denominator); }
 
             Fraction operator/(const Fraction& other) const {
-                return Fraction(numerator * other.denominator, denominator * other.numerator);
+                Fraction result (numerator * other.denominator, denominator * other.numerator);
+                result.Reduce();
+                return result;
             }
 
             inline Fraction operator/(int i) const { return Fraction(numerator, denominator * i); }
