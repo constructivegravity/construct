@@ -359,7 +359,6 @@ namespace Construction {
 
             Expression Execute() const {
                 // TODO:
-                //std::cout << "  \033[32m" << API::DegreesOfFreedom(GetTensors(0)) << "\033[0m" << std::endl;
                 return Tensor::Scalar(static_cast<int>(API::DegreesOfFreedom(GetTensors(0))));
             }
 
