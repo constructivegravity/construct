@@ -1000,7 +1000,7 @@ namespace Construction {
 		 */
 		class ScalarTensor : public AbstractTensor {
 		public:
-			ScalarTensor(Scalar value) : value(value) { }
+			ScalarTensor(const Scalar& value) : value(value) { type = TensorType::SCALAR; }
 
 			ScalarTensor(const std::string& name, const std::string& printed_text, Scalar value)
 				: AbstractTensor(name, printed_text, Indices()), value(value) {
@@ -1008,14 +1008,26 @@ namespace Construction {
 				type = TensorType::SCALAR;
 			}
 
+            ScalarTensor(const ScalarTensor& other) : value(other.value) {
+                type = TensorType::SCALAR;
+            }
+
+            ScalarTensor(ScalarTensor&& other) : value(std::move(other.value)) {
+                type = TensorType::SCALAR;
+            }
+
 			virtual ~ScalarTensor() = default;
 		public:
 			virtual TensorPointer Clone() const override {
-				return TensorPointer(new ScalarTensor(*this));
+				return TensorPointer(new ScalarTensor(value));
 			}
+        public:
+            virtual TensorPointer Canonicalize() const override {
+                return TensorPointer(new ScalarTensor(value));
+            }
 		public:
 			virtual std::string ToString() const override {
-				return printed_text;
+				return value.ToString();
 			}
         public:
 			virtual Scalar Evaluate(const std::vector<unsigned>& args) const override {
@@ -1039,6 +1051,8 @@ namespace Construction {
 
 				return TensorPointer(new ScalarTensor(value));
 			}
+        public:
+            Scalar GetValue() const { return value; }
 		private:
 			Scalar value;
 		};
@@ -1109,6 +1123,17 @@ namespace Construction {
 				return TensorPointer(new ZeroTensor());
 			}
 
+            // If one of the tensors is scalar
+            if (one.IsScalar()) {
+                auto value = static_cast<ScalarTensor*>(one.Clone().get())->GetValue();
+                return std::move(Multiply(second, value));
+            }
+
+            if (second.IsScalar()) {
+                auto value = static_cast<ScalarTensor*>(second.Clone().get())->GetValue();
+                return std::move(Multiply(one, value));
+            }
+
 			return TensorPointer(new MultipliedTensor(
 					std::move(one.Clone()),
 					std::move(second.Clone())
@@ -1126,6 +1151,12 @@ namespace Construction {
 
 			// If the tensor is zero, return zero
 			if (one.IsZeroTensor()) return std::move(clone);
+
+            // Syntactic sugar for scaling of scalars
+            if (one.IsScalar()) {
+                auto s = c * static_cast<ScalarTensor*>(clone.get())->GetValue();
+                return TensorPointer(new ScalarTensor(s));
+            }
 
 			// Syntactic sugar for scaling a scaled tensor
 			if (one.IsScaledTensor()) {
@@ -2129,7 +2160,10 @@ namespace Construction {
 				} else if (pointer->IsSubstitute()) {
 					auto res = Tensor(std::move(static_cast<SubstituteTensor*>(pointer.get())->GetTensor()->Clone())).SeparateScalefactor();
 					return { res.first, Tensor::Substitute(res.second, GetIndices()) };
-				} else {
+				} else if (pointer->IsScalar()) {
+                    auto scale = static_cast<ScalarTensor*>(pointer.get())->GetValue();
+                    return { scale, Tensor::One() };
+                } else {
 					return { 1, *this };
 				}
 			}

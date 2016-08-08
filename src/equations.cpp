@@ -98,6 +98,8 @@ int main(int argc, char** argv) {
                 if (s.second.IsAdded()) {
                     std::cout << "(" << s.second << ")";
                 } else std::cout << s.second;
+            } else if (t.IsScalar()) {
+                std::cout << "     \033[32m" << t.ToString();
             } else {
                 std::cout << "     \033[33m" << t.ToString();
             }

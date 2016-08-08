@@ -44,7 +44,8 @@ namespace Construction {
             enum State {
                 WAITING,
                 SOLVING,
-                SOLVED
+                SOLVED,
+                ABORTED
             };
         public:
             // Constructor
@@ -237,37 +238,49 @@ namespace Construction {
                 CLI cli;
 
                 // Set the coefficient of the session
-                cli(eq);
+                try {
+                    cli(eq);
 
-                // III. Convert the output into a substitution
-                // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-                auto subst = Session::Instance()->GetCurrent().As<Tensor::Substitution>();
+                    // III. Convert the output into a substitution
+                    // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+                    auto subst = Session::Instance()->GetCurrent().As<Tensor::Substitution>();
 
-                //  IV. Substitute the result into the coefficients
-                // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-                for (auto it = Coefficients::Instance()->begin(); it != Coefficients::Instance()->end(); ++it) {
-                    // Get the coefficient
-                    auto coeff = it->second;
+                    //  IV. Substitute the result into the coefficients
+                    // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+                    for (auto it = Coefficients::Instance()->begin(); it != Coefficients::Instance()->end(); ++it) {
+                        // Get the coefficient
+                        auto coeff = it->second;
 
-                    bool fromOtherEq= false;
+                        bool fromOtherEq= false;
 
-                    // If the coefficient is not from this equation, lock
-                    if (std::find(coefficients.begin(), coefficients.end(), coeff) == coefficients.end()) {
-                        // Check if the coefficient is finished
-                        if (!coeff->IsFinished()) continue;
+                        // If the coefficient is not from this equation, lock
+                        if (std::find(coefficients.begin(), coefficients.end(), coeff) == coefficients.end()) {
+                            // Check if the coefficient is finished
+                            if (!coeff->IsFinished()) continue;
 
-                        coeff->Lock();
-                        fromOtherEq = true;
+                            coeff->Lock();
+                            fromOtherEq = true;
+                        }
+
+                        // Substitute the results into the coefficient
+                        coeff->SetTensor(subst(*coeff->GetAsync()));
+
+                        // Overwrite the tensor in the session
+                        Session::Instance()->Get(coeff->GetName()) = *coeff->GetAsync();
+
+                        // Release the lock from the coefficient
+                        coeff->Unlock();
                     }
+                } catch (...) {
+                    state = ABORTED;
 
-                    // Substitute the results into the coefficient
-                    coeff->SetTensor(subst(*coeff->GetAsync()));
+                    // TODO: THROW EXCEPTION
+                    std::cout << "Error in equation `" << eq << "`" << std::endl;
 
-                    // Overwrite the tensor in the session
-                    Session::Instance()->Get(coeff->GetName()) = *coeff->GetAsync();
+                    variable.notify_all();
+                    Notify();
 
-                    // Release the lock from the coefficient
-                    coeff->Unlock();
+                    return;
                 }
 
                 // Set the state to solved

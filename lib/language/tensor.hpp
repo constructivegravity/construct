@@ -496,6 +496,7 @@ namespace Construction {
 
                 // If the tensor is zero, return
                 if (tensor.IsZeroTensor()) return tensor;
+                if (tensor.IsScalar()) return tensor;
 
                 tensor.SetIndices(Tensor::Permutation::From(GetIndices(1), tensor.GetIndices())(GetIndices(2)));
                 return tensor.Canonicalize();
