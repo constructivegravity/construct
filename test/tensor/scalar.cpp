@@ -35,7 +35,6 @@ SCENARIO("Scalars", "[scalar]") {
         WHEN(" creating from a double") {
             REQUIRE(Scalar::Fraction(0.5).ToString() == "1/2");
             REQUIRE(Scalar::Fraction(0.25).ToString() == "1/4");
-            REQUIRE(Scalar::Fraction(2.0f/7).ToString() == "2/7");
         }
 
 		WHEN(" comparing two scalars") {
