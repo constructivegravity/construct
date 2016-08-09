@@ -249,15 +249,12 @@ namespace Construction {
                     // Get the coefficient
                     auto coeff = it->second;
 
-                    bool fromOtherEq= false;
-
                     // If the coefficient is not from this equation, lock
                     if (std::find(coefficients.begin(), coefficients.end(), coeff) == coefficients.end()) {
                         // Check if the coefficient is finished
                         if (!coeff->IsFinished()) continue;
 
                         coeff->Lock();
-                        fromOtherEq = true;
                     }
 
                     // Substitute the results into the coefficient
