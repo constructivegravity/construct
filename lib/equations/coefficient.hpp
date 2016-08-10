@@ -92,6 +92,9 @@ namespace Construction {
                 // Get reference to the coefficient
                 auto ref = GetReference();
 
+                Construction::Logger logger;
+                logger << Construction::Logger::DEBUG << "Notify all the observers of " << ref << Construction::Logger::endl;
+
                 // Iterate over all observers
                 for (auto& fn : observers) {
                     fn(ref);
@@ -285,6 +288,9 @@ namespace Construction {
                 // Finished
                 state = FINISHED;
 
+                Construction::Logger logger;
+                logger << Construction::Logger::DEBUG << "Finished coefficient " << GetReference() << ": `" << ToString() << "`" << Construction::Logger::endl;
+
                 Notify();
                 variable.notify_all();
             }
@@ -316,7 +322,7 @@ namespace Construction {
         public:
             std::string ToString() const {
                 std::stringstream ss;
-                ss << "#<" << id << ":" << l << ":" << ld << ":" << ":" << r << ":" << rd << ">";
+                ss << "#<" << id << ":" << l << ":" << ld << ":" << r << ":" << rd << ">";
 
                 if (state == FINISHED) {
                     ss << " = " << tensor->ToString();
@@ -411,6 +417,23 @@ namespace Construction {
             std::unordered_map<Definition, CoefficientReference, DefinitionHasher>::const_iterator end() const { return map.end(); }
         private:
             std::unordered_map<Definition, CoefficientReference, DefinitionHasher> map;
+        };
+
+        class CoefficientsLock {
+        public:
+            CoefficientsLock() {
+                // Lock all the coefficients
+                for (auto it = Coefficients::Instance()->begin(); it != Coefficients::Instance()->end(); ++it) {
+                    it->second->Lock();
+                }
+            }
+
+            ~CoefficientsLock() {
+                // Release all the coefficients
+                for (auto it = Coefficients::Instance()->begin(); it != Coefficients::Instance()->end(); ++it) {
+                    it->second->Unlock();
+                }
+            }
         };
 
     }

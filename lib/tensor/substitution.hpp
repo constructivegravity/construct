@@ -51,6 +51,125 @@ namespace Construction {
 
 				return ss.str();
 			}
+        public:
+            std::vector< std::pair<Scalar, Scalar> >::iterator begin() { return substitutions.begin(); }
+            std::vector< std::pair<Scalar, Scalar> >::iterator end() { return substitutions.end(); }
+
+            std::vector< std::pair<Scalar, Scalar> >::const_iterator begin() const { return substitutions.begin(); }
+            std::vector< std::pair<Scalar, Scalar> >::const_iterator end() const { return substitutions.end(); }
+        public:
+            /**
+                \brief Merge multiple substitutions into one common
+
+             */
+            static Substitution Merge(const std::vector<Substitution> substitutions) {
+                if (substitutions.size() == 1) return substitutions[0];
+
+                // Turn this into a matrix
+                std::vector<Scalar> variables;
+
+                std::vector<std::unordered_map<Scalar, double>> data;
+
+                // Iterate over all substitutions
+                int i=0;
+                int pos=0;
+                for (auto& subst : substitutions) {
+                    // Iterate over all scalars in the substitution
+                    for (auto& s : subst) {
+                        // Turn this into an equation of the form lhs-rhs = 0
+                        Scalar eq = s.first;
+
+                        auto summands = s.second.GetSummands();
+                        for (auto& t : summands) {
+                            eq -= t;
+                        }
+
+                        auto r = eq.SeparateVariablesFromRest();
+
+                        std::unordered_map<Scalar, double> map;
+
+                        bool first=true;
+
+                        // Add the variable to the list
+                        for (auto& v : r.first) {
+                            if (first) {
+                                first = false;
+
+                                auto it = std::find(variables.begin(), variables.end(), v.first);
+                                if (it != variables.end()) {
+                                    variables.erase(it);
+                                }
+
+                                variables.insert(variables.begin() + pos++, v.first);
+                            } else {
+                                if (std::find(variables.begin(), variables.end(), v.first) == variables.end()) {
+                                    variables.push_back(v.first);
+                                }
+                            }
+
+                            if (!v.second.IsNumeric()) assert(false);
+
+                            // Get the value
+                            map[v.first] = v.second.ToDouble();
+                        }
+
+                        data.push_back(map);
+                    }
+                    i++;
+                }
+
+                // Write the elements into a matrix
+                Vector::Matrix M(data.size(), variables.size());
+
+                // Insert the data from above
+                for (int i=0; i<data.size(); ++i) {
+                    for (int j=0; j<variables.size(); ++j) {
+                        M(i,j) = data[i][variables[j]];
+                    }
+                }
+
+                // Free memory in data
+                data.clear();
+
+                // Row reduce
+                M.ToRowEchelonForm();
+
+                // Read out
+                Substitution result;
+
+                // Extract the results
+                for (int i=0; i<M.GetNumberOfRows(); i++) {
+                    auto vec = M.GetRowVector(i);
+
+                    // If the vector has zero norm, we get no further information => quit
+                    if (vec * vec == 0) break;
+
+                    bool isZero = true;
+                    Scalar lhs = 0;
+                    Scalar rhs = 0;
+
+                    // Iterate over all the components
+                    for (int j=0; j<vec.GetDimension(); j++) {
+                        if (vec[j] == 0 && isZero) continue;
+                        if (vec[j] == 1 && isZero) {
+                            lhs = variables[j];
+                            isZero = false;
+                        } else if (vec[j] != 0) {
+                            rhs += (-variables[j] * Scalar::Fraction(vec[j]));
+                        }
+                    }
+
+                    // If the left hand side is not a variable, throw exception
+                    if (lhs.IsNumeric() && lhs.ToDouble() == 0) {
+                        throw InvalidSubstitutionException();
+                    }
+
+                    // Add to the result
+                    result.Insert(lhs, rhs);
+                }
+
+                return result;
+            }
 		public:
 			virtual void Serialize(std::ostream& os) const override {
 				// Write size

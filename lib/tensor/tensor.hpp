@@ -9,6 +9,7 @@
 #include <unordered_map>
 
 #include <common/task_pool.hpp>
+#include <common/logger.hpp>
 #include <tensor/permutation.hpp>
 #include <tensor/fraction.hpp>
 #include <tensor/symmetry.hpp>
@@ -578,7 +579,7 @@ namespace Construction {
 			/**
 				Canonicalize a sum of two tensors
 			 */
-			TensorPointer Canonicalize() const override {
+			virtual TensorPointer Canonicalize() const override {
 				std::vector<TensorPointer> newSummands;
 
 				for (auto& tensor : summands) {
@@ -731,6 +732,10 @@ namespace Construction {
 				auto B = AbstractTensor::Deserialize(is)->Clone();
 				return TensorPointer(new MultipliedTensor(std::move(A), std::move(B)));
 			}
+        public:
+            virtual TensorPointer Canonicalize() const override {
+                return TensorPointer(new MultipliedTensor(std::move(A->Canonicalize()), std::move(B->Canonicalize())));
+            }
 		private:
 			TensorPointer A;
 			TensorPointer B;
@@ -776,7 +781,7 @@ namespace Construction {
                 return A->Evaluate(args) * c;
 			}
 
-			TensorPointer Canonicalize() const override {
+			virtual TensorPointer Canonicalize() const override {
 				auto newA = A->Canonicalize();
 				if (newA->IsScaledTensor()) {
 					ScaledTensor* scaled = static_cast<ScaledTensor*>(newA.get());
@@ -869,6 +874,10 @@ namespace Construction {
 			static TensorPointer DoDeserialize(std::istream& is, const Indices& indices) {
 				return TensorPointer(new ZeroTensor());
 			}
+        public:
+            virtual TensorPointer Canonicalize() const override {
+                return TensorPointer(new ZeroTensor());
+            }
 		};
 
 		/*MultipliedTensor AbstractTensor::operator*(const AbstractTensor &other) const {
@@ -960,6 +969,10 @@ namespace Construction {
 
 				return (*A)(assignment);
 			}
+
+            virtual TensorPointer Canonicalize() const override {
+                return TensorPointer(new SubstituteTensor(std::move(A->Canonicalize()), indices));
+            }
 		public:
 			const TensorPointer& GetTensor() const {
 				return A;
@@ -2163,12 +2176,18 @@ namespace Construction {
 				} else if (pointer->IsScalar()) {
                     auto scale = static_cast<ScalarTensor*>(pointer.get())->GetValue();
                     return { scale, Tensor::One() };
+                } else if (pointer->IsMultipliedTensor()) {
+                    auto a1 = Tensor(TensorPointer(As<MultipliedTensor>()->GetFirst()->Clone())).SeparateScalefactor();
+                    auto a2 = Tensor(TensorPointer(As<MultipliedTensor>()->GetSecond()->Clone())).SeparateScalefactor();
+                    return { a1.first * a2.first , a1.second * a2.second };
                 } else {
 					return { 1, *this };
 				}
 			}
 
             Tensor CollectByVariables() const {
+                Construction::Logger::Debug("Collect by variables in tensor ", ToString());
+
                 // Expand first
                 auto expanded = Expand();
 
@@ -2225,11 +2244,15 @@ namespace Construction {
 			}
 
 			Tensor SubstituteVariables(const std::vector<std::pair<scalar_type, scalar_type>>& substitutions) const {
+                Construction::Logger::Debug("Substitute variables into ", ToString());
+
 				Tensor result = *this;
 
 				for (auto& substitution : substitutions) {
 					result = std::move(result.SubstituteVariable(substitution.first, substitution.second));
 				}
+
+                Construction::Logger::Debug("Finished substitution into ", ToString(), ". Collect by variables ...");
 
 				return result.CollectByVariables();
 			}
