@@ -560,7 +560,13 @@ namespace Construction {
 
                 if (current.IsIndices()) {
                     backtracking.CancelBacktracking();
-                    return std::make_shared<IndicesNode>(current.GetContent());
+
+                    auto result = std::make_shared<IndicesNode>(current.GetContent());
+
+                    // Move cursor
+                    GetNext();
+
+                    return std::move(result);
                 }
 
                 return nullptr;
@@ -571,7 +577,13 @@ namespace Construction {
 
                 if (current.IsString()) {
                     backtracking.CancelBacktracking();
-                    return std::make_shared<StringNode>(current.GetContent());
+
+                    auto result = std::make_shared<StringNode>(current.GetContent());
+
+                    // Move cursor
+                    GetNext();
+
+                    return std::move(result);
                 }
 
                 return nullptr;
@@ -582,8 +594,16 @@ namespace Construction {
 
                 if (current.IsNumeric()) {
                     backtracking.CancelBacktracking();
-                    return std::make_shared<NumericNode>(current.GetContent());
+
+                    auto result = std::make_shared<NumericNode>(current.GetContent());
+
+                    // Move cursor
+                    GetNext();
+
+                    return std::move(result);
                 }
+
+                // Move cursor
 
                 return nullptr;
             }
@@ -597,7 +617,13 @@ namespace Construction {
                 // Go to the next position
                 backtracking.CancelBacktracking();
 
-                return std::make_shared<LiteralNode>(current.GetContent());
+                // Make result
+                auto result = std::make_shared<LiteralNode>(current.GetContent());
+
+                // Move cursor
+                GetNext();
+
+                return std::move(result);
             }
 
             std::shared_ptr<Node> ParsePrimary() {
@@ -629,7 +655,11 @@ namespace Construction {
 
                 if (current.IsPrevious()) {
                     backtracking.CancelBacktracking();
-                    return std::make_shared<PreviousNode>();
+
+                    auto result = std::make_shared<PreviousNode>();
+                    GetNext();
+
+                    return std::move(result);
                 }
 
                 return nullptr;
@@ -704,6 +734,9 @@ namespace Construction {
 
                     // Finally cancel backtracking
                     backtracking.CancelBacktracking();
+
+                    // Go to the next token
+                    GetNext();
 
                     return std::make_shared<CommandNode>(std::move(identifier), std::move(arguments));
                 }
@@ -945,8 +978,6 @@ namespace Construction {
         BacktrackingRAII::~BacktrackingRAII() {
             if (backtrack) {
                 parser.GoToPosition(position);
-            } else {
-                parser.GetNext();
             }
         }
 

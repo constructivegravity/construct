@@ -127,7 +127,9 @@ namespace Construction {
 
                 // Previous token
                 if (document->IsPrevious()) {
-                    PrintExpression(lastResult);
+                    if (!silent) {
+                        PrintExpression(lastResult);
+                    }
                     return;
                 }
                 // Literals
@@ -153,7 +155,7 @@ namespace Construction {
                 // Indices
                 else if (document->IsIndices()) {
                     // Use index arguments to parse the indices
-                    IndexArgument arg(std::dynamic_pointer_cast<NumericNode>(document)->GetText());
+                    IndexArgument arg(std::dynamic_pointer_cast<IndicesNode>(document)->GetText());
 
                     // Get the indices
                     lastResult = arg.GetIndices();
@@ -209,7 +211,7 @@ namespace Construction {
                             } else if (leftResult.IsScalar()) {
                                 Session::Instance()->SetCurrent("", leftResult.As<Tensor::Scalar>() + rightResult.As<Tensor::Scalar>());
                             } else if (leftResult.IsSubstitution()) {
-                                Session::Instance()->SetCurrent("", Tensor::Substitution::Merge({ leftResult.As<Tensor::Substitution>(), rightResult.As<Tensor::Substitution>() });
+                                Session::Instance()->SetCurrent("", Tensor::Substitution::Merge({ leftResult.As<Tensor::Substitution>(), rightResult.As<Tensor::Substitution>() }));
                             }
                             break;
                         case '-':
