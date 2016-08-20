@@ -136,7 +136,7 @@ namespace Construction {
                 return GetArgument<SubstitutionArgument>(pos)->GetSubstitution();
             }
 
-            double GetNumeric(unsigned pos) const {
+            Tensor::Scalar GetNumeric(unsigned pos) const {
                 assert(pos < arguments.size());
                 assert(arguments[pos]->IsNumericArgument());
                 return GetArgument<NumericArgument>(pos)->GetValue();

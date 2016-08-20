@@ -160,7 +160,7 @@ namespace Construction {
                 }
 
                 Expression Execute() const {
-                    return API::Coefficient(GetNumeric(0), GetNumeric(1), GetNumeric(2), GetNumeric(3));
+                    return API::Coefficient(GetNumeric(0).ToDouble(), GetNumeric(1).ToDouble(), GetNumeric(2).ToDouble(), GetNumeric(3).ToDouble());
                 }
         };
 
@@ -305,7 +305,7 @@ namespace Construction {
                     std::vector<unsigned> indices;
 
                     for (auto i=1; i<Size(); i++) {
-                        unsigned j = static_cast<unsigned>(GetNumeric(i));
+                        unsigned j = static_cast<unsigned>(GetNumeric(i).ToDouble());
                         indices.push_back(j);
                     }
 

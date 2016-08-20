@@ -70,7 +70,7 @@ namespace Construction {
 		 	we do not implement the Einstein sum convention here. This may
 		 	follow in the future.
 		 */
-		class AbstractTensor : public Printable, Serializable<AbstractTensor> {
+		class AbstractTensor : public Printable, public Serializable<AbstractTensor> {
 		public:
 			enum class TensorType {
 				ADDITION = 1,
@@ -1532,7 +1532,7 @@ namespace Construction {
 				return result;
 			}
 
-			virtual void SetIndices(const Indices& indices) {
+			virtual void SetIndices(const Indices& indices) override {
 				this->indices = indices;
 			}
 
@@ -1670,7 +1670,7 @@ namespace Construction {
 			std::getline(is, printed_text, ';');
 
 			// Read indices
-			auto indices = *Indices::Deserialize(is);
+			auto indices = *static_cast<Indices*>(Indices::Deserialize(is).get());
 
 			// Read type
 			int typeC;
@@ -1729,15 +1729,15 @@ namespace Construction {
 
 		class Tensor : public AbstractExpression {
 		public:
-			Tensor() : AbstractExpression(TENSOR), pointer(TensorPointer(new ZeroTensor())) { }
-			Tensor(const std::string& name, const std::string& printable, const Indices& indices) : AbstractExpression(TENSOR), pointer(TensorPointer(new AbstractTensor(name, printable, indices))) { }
+			Tensor() : pointer(TensorPointer(new ZeroTensor())) { }
+			Tensor(const std::string& name, const std::string& printable, const Indices& indices) : pointer(TensorPointer(new AbstractTensor(name, printable, indices))) { }
 
-			Tensor(const Tensor& other) : AbstractExpression(TENSOR), pointer(std::move(other.pointer->Clone())) { }
-			Tensor(Tensor&& other) : AbstractExpression(TENSOR), pointer(std::move(other.pointer)) { }
+			Tensor(const Tensor& other) : pointer(std::move(other.pointer->Clone())) { }
+			Tensor(Tensor&& other) : pointer(std::move(other.pointer)) { }
 
 			virtual ~Tensor() = default;
 		private:
-			Tensor(TensorPointer pointer) : AbstractExpression(TENSOR), pointer(std::move(pointer)) { }
+			Tensor(TensorPointer pointer) : pointer(std::move(pointer)) { }
 		public:
 			Tensor& operator=(const Tensor& other) {
 				pointer = std::move(other.pointer->Clone());
@@ -1762,6 +1762,8 @@ namespace Construction {
 			}
 		private:
 			typedef Scalar scalar_type;
+		public:
+			virtual bool IsTensorExpression() const override { return true; }
 		public:
 			static Tensor Zero() { return Tensor(TensorPointer(new ZeroTensor())); }
 			static Tensor One() { return Tensor(TensorPointer(new ScalarTensor(1))); }
@@ -1828,6 +1830,7 @@ namespace Construction {
 			bool IsEpsilonGamma() const { return pointer->IsEpsilonGammaTensor(); }
 			bool IsDelta() const { return pointer->IsDeltaTensor(); }
 
+			AbstractTensor::TensorType GetType() const { return pointer->GetType(); }
 			std::string TypeToString() const { return pointer->TypeToString(); }
 		public:
 			inline bool IsEqual(const Tensor& other) const { return pointer->IsEqual(*other.pointer); }

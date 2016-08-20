@@ -10,15 +10,18 @@ namespace Construction {
 
 		class Substitution : public AbstractExpression {
 		public:
-			Substitution() : AbstractExpression(AbstractExpression::SUBSTITUTION, 36) { }
+			Substitution() = default;
 
-			Substitution(const Scalar& variable, const Scalar& other) : AbstractExpression(AbstractExpression::SUBSTITUTION, 36) {
+			Substitution(const Scalar& variable, const Scalar& other) {
 				substitutions.push_back({variable,other}); 
 			}
 		public:
 			void Insert(const Scalar& variable, const Scalar& expression) {
 				substitutions.push_back({variable, expression});
 			}
+
+			virtual bool IsSubstitutionExpression() const override { return true; }
+			virtual inline int GetColorCode() const override { return 36; }
 		public:
 			inline Scalar operator()(const Scalar& scalar) const {
 				Scalar result = scalar;

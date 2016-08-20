@@ -6,6 +6,8 @@
 #include <map>
 #include <algorithm>
 
+#include <tensor/expression.hpp>
+
 #include <common/error.hpp>
 #include <common/printable.hpp>
 #include <common/range.hpp>
@@ -395,9 +397,9 @@ namespace Construction {
 		/**
 			\class Indices
 		 */
-		class Indices : public Printable, Serializable<Indices> {
+		class Indices : public Serializable<Indices>, public AbstractExpression {
 		public:
-			Indices() = default;
+			Indices() { }
 
 			Indices(std::initializer_list<Index> indices) {
 				for (auto index : indices) {
@@ -658,25 +660,6 @@ namespace Construction {
 
 				// Start recursion
 				fn({}, {});
-
-				/*std::vector<unsigned> v1, v2;
-				//pool.Enqueue(fn, v1, v2);
-				threads.emplace_back(std::thread(fn, v1, v2));
-
-				// Wait for the recursion to finish
-				while (true) {
-					std::unique_lock<std::mutex> lock(mutex);
-					if (result.size() == size) {
-						std::unique_lock<std::mutex> lock(finishedMutex);
-						finished = true;
-						break;
-					}
-				}
-
-				// Join the remaining threads
-				/*for (auto& thread : threads) {
-					thread.detach();
-				}*/
 
 				return result;
 			}
@@ -1065,6 +1048,9 @@ namespace Construction {
                 return result;
             }
 		public:
+			virtual std::unique_ptr<AbstractExpression> Clone() const override { return std::move(ExpressionPointer(new Indices(*this))); }
+			virtual bool IsIndicesExpression() const override { return true; }
+		public:
 			void Serialize(std::ostream& os) const {
 				// Write the size of the indices
 				unsigned size = indices.size();
@@ -1076,7 +1062,7 @@ namespace Construction {
 				}
 			}
 
-			static std::unique_ptr<Indices> Deserialize(std::istream& is) {
+			static std::unique_ptr<AbstractExpression> Deserialize(std::istream& is) {
 				// Read size
 				unsigned size;
 				is.read(reinterpret_cast<char*>(&size), sizeof(unsigned));
@@ -1095,7 +1081,6 @@ namespace Construction {
 		private:
 			std::vector<Index> indices;
 		};
-
 
 		std::vector<unsigned> IndexAssignments::operator()(const Indices& indices) const {
 			std::vector<unsigned> result;

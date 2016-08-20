@@ -26,6 +26,11 @@ namespace Construction {
             WrongTypeException() : Exception("Unexpected type error") { }
         };
 
+        class IncompatibleTypesException : public Exception {
+        public:
+            IncompatibleTypesException() : Exception("Incompatible types") { }
+        };
+
         class CLI {
         public:
             CLI() {
@@ -120,8 +125,165 @@ namespace Construction {
 
                 Common::TimeMeasurement time;
 
+                // Previous token
                 if (document->IsPrevious()) {
                     PrintExpression(lastResult);
+                    return;
+                }
+                // Literals
+                else if (document->IsLiteral()) {
+                    auto id = std::dynamic_pointer_cast<LiteralNode>(document)->GetText();
+                    Session::Instance()->SetCurrent(definition[id], Session::Instance()->Get(id));
+
+                    // Update current
+                    lastResult = Session::Instance()->GetCurrent();
+
+                    if (!silent) PrintExpression(lastResult);
+                    return;
+                }
+                // Numerics
+                else if (document->IsNumeric()) {
+                    lastResult = Scalar(std::atof(std::dynamic_pointer_cast<NumericNode>(document)->GetText().c_str()));
+                    Session::Instance()->SetCurrent("", lastResult);
+
+                    if (!silent) PrintExpression(lastResult);
+
+                    return;
+                }
+                // Indices
+                else if (document->IsIndices()) {
+                    // Use index arguments to parse the indices
+                    IndexArgument arg(std::dynamic_pointer_cast<NumericNode>(document)->GetText());
+
+                    // Get the indices
+                    lastResult = arg.GetIndices();
+
+                    // Update the session
+                    Session::Instance()->SetCurrent("", lastResult);
+
+                    if (!silent) PrintExpression(lastResult);
+
+                    return;
+                }
+                // String
+                else if (document->IsString()) {
+                    // Get the value
+                    lastResult = Tensor::StringExpression(std::dynamic_pointer_cast<StringNode>(document)->GetText());
+
+                    // Update the session
+                    Session::Instance()->SetCurrent("", lastResult);
+
+                    if (!silent) PrintExpression(lastResult);
+
+                    return;
+                }
+                // Binary operations
+                else if (document->IsBinary()) {
+                    auto lhs = std::dynamic_pointer_cast<BinaryNode>(document)->GetLeft();
+                    auto rhs = std::dynamic_pointer_cast<BinaryNode>(document)->GetRight();
+
+                    // Execute the left command
+                    Execute(lhs, true);
+
+                    // Get the result
+                    auto leftResult = Session::Instance()->GetCurrent();
+
+                    // Reset the current instance to get the same initial conditions
+                    Session::Instance()->SetCurrent("", lastResult);
+
+                    // Execute the right command
+                    Execute(rhs, true);
+
+                    // Get the result
+                    auto rightResult = Session::Instance()->GetCurrent();
+
+                    // Do add them
+                    switch (std::dynamic_pointer_cast<BinaryNode>(document)->GetOperator()) {
+                        case '+':
+                            if (leftResult.GetType() != rightResult.GetType()) {
+                                throw IncompatibleTypesException();
+                            }
+
+                            if (leftResult.IsTensor()) {
+                                Session::Instance()->SetCurrent("", leftResult.As<Tensor::Tensor>() + rightResult.As<Tensor::Tensor>());
+                            } else if (leftResult.IsScalar()) {
+                                Session::Instance()->SetCurrent("", leftResult.As<Tensor::Scalar>() + rightResult.As<Tensor::Scalar>());
+                            } else if (leftResult.IsSubstitution()) {
+                                Session::Instance()->SetCurrent("", Tensor::Substitution::Merge({ leftResult.As<Tensor::Substitution>(), rightResult.As<Tensor::Substitution>() });
+                            }
+                            break;
+                        case '-':
+                            if (leftResult.GetType() != rightResult.GetType()) {
+                                throw IncompatibleTypesException();
+                            }
+
+                            if (leftResult.IsTensor()) {
+                                Session::Instance()->SetCurrent("", leftResult.As<Tensor::Tensor>() - rightResult.As<Tensor::Tensor>());
+                            } else if (leftResult.IsScalar()) {
+                                Session::Instance()->SetCurrent("", leftResult.As<Tensor::Scalar>() - rightResult.As<Tensor::Scalar>());
+                            }
+                            break;
+                        case '*':
+                            if (!(leftResult.IsTensor() && rightResult.IsTensor()) &&
+                                !(leftResult.IsTensor() && rightResult.IsScalar()) &&
+                                !(leftResult.IsScalar() && rightResult.IsTensor()) &&
+                                !(leftResult.IsScalar() && rightResult.IsScalar())
+                            ) {
+                                throw IncompatibleTypesException();
+                            }
+
+                            if (leftResult.IsTensor()) {
+                                Expression newExpression = (rightResult.IsTensor()) ? leftResult.As<Tensor::Tensor>() * rightResult.As<Tensor::Tensor>() : leftResult.As<Tensor::Tensor>() * rightResult.As<Tensor::Scalar>();
+
+                                // Convert completely contracted tensors (a.k.a. scalars) into real scalars
+                                if (newExpression.IsTensor() && newExpression.As<Tensor::Tensor>().IsScalar()) {
+                                    newExpression = (*newExpression.As<Tensor::Tensor>().As<Tensor::ScalarTensor>())();
+                                }
+
+                                Session::Instance()->SetCurrent("", newExpression);
+                            } else if (leftResult.IsScalar()) {
+                                auto newExpression = Expression::Void();
+
+                                if (rightResult.IsScalar()) {
+                                    newExpression = leftResult.As<Tensor::Scalar>() * rightResult.As<Tensor::Scalar>();
+                                } else {
+                                    Tensor::Tensor multiplied = rightResult.As<Tensor::Tensor>() * leftResult.As<Tensor::Scalar>();
+                                    newExpression = multiplied;
+                                }
+
+                                Session::Instance()->SetCurrent("", newExpression);
+                            }
+                            break;
+                    }
+
+                    if (!silent) {
+                        PrintExpression(Session::Instance()->GetCurrent());
+                    }
+
+                    return;
+                } else if (document->IsNegation()) {
+                    auto node = std::dynamic_pointer_cast<NegationNode>(document)->GetNode();
+
+                    // Execute the command and load the latest content to memory
+                    Execute(node, true);
+
+                    // Get last result
+                    auto last = Session::Instance()->GetCurrent();
+
+                    if (last.IsScalar()) {
+                        lastResult = -last.As<Tensor::Scalar>();
+                    } else if (last.IsTensor()) {
+                        lastResult = -last.As<Tensor::Tensor>();
+                    }
+
+                    // Update the value
+                    Session::Instance()->SetCurrent("", lastResult);
+
+                    // Print the negated expression
+                    if (!silent) {
+                        PrintExpression(lastResult);
+                    }
+
                     return;
                 } else if (document->IsCommand()) {
                     auto commandName = std::dynamic_pointer_cast<CommandNode>(document)->GetIdentifier()->GetText();
@@ -153,119 +315,52 @@ namespace Construction {
                     auto args = std::dynamic_pointer_cast<CommandNode>(document)->GetArguments();
 
                     for (auto& arg : *args) {
-                        // If the argument is another command, call this first
-                        if (arg->IsCommand()) {
-                            auto cmd = std::dynamic_pointer_cast<CommandNode>(arg);
-                            Execute(cmd, true);
+                        // Execute again to load this
+                        Execute(arg, true);
 
-                            // Replace with a tensor argument reference to the previous result
-                            lastResult = Session::Instance()->GetCurrent();
+                        // Load the expression
+                        Expression expr = Session::Instance()->GetCurrent();
 
-                            switch (lastResult.GetType()) {
-                                // Tensor
-                                {
-                                    case Tensor::AbstractExpression::TENSOR:
-                                        auto newArg = std::make_shared<TensorArgument>();
-                                        newArg->SetTensor(lastResult.As<Tensor::Tensor>());
-                                        command->AddArgument(std::move(newArg));
-                                        break;
-                                }
+                        // Set the last expression back
+                        Session::Instance()->SetCurrent("", lastResult);
 
-                                // Substitution
-                                {
-                                    case Tensor::AbstractExpression::SUBSTITUTION:
-                                        auto newArg = std::make_shared<SubstitutionArgument>();
-                                        newArg->SetSubstitution(lastResult.As<Tensor::Substitution>());
-                                        command->AddArgument(std::move(newArg));
-                                        break;
-                                }
-
-                                case Tensor::AbstractExpression::SCALAR:
-                                    // TODO: implement scalar argument
-                                    throw WrongTypeException();
-                                    break;
-
-                                default:
-                                    throw WrongTypeException();
-                                    break;
+                        // Turn the argument into an argument
+                        switch (expr.GetType()) {
+                            case Tensor::ExpressionType::TENSOR: {
+                                auto newArg = std::make_shared<TensorArgument>();
+                                newArg->SetTensor(expr.As<Tensor::Tensor>());
+                                command->AddArgument(std::move(newArg));
                             }
-                        }
-                        // If pointer to previous, add this
-                        else if (arg->IsPrevious()) {
-                            switch (previousResult.GetType()) {
-                                {
-                                    case Tensor::AbstractExpression::TENSOR:
-                                        auto newArg = std::make_shared<TensorArgument>();
-                                        newArg->SetTensor(previousResult.As<Tensor::Tensor>());
-                                        command->AddArgument(std::move(newArg));
-                                        break;
-                                }
+                                break;
 
-                                {
-                                    case Tensor::AbstractExpression::SUBSTITUTION:
-                                        auto newArg = std::make_shared<SubstitutionArgument>();
-                                        newArg->SetSubstitution(previousResult.As<Tensor::Substitution>());
-                                        command->AddArgument(std::move(newArg));
-                                        break;
-                                }
-
-                                case Tensor::AbstractExpression::SCALAR:
-                                    // TODO: implement scalar argument
-                                    throw WrongTypeException();
-                                    break;
-
-                                default:
-                                    throw WrongTypeException();
-                                    break;
+                            case Tensor::ExpressionType::SCALAR: {
+                                auto newArg = std::make_shared<NumericArgument>(expr.As<Tensor::Scalar>());
+                                command->AddArgument(std::move(newArg));
                             }
-                        }
-                        // If is a literal, load the name from memory
-                        else if (arg->IsLiteral()) {
-                            auto id = arg->ToString();
-                            lastResult = Session::Instance()->Get(id);
+                                break;
 
-                            switch (lastResult.GetType()) {
-                                {
-                                    case Tensor::AbstractExpression::TENSOR:
-                                        auto newArg = std::make_shared<TensorArgument>();
-                                        newArg->SetTensor(lastResult.As<Tensor::Tensor>());
-                                        command->AddArgument(std::move(newArg));
-                                        break;
-                                }
-
-                                {
-                                    case Tensor::AbstractExpression::SUBSTITUTION:
-                                        auto newArg = std::make_shared<SubstitutionArgument>();
-                                        newArg->SetSubstitution(lastResult.As<Tensor::Substitution>());
-                                        command->AddArgument(std::move(newArg));
-                                        break;
-                                }
-
-                                case Tensor::AbstractExpression::SCALAR:
-                                    // TODO: implement scalar argument
-                                    throw WrongTypeException();
-                                    break;
-
-                                default:
-                                    throw WrongTypeException();
-                                    break;
+                            case Tensor::ExpressionType::SUBSTITUTION: {
+                                auto newArg = std::make_shared<SubstitutionArgument>();
+                                newArg->SetSubstitution(expr.As<Tensor::Substitution>());
+                                command->AddArgument(std::move(newArg));
                             }
-                        }
-                        // If indices, add this
-                        else if (arg->IsIndices()) {
-                            command->AddArgument(std::make_shared<IndexArgument>(
-                                    std::dynamic_pointer_cast<IndicesNode>(arg)->GetText()
-                            ));
-                        }
-                        // If string, add this
-                        else if (arg->IsString()) {
-                            command->AddArgument(std::make_shared<StringArgument>(
-                                    std::dynamic_pointer_cast<StringNode>(arg)->GetText()
-                            ));
-                        } else if (arg->IsNumeric()) {
-                            command->AddArgument(std::make_shared<NumericArgument>(
-                                    std::dynamic_pointer_cast<NumericNode>(arg)->GetText()
-                            ));
+                                break;
+
+                            case Tensor::ExpressionType::INDICES: {
+                                auto newArg = std::make_shared<IndexArgument>(expr.As<Tensor::Indices>());
+                                command->AddArgument(std::move(newArg));
+                            }
+                                break;
+
+                            case Tensor::ExpressionType::STRING: {
+                                auto newArg = std::make_shared<StringArgument>(expr.As<Tensor::StringExpression>().ToString());
+                                command->AddArgument(std::move(newArg));
+                            }
+                                break;
+
+                            default:
+                                // TODO: proper exception
+                                throw UnknownCommandException();
                         }
                     }
 
@@ -339,15 +434,6 @@ namespace Construction {
                         std::cout << "\033[90m   " << time << "\033[0m" << std::endl;
                     }
 
-                    return;
-                } else if (document->IsLiteral()) {
-                    auto id = std::dynamic_pointer_cast<LiteralNode>(document)->GetText();
-                    Session::Instance()->SetCurrent(definition[id], Session::Instance()->Get(id));
-
-                    // Update current
-                    lastResult = Session::Instance()->GetCurrent();
-
-                    if (!silent) PrintExpression(lastResult);
                     return;
                 } else {
                     Error("Cannot execute this :'(");
