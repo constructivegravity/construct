@@ -6,7 +6,6 @@
 #include <numeric>
 #include <cmath>
 #include <memory>
-#include <unordered_map>
 
 #include <common/task_pool.hpp>
 #include <common/logger.hpp>
@@ -2118,7 +2117,8 @@ namespace Construction {
 
                 int k=0;
 
-                std::unordered_map<scalar_type, Tensor> map;
+                std::vector<scalar_type> map_scalar;
+				std::vector<Tensor> map_tensor;
 
                 // Iterate over the rows
                 unsigned max = std::min(static_cast<unsigned>(M.GetNumberOfRows()), static_cast<unsigned>(summands.size()));
@@ -2154,18 +2154,19 @@ namespace Construction {
                     }
 
                 	// Add to the tensor map
-                	auto it = map.find(scalar);
-                	if (it == map.end()) {
-                        map.insert({ scalar, tensor });
+                	auto it = std::find(map_scalar.begin(), map_scalar.end(), scalar);
+                	if (it == map_scalar.end()) {
+                        map_scalar.push_back(scalar);
+						map_tensor.push_back(tensor);
                 	} else {
-                        it->second += tensor;
+						map_tensor[std::distance(map_scalar.begin(), it)] += tensor;
                 	}
                 }
 
                 // Add everything to the result
-                for (auto& pair : map) {
-                    result += pair.first * pair.second;
-                }
+				for (int i=0; i<map_scalar.size(); ++i) {
+					result += map_scalar[i] * map_tensor[i];
+				}
 
 				return result;
 			}
@@ -2291,7 +2292,8 @@ namespace Construction {
 				auto summands = Expand().GetSummands();
 
 				// Start result
-                std::unordered_map<scalar_type, Tensor> map;
+				std::vector<scalar_type> map_scalar_;
+				std::vector<Tensor> map_tensor_;
 
 				// Iterate over all the summands
 				for (auto& _tensor : summands) {
@@ -2316,20 +2318,21 @@ namespace Construction {
                             assert(false);
                         }
 
-                        auto it = map.find(variable);
+                        auto it = std::find(map_scalar_.begin(), map_scalar_.end(), variable);
 
-                        if (it == map.end()) {
-                            map.insert({ variable, factor * tensor });
+                        if (it == map_scalar_.end()) {
+							map_scalar_.push_back(variable);
+							map_tensor_.push_back(factor*tensor);
                         } else {
-                            it->second += factor * tensor;
+							map_tensor_[std::distance(map_scalar_.begin(), it)] += factor * tensor;
                         }
                     }
 				}
 
 				// Turn this into the result
 				std::vector< std::pair<scalar_type, Tensor> > result;
-                for (auto& pair : map) {
-                    result.push_back(pair);
+                for (int i=0; i<map_scalar_.size(); ++i) {
+                    result.push_back({ map_scalar_[i], map_tensor_[i] });
                 }
 
 				return result;
