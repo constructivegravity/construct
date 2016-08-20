@@ -20,7 +20,7 @@ SCENARIO("API methods", "[api]") {
 			auto arbitrary = Construction::Language::API::Arbitrary(indices);
 
 			THEN(" we get two gammas") {
-				REQUIRE(arbitrary.ToString() == "e_1 * \\gamma_{ab}\\gamma_{cd} + e_2 * \\gamma_{ac}\\gamma_{bd} + e_3 * \\gamma_{ad}\\gamma_{bc}");
+				REQUIRE(arbitrary.ToString() == "e_1 * \\gamma_{ab}\\gamma_{cd} + \ne_2 * \\gamma_{ac}\\gamma_{bd} + \ne_3 * \\gamma_{ad}\\gamma_{bc}");
 			}
 
 		}
