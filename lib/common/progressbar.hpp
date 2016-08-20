@@ -78,7 +78,7 @@ namespace Construction {
 
                 std::cerr << std::fixed << std::setprecision(1) << (static_cast<double>(pos)/max * 100) << " % ";
 
-                std::cerr << "(" << pos << " / " << max << ")";
+                std::cerr << "(" << pos << " / " << max << ")           ";
 
                 // Go back to the beginning
                 std::cerr << "\r";

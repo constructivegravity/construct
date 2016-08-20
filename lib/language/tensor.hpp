@@ -185,13 +185,10 @@ namespace Construction {
             }
 
             Expression Execute() const {
-                auto t = GetTensors(0);
-
                 auto result = Tensor::Tensor::Zero();
 
                 for (auto i=0; i<Size(); i++) {
-                    auto s = GetTensors(i);
-                    result = API::Add(result, s);
+                    result += GetTensors(i);
                 }
 
                 return result;
@@ -201,6 +198,57 @@ namespace Construction {
         REGISTER_COMMAND(Add);
         REGISTER_ARGUMENT(Add, 0, ArgumentType::TENSOR);
         REGISTER_REPEATED_ARGUMENT(Add, 1, ArgumentType::TENSOR);
+
+        /**
+            \class AddCommand
+
+            Command to add two tensors
+         */
+        CLI_COMMAND(Subtract)
+            std::string Help() const {
+                return "Subtract(<Tensor>, <Tensor>...)";
+            }
+
+            static bool Cachable() {
+                return false;
+            }
+
+            Expression Execute() const {
+                auto result = GetTensors(0);
+
+                for (auto i=1; i<Size(); i++) {
+                    result -= GetTensors(i);
+                }
+
+                return result;
+            }
+        };
+
+        REGISTER_COMMAND(Subtract);
+        REGISTER_ARGUMENT(Subtract, 0, ArgumentType::TENSOR);
+        REGISTER_REPEATED_ARGUMENT(Subtract, 1, ArgumentType::TENSOR);
+
+        /**
+            \class NegateCommand
+
+            Command to add two tensors
+         */
+        CLI_COMMAND(Negate)
+            std::string Help() const {
+                return "Negate(<Tensor>)";
+            }
+
+            static bool Cachable() {
+                return false;
+            }
+
+            Expression Execute() const {
+                return -GetTensors(0);
+            }
+        };
+
+        REGISTER_COMMAND(Negate);
+        REGISTER_ARGUMENT(Negate, 0, ArgumentType::TENSOR);
 
         /**
             \class AddCommand
@@ -224,6 +272,54 @@ namespace Construction {
         REGISTER_COMMAND(Scale);
         REGISTER_ARGUMENT(Scale, 0, ArgumentType::TENSOR);
         REGISTER_ARGUMENT(Scale, 1, ArgumentType::NUMERIC);
+
+        CLI_COMMAND(Multiply)
+            std::string Help() const {
+                return "Multiply(<Tensor>, <Tensor>...)";
+            }
+
+            static bool Cachable() {
+                return false;
+            }
+
+            Expression Execute() const {
+                auto result = GetTensors(0);
+
+                for (auto i=1; i<Size(); i++) {
+                    result *= GetTensors(i);
+                }
+
+                return result;
+            }
+        };
+
+        REGISTER_COMMAND(Multiply);
+        REGISTER_ARGUMENT(Multiply, 0, ArgumentType::TENSOR);
+        REGISTER_REPEATED_ARGUMENT(Multiply, 1, ArgumentType::TENSOR);
+
+        CLI_COMMAND(Contract)
+            std::string Help() const {
+                return "Contract(<Tensor>, <Tensor>...)";
+            }
+
+            static bool Cachable() {
+                return false;
+            }
+
+            Expression Execute() const {
+                auto result = GetTensors(0);
+
+                for (auto i=1; i<Size(); i++) {
+                    result *= GetTensors(i);
+                }
+
+                return result;
+            }
+        };
+
+        REGISTER_COMMAND(Contract);
+        REGISTER_ARGUMENT(Contract, 0, ArgumentType::TENSOR);
+        REGISTER_REPEATED_ARGUMENT(Contract, 1, ArgumentType::TENSOR);
 
         /**
             \class AppendCommand
@@ -263,7 +359,6 @@ namespace Construction {
 
             Expression Execute() const {
                 // TODO:
-                //std::cout << "  \033[32m" << API::DegreesOfFreedom(GetTensors(0)) << "\033[0m" << std::endl;
                 return Tensor::Scalar(static_cast<int>(API::DegreesOfFreedom(GetTensors(0))));
             }
 
@@ -401,6 +496,7 @@ namespace Construction {
 
                 // If the tensor is zero, return
                 if (tensor.IsZeroTensor()) return tensor;
+                if (tensor.IsScalar()) return tensor;
 
                 tensor.SetIndices(Tensor::Permutation::From(GetIndices(1), tensor.GetIndices())(GetIndices(2)));
                 return tensor.Canonicalize();

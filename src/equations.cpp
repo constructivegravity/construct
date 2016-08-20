@@ -1,5 +1,7 @@
 #define RECOVER_FROM_EXCEPTIONS 	0
 
+#include <common/logger.hpp>
+
 #include <equations/equations.hpp>
 #include <common/progressbar.hpp>
 
@@ -8,10 +10,18 @@ int main(int argc, char** argv) {
     std::cerr << "(c) 2016 Constructive Gravity Group Erlangen" << std::endl;
     std::cerr << "All rights reserved." << std::endl << std::endl;
 
+    Construction::Logger::Screen("screen");
+    Construction::Logger::File("file", "apple.log");
+
+    Construction::Logger logger;
+    logger.SetDebugLevel("screen", Construction::Common::DebugLevel::DEBUG);
+
     if (argc < 2) {
-        std::cerr << "You need to specify the file that needs to be solved" << std::endl;
+        logger << Construction::Logger::ERROR << "You need to specify the file that needs to be solved" << Construction::Logger::endl;
         return -1;
     }
+
+    logger << Construction::Logger::DEBUG << "Start to solve file `" << argv[1] << "`" << Construction::Logger::endl;
 
     // Open file
     std::ifstream file (argv[1]);
@@ -26,13 +36,16 @@ int main(int argc, char** argv) {
         if (line == "") continue;
 
         // Add the equation
-        equations.push_back(
-            std::unique_ptr<Construction::Equations::Equation>(new Construction::Equations::Equation(line))
-        );
+        auto eq = std::unique_ptr<Construction::Equations::Equation>(new Construction::Equations::Equation(line));
+
+        // If the equation isn't empty, add it
+        if (!eq->IsEmpty()) {
+            equations.push_back(std::move(eq));
+        }
     }
 
     // Calculate number of coefficients and equations
-    int numberOfSteps = equations.size() + Construction::Equations::Coefficients::Instance()->Size();
+    int numberOfSteps = equations.size() + 8 * Construction::Equations::Coefficients::Instance()->Size();
 
     // Create progress bar
     Construction::Common::ProgressBar progress (numberOfSteps, 100);
@@ -52,7 +65,8 @@ int main(int argc, char** argv) {
     }
 
     // Start progress bar
-    std::cerr << "Start calculating ..." << std::endl;
+    logger << Construction::Logger::INFO << "Start calculating ..." << Construction::Logger::endl;
+
     progress.Start();
 
     // Start the generation of all required coefficients
@@ -95,6 +109,8 @@ int main(int argc, char** argv) {
                 if (s.second.IsAdded()) {
                     std::cout << "(" << s.second << ")";
                 } else std::cout << s.second;
+            } else if (t.IsScalar()) {
+                std::cout << "     \033[32m" << t.ToString();
             } else {
                 std::cout << "     \033[33m" << t.ToString();
             }

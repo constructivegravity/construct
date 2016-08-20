@@ -1,5 +1,7 @@
 #pragma once
 
+#include <common/logger.hpp>
+
 #include <tensor/index.hpp>
 #include <tensor/tensor.hpp>
 #include <tensor/substitution.hpp>
@@ -287,6 +289,9 @@ namespace Construction {
             Substitution HomogeneousSystem(const Tensor::Tensor& tensor) {
                 auto system = tensor.ToHomogeneousLinearSystem();
 
+                Construction::Logger logger;
+                logger << Construction::Logger::DEBUG << "Turned equation into tensor `" << tensor << "`" << Construction::Logger::endl;
+
                 // Reduce
                 system.first.ToRowEchelonForm();
 
@@ -310,8 +315,13 @@ namespace Construction {
                             lhs = system.second[j];
                             isZero = false;
                         } else if (vec[j] != 0) {
-                            rhs += (-system.second[j] * vec[j]);
+                            rhs += (-system.second[j] * Tensor::Scalar::Fraction(vec[j]));
                         }
+                    }
+
+                    // If the left hand side is not a variable, throw exception
+                    if (lhs.IsNumeric() && lhs.ToDouble() == 0) {
+                        throw Tensor::InvalidSubstitutionException();
                     }
 
                     // Add to the result

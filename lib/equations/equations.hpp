@@ -3,6 +3,7 @@
 #include <memory>
 #include <vector>
 
+#include <common/singleton.hpp>
 #include <language/cli.hpp>
 #include <equations/coefficient.hpp>
 
@@ -10,6 +11,150 @@ using Construction::Language::CLI;
 
 namespace Construction {
     namespace Equations {
+
+        /**
+            \class SubstitutionManager
+
+            \brief Class that manages the substitution of results from equations
+                   into the coefficients.
+
+            Class that manages the substitution of results from equations
+            into the coefficients. This works by a ticket system, i.e. any
+            equation that can be calculated asks the manager for a ticket.
+            If there are no tickets available for now, the equation thread
+            is blocked until new tickets are available.
+
+            If an equation has a ticket, it can be evaluated and the resulting
+            substitution is send by the ticket back into the manager.
+         */
+        class SubstitutionManager : public Singleton<SubstitutionManager> {
+        public:
+            // The manager is either serving a locked
+            enum State {
+                SERVING,
+                LOCKED
+            };
+        protected:
+            /**
+                \class Ticket
+
+
+             */
+            class Ticket : public std::enable_shared_from_this<Ticket> {
+            public:
+                enum State {
+                    WAITING,
+                    FULFILLED
+                };
+            public:
+                void Fulfill(const Substitution& substitution) {
+                    SubstitutionManager::Instance()->Fulfill(shared_from_this(), substitution);
+                }
+            public:
+                friend class SubstitutionManager;
+            private:
+                State state;
+            };
+
+            void Fulfill(std::shared_ptr<Ticket> ticket, const Substitution& substition) {
+                // Lock the mutex
+                {
+                    std::unique_lock<std::mutex> lock(mutex);
+
+                    // Check if the ticket was already served
+                    auto it = std::find(tickets.begin(), tickets.end(), ticket);
+                    if (it == tickets.end()) return;
+
+                    // Remove the ticket from the list and mark it fulfilled
+                    tickets.erase(it);
+                    ticket->state = Ticket::FULFILLED;
+
+                    // Insert the substitution
+                    substitutions.push_back(substition);
+
+                    // Set the state to locked to keep the manager
+                    // from giving further tickets
+                    state = LOCKED;
+
+                    Construction::Logger logger;
+                    logger << Construction::Logger::DEBUG << "Fulfilled ticket " << ticket << Construction::Logger::endl;
+                }
+
+                // If no ticket left, apply the substitutions
+                if (tickets.size() == 0) {
+                    Apply();
+                }
+            }
+        public:
+            std::shared_ptr<Ticket> GetTicket() {
+                // Lock the mutex
+                std::unique_lock<std::mutex> lock(mutex);
+
+                // Wait for the thread to be ticket less
+                variable.wait(lock, [&]() {
+                    return state == SERVING;
+                });
+
+                // Create ticket
+                auto ticket = std::make_shared<Ticket>();
+
+                // Add to the list and return one for the thread
+                tickets.push_back(ticket);
+
+                // If the number of tickets is equal to a threshold
+                // set the state to LOCKED
+                if (tickets.size() == 4) {
+                    state = LOCKED;
+                }
+
+                Construction::Logger logger;
+                logger << Construction::Logger::DEBUG << "Issued ticket " << ticket << Construction::Logger::endl;
+
+                return ticket;
+            }
+        private:
+            void Apply() {
+                // Lock the mutex
+                std::unique_lock<std::mutex> lock(mutex);
+
+                Construction::Logger::Debug("Apply substitutions (from ", substitutions.size(), " tickets)");
+
+                // Merge
+                auto merged = Tensor::Substitution::Merge(substitutions);
+
+                Construction::Logger::Debug("Merged substitutions into ", merged);
+
+                // Reset the list of substitutions
+                substitutions.clear();
+
+                // Lock all the coefficients
+                CoefficientsLock coeffsLock;
+
+                // Iterate over all coefficients and apply the
+                for (auto& pair : *Coefficients::Instance()) {
+                    auto ref = pair.second;
+
+                    ref->SetTensor(merged(*ref->GetAsync()));
+
+                    // Overwrite the tensor in the session
+                    Session::Instance()->Get(ref->GetName()) = *ref->GetAsync();
+                }
+
+                // Set the state back to serving
+                state = SERVING;
+
+                // Wake up all sleeping threads
+                variable.notify_all();
+            }
+        private:
+            State state;
+
+            std::vector<Tensor::Substitution> substitutions;
+            std::vector<std::shared_ptr<Ticket>> tickets;
+
+            std::mutex mutex;
+            std::condition_variable variable;
+        };
 
         /**
             \class Equation
@@ -44,7 +189,8 @@ namespace Construction {
             enum State {
                 WAITING,
                 SOLVING,
-                SOLVED
+                SOLVED,
+                ABORTED
             };
         public:
             // Constructor
@@ -55,12 +201,16 @@ namespace Construction {
 
             ~Equation() {
                 // Join the thread of the calculation
-                thread.join();
+                if (!isEmpty) {
+                    thread.join();
+                }
             }
         public:
             bool IsWaiting() const { return state == WAITING; }
             bool IsSolving() const { return state == SOLVING; }
             bool IsSolved() const { return state == SOLVED; }
+
+            bool IsEmpty() const { return isEmpty; }
         public:
             /**
                 \brief Parses the expression
@@ -85,6 +235,11 @@ namespace Construction {
                 // Recognize a coefficient
                 for (int i=0; i<code.size(); ++i) {
                     char c = code[i];
+
+                    // Ignore comments
+                    if (c == '/' && i<code.size()-1 && code[i+1] == '/' ) {
+                        break;
+                    }
 
                     if (!inCoeff) {
                         if (c == '#' && i < code.size()-1 & code[i+1] == '<') {
@@ -120,11 +275,22 @@ namespace Construction {
                         inCoeff = false;
                         mode = 0;
 
+                        // Bring the coefficients into canonical order.
+                        // Since we have the exchange symmetry, this is of course
+                        // always possible.
+                        if (r < l || (r == l && rd < ld)) {
+                            // Swap the blocks
+                            auto tmp = l;
+                            l = r;
+                            r = tmp;
+
+                            tmp = ld;
+                            ld = rd;
+                            rd = tmp;
+                        }
+
                         // Get the coefficient reference
                         auto ref = Coefficients::Instance()->Get(l, ld, r, rd, id);
-
-                        // Add the notification method
-                        ref->RegisterObserver(std::bind(&Equation::OnCoefficientCalculated, this, std::placeholders::_1));
 
                         // Replace the coefficient with a dummy name
                         {
@@ -143,14 +309,38 @@ namespace Construction {
                             current += ss.str();
                         }
 
-                        temp = "";
+                        bool found=false;
+                        for (auto& ref_ : coefficients) {
+                            if (ref_ == ref) {
+                                found = true;
+                                break;
+                            }
+                        }
 
-                        // Put on the list
-                        coefficients.push_back(std::move(ref));
+                        if (!found) {
+                            // Add the notification method
+                            ref->RegisterObserver(std::bind(&Equation::OnCoefficientCalculated, this, std::placeholders::_1));
+
+                            // Put on the list
+                            coefficients.push_back(std::move(ref));
+                        }
+
+                        temp = "";
                         continue;
                     }
 
                     temp += c;
+                }
+
+                // Check if the equation is trivial
+                {
+                    isEmpty = true;
+                    for (auto& c : current) {
+                        if (c != ' ') {
+                            isEmpty = false;
+                            break;
+                        }
+                    }
                 }
 
                 eq = "subst = HomogeneousSystem(" + current + "):";
@@ -170,8 +360,16 @@ namespace Construction {
                     }
                 }
 
-                // Solve the equation in a new thread#
-                this->thread = std::thread(&Equation::Solve, this);
+                // Lock the mutex
+                std::unique_lock<std::mutex> lock(startMutex);
+
+                Construction::Logger logger;
+                logger << Construction::Logger::DEBUG << "Finished all coefficients for equation `" << eq << "`" << Construction::Logger::endl;
+
+                if (state == WAITING) {
+                    // Solve the equation in a new thread#
+                    this->thread = std::thread(&Equation::Solve, this);
+                }
             }
 
             void Solve() {
@@ -180,12 +378,12 @@ namespace Construction {
                 // Set the state to solving
                 state = SOLVING;
 
-                //   I. Lock the coefficients, so that no other equation can
-                //      change it in the meantime
-                // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-                for (auto& coeff : coefficients) {
-                    coeff->Lock();
-                }
+                Construction::Logger logger;
+                logger << Construction::Logger::DEBUG << "Start solving equation `" << eq << "`" << Construction::Logger::endl;
+
+                //   I. Get a ticket to promise to yield a substitution
+                //      or wait until a ticket can be returned
+                auto ticket = SubstitutionManager::Instance()->GetTicket();
 
                 //  II. Use the CLI to parse the equation and execute it
                 //      to obtain the substitution
@@ -193,29 +391,32 @@ namespace Construction {
                 CLI cli;
 
                 // Set the coefficient of the session
-                cli(eq);
+                try {
+                    cli(eq);
 
-                // III. Convert the output into a substitution
-                // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-                auto subst = Session::Instance()->GetCurrent().As<Tensor::Substitution>();
+                    // III. Convert the output into a substitution
+                    // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+                    auto subst = Session::Instance()->GetCurrent().As<Tensor::Substitution>();
 
-                //  IV. Substitute the result into the coefficients
-                // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-                for (auto& coeff : coefficients) {
-                    coeff->SetTensor(subst(*coeff->GetAsync()));
+                    //  IV. Give the substitution to the ticket
+                    // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+                    ticket->Fulfill(subst);
+                } catch (...) {
+                    state = ABORTED;
 
-                    // Overwrite the tensor in the session
-                    Session::Instance()->Get(coeff->GetName()) = *coeff->GetAsync();
-                }
+                    // TODO: THROW EXCEPTION
+                    std::cout << "Error in equation `" << eq << "`" << std::endl;
 
-                //   V. Release locks
-                // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-                for (auto& coeff : coefficients) {
-                    coeff->Unlock();
+                    variable.notify_all();
+                    Notify();
+
+                    return;
                 }
 
                 // Set the state to solved
                 state = SOLVED;
+
+                logger << Construction::Logger::DEBUG << "Solved equation `" << eq << "`" << Construction::Logger::endl;
 
                 variable.notify_all();
                 Notify();
@@ -243,7 +444,10 @@ namespace Construction {
         private:
             std::thread thread;
             std::mutex mutex;
+            std::mutex startMutex;
             std::condition_variable variable;
+
+            bool isEmpty;
 
             std::string eq;
             std::vector<CoefficientReference> coefficients;
