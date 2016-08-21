@@ -345,7 +345,8 @@ namespace Construction {
                     }
                 }
 
-                eq = "subst = HomogeneousSystem(" + current + "):";
+                substName = "subst" + Coefficient::GetRandomString(3);
+                eq = substName + " = HomogeneousSystem(" + current + "):";
             }
         public:
             /**
@@ -398,18 +399,18 @@ namespace Construction {
 
                     // III. Convert the output into a substitution
                     // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-                    auto subst = Session::Instance()->GetCurrent().As<Tensor::Substitution>();
+                    auto subst = Session::Instance()->Get(substName).As<Tensor::Substitution>();
 
                     Construction::Logger::Debug("Found substitution ", subst, " from equation ", eq);
 
                     //  IV. Give the substitution to the ticket
                     // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
                     ticket->Fulfill(subst);
-                } catch (...) {
+                } catch (const Exception& e) {
                     state = ABORTED;
 
                     // TODO: THROW EXCEPTION
-                    std::cout << "Error in equation `" << eq << "`" << std::endl;
+                    Construction::Logger::Error("Error in equation `", eq, "`: ", e.what());
 
                     variable.notify_all();
                     Notify();
@@ -454,6 +455,7 @@ namespace Construction {
             bool isEmpty;
 
             std::string eq;
+            std::string substName;
             std::vector<CoefficientReference> coefficients;
 
             std::vector<ObserverFunction> observers;
