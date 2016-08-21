@@ -874,6 +874,10 @@ namespace Construction {
 				return TensorPointer(new ZeroTensor());
 			}
         public:
+            virtual TensorPointer Clone() const override {
+                return TensorPointer(new ZeroTensor());
+            }
+
             virtual TensorPointer Canonicalize() const override {
                 return TensorPointer(new ZeroTensor());
             }
@@ -2235,6 +2239,8 @@ namespace Construction {
             }
 
 			Tensor SubstituteVariable(const scalar_type& variable, const scalar_type& expression) const {
+                if (IsZero()) return *this;
+
 				auto summands = GetSummands();
 
 				Tensor result = Tensor::Zero();
@@ -2344,6 +2350,11 @@ namespace Construction {
 
 			 */
 			std::pair< Vector::Matrix, std::vector<scalar_type> > ToHomogeneousLinearSystem() const {
+                // Ignore zero tensors
+                if (IsZero()) {
+                    return { Vector::Matrix(0,0), { } };
+                }
+
 				// First expand and get summands
 				auto variables = ExtractVariables();
 
