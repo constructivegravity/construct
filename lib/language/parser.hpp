@@ -723,7 +723,14 @@ namespace Construction {
                 if (current.IsLiteral()) {
                     auto identifier = ParseLiteral();
 
-                    if (!identifier || !current.IsLeftBracket()) return nullptr;
+                    if (!identifier) return nullptr;
+
+                    if (!current.IsLeftBracket()) {
+                        // Finally cancel backtracking
+                        backtracking.CancelBacktracking();
+
+                        return std::move(identifier);
+                    }
 
                     // Move parser to next token
                     GetNext();
