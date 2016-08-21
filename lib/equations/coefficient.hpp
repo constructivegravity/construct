@@ -154,6 +154,12 @@ namespace Construction {
             void Unlock() {
                 readMutex.unlock();
             }
+
+            bool IsLocked() const {
+                bool isUnlocked = readMutex.try_lock();
+                if (isUnlocked) readMutex.unlock();
+                return !isUnlocked;
+            }
         private:
             /**
                 \brief Calculates the actual tensor with the correct symmetries
@@ -331,8 +337,8 @@ namespace Construction {
                 return ss.str();
             }
         private:
-            std::mutex mutex;
-            std::mutex readMutex;
+            mutable std::mutex mutex;
+            mutable std::mutex readMutex;
 
             std::condition_variable variable;
             std::thread thread;
@@ -424,14 +430,18 @@ namespace Construction {
             CoefficientsLock() {
                 // Lock all the coefficients
                 for (auto it = Coefficients::Instance()->begin(); it != Coefficients::Instance()->end(); ++it) {
-                    it->second->Lock();
+                    if (it->second->IsFinished()) {
+                        it->second->Lock();
+                    }
                 }
             }
 
             ~CoefficientsLock() {
                 // Release all the coefficients
                 for (auto it = Coefficients::Instance()->begin(); it != Coefficients::Instance()->end(); ++it) {
-                    it->second->Unlock();
+                    if (it->second->IsLocked() && it->second->IsFinished()) {
+                        it->second->Unlock();
+                    }
                 }
             }
         };
