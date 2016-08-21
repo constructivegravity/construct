@@ -16,15 +16,18 @@ namespace Construction {
 
 		class Substitution : public AbstractExpression {
 		public:
-			Substitution() : AbstractExpression(AbstractExpression::SUBSTITUTION, 36) { }
+			Substitution() = default;
 
-			Substitution(const Scalar& variable, const Scalar& other) : AbstractExpression(AbstractExpression::SUBSTITUTION, 36) {
+			Substitution(const Scalar& variable, const Scalar& other) {
 				substitutions.push_back({variable,other});
 			}
 		public:
 			void Insert(const Scalar& variable, const Scalar& expression) {
 				substitutions.push_back({variable, expression});
 			}
+
+			virtual bool IsSubstitutionExpression() const override { return true; }
+			virtual inline int GetColorCode() const override { return 36; }
 		public:
 			inline Scalar operator()(const Scalar& scalar) const {
 				Scalar result = scalar;
@@ -62,60 +65,51 @@ namespace Construction {
                 \brief Merge multiple substitutions into one common
 
              */
-            static Substitution Merge(const std::vector<Substitution> substitutions) {
+            static Substitution Merge(const std::vector<Substitution>& substitutions) {
+                if (substitutions.size() == 0) return Substitution();
                 if (substitutions.size() == 1) return substitutions[0];
 
                 // Turn this into a matrix
                 std::vector<Scalar> variables;
 
-                std::vector<std::unordered_map<Scalar, double>> data;
+                std::vector<std::pair<std::vector<Scalar>, std::vector<double> >> data;
 
                 // Iterate over all substitutions
                 int i=0;
                 int pos=0;
                 for (auto& subst : substitutions) {
-                    // Iterate over all scalars in the substitution
                     for (auto& s : subst) {
-                        // Turn this into an equation of the form lhs-rhs = 0
                         Scalar eq = s.first;
 
-                        auto summands = s.second.GetSummands();
-                        for (auto& t : summands) {
+                        auto summands_ = s.second.GetSummands();
+
+                        for (auto& t : summands_) {
                             eq -= t;
                         }
 
                         auto r = eq.SeparateVariablesFromRest();
 
-                        std::unordered_map<Scalar, double> map;
+                        std::vector<Scalar> data_variables;
+                        std::vector<double> data_factors;
 
-                        bool first=true;
+                        // TODO: throw exception if there is a rest
 
-                        // Add the variable to the list
                         for (auto& v : r.first) {
-                            if (first) {
-                                first = false;
+                            // Add variables to list if necessary
+                            auto it = std::find(variables.begin(), variables.end(), v.first);
 
-                                auto it = std::find(variables.begin(), variables.end(), v.first);
-                                if (it != variables.end()) {
-                                    variables.erase(it);
-                                }
-
-                                variables.insert(variables.begin() + pos++, v.first);
-                            } else {
-                                if (std::find(variables.begin(), variables.end(), v.first) == variables.end()) {
-                                    variables.push_back(v.first);
-                                }
+                            if (it == variables.end()) {
+                                variables.push_back(v.first);
                             }
 
-                            if (!v.second.IsNumeric()) assert(false);
-
-                            // Get the value
-                            map[v.first] = v.second.ToDouble();
+                            data_variables.push_back(v.first);
+                            data_factors.push_back(v.second.ToDouble());
                         }
 
-                        data.push_back(map);
+                        data.push_back({ data_variables, data_factors });
                     }
-                    i++;
+
+                    ++i;
                 }
 
                 // Write the elements into a matrix
@@ -124,7 +118,11 @@ namespace Construction {
                 // Insert the data from above
                 for (int i=0; i<data.size(); ++i) {
                     for (int j=0; j<variables.size(); ++j) {
-                        M(i,j) = data[i][variables[j]];
+                        auto it = std::find(data[i].first.begin(), data[i].first.end(), variables[j]);
+
+                        if (it != data[i].first.end()) {
+                            M(i,j) = data[i].second[std::distance(data[i].first.begin(), it)];
+                        }
                     }
                 }
 

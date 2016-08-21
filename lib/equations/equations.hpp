@@ -110,7 +110,7 @@ namespace Construction {
                 Construction::Logger logger;
                 logger << Construction::Logger::DEBUG << "Issued ticket " << ticket << Construction::Logger::endl;
 
-                return ticket;
+                return std::move(ticket);
             }
         private:
             void Apply() {
@@ -134,10 +134,12 @@ namespace Construction {
                 for (auto& pair : *Coefficients::Instance()) {
                     auto ref = pair.second;
 
-                    ref->SetTensor(merged(*ref->GetAsync()));
+                    if (ref->IsFinished()) {
+                        ref->SetTensor(merged(*ref->GetAsync()));
 
-                    // Overwrite the tensor in the session
-                    Session::Instance()->Get(ref->GetName()) = *ref->GetAsync();
+                        // Overwrite the tensor in the session
+                        Session::Instance()->Get(ref->GetName()) = *ref->GetAsync();
+                    }
                 }
 
                 // Set the state back to serving
@@ -397,6 +399,8 @@ namespace Construction {
                     // III. Convert the output into a substitution
                     // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
                     auto subst = Session::Instance()->GetCurrent().As<Tensor::Substitution>();
+
+                    Construction::Logger::Debug("Found substitution ", subst, " from equation ", eq);
 
                     //  IV. Give the substitution to the ticket
                     // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-

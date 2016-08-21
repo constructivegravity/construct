@@ -17,4 +17,17 @@ SCENARIO("Substitution", "[substitution]") {
 
     }
 
+    GIVEN(" merging two substitutions") {
+        Construction::Tensor::Substitution substitution;
+        substitution.Insert(Construction::Tensor::Scalar("a"), Construction::Tensor::Scalar("m") + Construction::Tensor::Scalar("n") );
+        substitution.Insert(Construction::Tensor::Scalar("c"), Construction::Tensor::Scalar("b"));
+
+        Construction::Tensor::Substitution substitution2;
+        substitution2.Insert(Construction::Tensor::Scalar("b"), Construction::Tensor::Scalar("m") - Construction::Tensor::Scalar("n") );
+
+        auto merged = Construction::Tensor::Substitution::Merge({ substitution, substitution2 });
+
+        REQUIRE(merged.ToString() == "a = m + n\nc = m - n\nb = m - n\n");
+    }
+
 }

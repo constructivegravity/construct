@@ -130,6 +130,8 @@ namespace Construction {
             IndexArgument(const std::string& code) : BaseArgument(ArgumentType::INDEX) {
                 Parse(code);
             }
+
+            IndexArgument(const Tensor::Indices& indices) : BaseArgument(ArgumentType::INDEX), indices(indices) { }
         public:
             inline Tensor::Indices GetIndices() const { return indices; }
         public:
@@ -191,18 +193,19 @@ namespace Construction {
         class NumericArgument : public BaseArgument {
         public:
             NumericArgument(const std::string& text) : BaseArgument(ArgumentType::NUMERIC), value(std::atof(text.c_str())) { }
+            NumericArgument(const Tensor::Scalar& value) : BaseArgument(ArgumentType::NUMERIC), value(value) { }
         public:
-            inline void SetValue(int v) {
+            inline void SetValue(const Tensor::Scalar& v) {
                 value = v;
             }
 
-            inline double GetValue() const {
+            inline Tensor::Scalar GetValue() const {
                 return value;
             }
         public:
             virtual void Parse(const std::string& code) { }
         private:
-            double value;
+            Tensor::Scalar value;
         };
 
         class StringArgument : public BaseArgument {

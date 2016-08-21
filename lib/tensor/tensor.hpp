@@ -6,7 +6,6 @@
 #include <numeric>
 #include <cmath>
 #include <memory>
-#include <unordered_map>
 
 #include <common/task_pool.hpp>
 #include <common/logger.hpp>
@@ -72,7 +71,7 @@ namespace Construction {
 		 	we do not implement the Einstein sum convention here. This may
 		 	follow in the future.
 		 */
-		class AbstractTensor : public Printable, Serializable<AbstractTensor> {
+		class AbstractTensor : public Printable, public Serializable<AbstractTensor> {
 		public:
 			enum class TensorType {
 				ADDITION = 1,
@@ -875,6 +874,10 @@ namespace Construction {
 				return TensorPointer(new ZeroTensor());
 			}
         public:
+            virtual TensorPointer Clone() const override {
+                return TensorPointer(new ZeroTensor());
+            }
+
             virtual TensorPointer Canonicalize() const override {
                 return TensorPointer(new ZeroTensor());
             }
@@ -1594,7 +1597,7 @@ namespace Construction {
 				return result;
 			}
 
-			virtual void SetIndices(const Indices& indices) {
+			virtual void SetIndices(const Indices& indices) override {
 				this->indices = indices;
 			}
 
@@ -1732,7 +1735,7 @@ namespace Construction {
 			std::getline(is, printed_text, ';');
 
 			// Read indices
-			auto indices = *Indices::Deserialize(is);
+			auto indices = *static_cast<Indices*>(Indices::Deserialize(is).get());
 
 			// Read type
 			int typeC;
@@ -1791,15 +1794,15 @@ namespace Construction {
 
 		class Tensor : public AbstractExpression {
 		public:
-			Tensor() : AbstractExpression(TENSOR), pointer(TensorPointer(new ZeroTensor())) { }
-			Tensor(const std::string& name, const std::string& printable, const Indices& indices) : AbstractExpression(TENSOR), pointer(TensorPointer(new AbstractTensor(name, printable, indices))) { }
+			Tensor() : pointer(TensorPointer(new ZeroTensor())) { }
+			Tensor(const std::string& name, const std::string& printable, const Indices& indices) : pointer(TensorPointer(new AbstractTensor(name, printable, indices))) { }
 
-			Tensor(const Tensor& other) : AbstractExpression(TENSOR), pointer(std::move(other.pointer->Clone())) { }
-			Tensor(Tensor&& other) : AbstractExpression(TENSOR), pointer(std::move(other.pointer)) { }
+			Tensor(const Tensor& other) : pointer(std::move(other.pointer->Clone())) { }
+			Tensor(Tensor&& other) : pointer(std::move(other.pointer)) { }
 
 			virtual ~Tensor() = default;
 		private:
-			Tensor(TensorPointer pointer) : AbstractExpression(TENSOR), pointer(std::move(pointer)) { }
+			Tensor(TensorPointer pointer) : pointer(std::move(pointer)) { }
 		public:
 			Tensor& operator=(const Tensor& other) {
 				pointer = std::move(other.pointer->Clone());
@@ -1824,6 +1827,8 @@ namespace Construction {
 			}
 		private:
 			typedef Scalar scalar_type;
+		public:
+			virtual bool IsTensorExpression() const override { return true; }
 		public:
 			static Tensor Zero() { return Tensor(TensorPointer(new ZeroTensor())); }
 			static Tensor One() { return Tensor(TensorPointer(new ScalarTensor(1))); }
@@ -1890,6 +1895,7 @@ namespace Construction {
 			bool IsEpsilonGamma() const { return pointer->IsEpsilonGammaTensor(); }
 			bool IsDelta() const { return pointer->IsDeltaTensor(); }
 
+			AbstractTensor::TensorType GetType() const { return pointer->GetType(); }
 			std::string TypeToString() const { return pointer->TypeToString(); }
 		public:
 			inline bool IsEqual(const Tensor& other) const { return pointer->IsEqual(*other.pointer); }
@@ -2115,7 +2121,8 @@ namespace Construction {
 
                 int k=0;
 
-                std::unordered_map<scalar_type, Tensor> map;
+                std::vector<scalar_type> map_scalar;
+				std::vector<Tensor> map_tensor;
 
                 // Iterate over the rows
                 unsigned max = std::min(static_cast<unsigned>(M.GetNumberOfRows()), static_cast<unsigned>(summands.size()));
@@ -2151,18 +2158,19 @@ namespace Construction {
                     }
 
                 	// Add to the tensor map
-                	auto it = map.find(scalar);
-                	if (it == map.end()) {
-                        map.insert({ scalar, tensor });
+                	auto it = std::find(map_scalar.begin(), map_scalar.end(), scalar);
+                	if (it == map_scalar.end()) {
+                        map_scalar.push_back(scalar);
+						map_tensor.push_back(tensor);
                 	} else {
-                        it->second += tensor;
+						map_tensor[std::distance(map_scalar.begin(), it)] += tensor;
                 	}
                 }
 
                 // Add everything to the result
-                for (auto& pair : map) {
-                    result += pair.first * pair.second;
-                }
+				for (int i=0; i<map_scalar.size(); ++i) {
+					result += map_scalar[i] * map_tensor[i];
+				}
 
 				return result;
 			}
@@ -2231,6 +2239,8 @@ namespace Construction {
             }
 
 			Tensor SubstituteVariable(const scalar_type& variable, const scalar_type& expression) const {
+                if (IsZero()) return *this;
+
 				auto summands = GetSummands();
 
 				Tensor result = Tensor::Zero();
@@ -2288,7 +2298,8 @@ namespace Construction {
 				auto summands = Expand().GetSummands();
 
 				// Start result
-                std::unordered_map<scalar_type, Tensor> map;
+				std::vector<scalar_type> map_scalar_;
+				std::vector<Tensor> map_tensor_;
 
 				// Iterate over all the summands
 				for (auto& _tensor : summands) {
@@ -2313,20 +2324,21 @@ namespace Construction {
                             assert(false);
                         }
 
-                        auto it = map.find(variable);
+                        auto it = std::find(map_scalar_.begin(), map_scalar_.end(), variable);
 
-                        if (it == map.end()) {
-                            map.insert({ variable, factor * tensor });
+                        if (it == map_scalar_.end()) {
+							map_scalar_.push_back(variable);
+							map_tensor_.push_back(factor*tensor);
                         } else {
-                            it->second += factor * tensor;
+							map_tensor_[std::distance(map_scalar_.begin(), it)] += factor * tensor;
                         }
                     }
 				}
 
 				// Turn this into the result
 				std::vector< std::pair<scalar_type, Tensor> > result;
-                for (auto& pair : map) {
-                    result.push_back(pair);
+                for (int i=0; i<map_scalar_.size(); ++i) {
+                    result.push_back({ map_scalar_[i], map_tensor_[i] });
                 }
 
 				return result;
@@ -2338,6 +2350,11 @@ namespace Construction {
 
 			 */
 			std::pair< Vector::Matrix, std::vector<scalar_type> > ToHomogeneousLinearSystem() const {
+                // Ignore zero tensors
+                if (IsZero()) {
+                    return { Vector::Matrix(0,0), { } };
+                }
+
 				// First expand and get summands
 				auto variables = ExtractVariables();
 

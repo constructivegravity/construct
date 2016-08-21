@@ -7,13 +7,13 @@
 
 using namespace Construction::Tensor;
 
-Scalar::Scalar() : AbstractExpression(SCALAR), pointer(ScalarPointer(new Tensor::Fraction(0))) { }
-Scalar::Scalar(double v) : AbstractExpression(SCALAR), pointer(ScalarPointer(new FloatingPointScalar(v))) { }
-Scalar::Scalar(int v) : AbstractExpression(SCALAR), pointer(ScalarPointer(new Tensor::Fraction(v))) { }
-Scalar::Scalar(int numerator, unsigned denominator) : AbstractExpression(SCALAR), pointer(ScalarPointer(new Tensor::Fraction(numerator, denominator))) { }
-Scalar::Scalar(const std::string& name) : AbstractExpression(SCALAR), pointer(ScalarPointer(new Tensor::Variable(name))) { }
-Scalar::Scalar(const std::string& name, const std::string& printed_text) : AbstractExpression(SCALAR), pointer(ScalarPointer(new Tensor::Variable(name, printed_text))) { }
-Scalar::Scalar(const std::string& name, unsigned id) : AbstractExpression(SCALAR) {
+Scalar::Scalar() : pointer(ScalarPointer(new Tensor::Fraction(0))) { }
+Scalar::Scalar(double v) : pointer(ScalarPointer(new FloatingPointScalar(v))) { }
+Scalar::Scalar(int v) : pointer(ScalarPointer(new Tensor::Fraction(v))) { }
+Scalar::Scalar(int numerator, unsigned denominator) : pointer(ScalarPointer(new Tensor::Fraction(numerator, denominator))) { }
+Scalar::Scalar(const std::string& name) : pointer(ScalarPointer(new Tensor::Variable(name))) { }
+Scalar::Scalar(const std::string& name, const std::string& printed_text) : pointer(ScalarPointer(new Tensor::Variable(name, printed_text))) { }
+Scalar::Scalar(const std::string& name, unsigned id) {
     std::stringstream ss;
     ss << name << "_" << id;
     pointer = ScalarPointer(new Tensor::Variable(ss.str()));

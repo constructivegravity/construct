@@ -294,10 +294,10 @@ namespace Construction {
             Scalar(const std::string& name, const std::string& printed_text);
             Scalar(const std::string& name, unsigned id);
 
-            Scalar(const Scalar& other) : AbstractExpression(SCALAR), pointer(std::move(other.pointer->Clone())) { }
-            Scalar(Scalar&& other) : AbstractExpression(SCALAR), pointer(std::move(other.pointer)) { }
+            Scalar(const Scalar& other) : pointer(std::move(other.pointer->Clone())) { }
+            Scalar(Scalar&& other) : pointer(std::move(other.pointer)) { }
 
-            Scalar(std::unique_ptr<AbstractScalar> pointer) : AbstractExpression(SCALAR), pointer(std::move(pointer)) { }
+            Scalar(std::unique_ptr<AbstractScalar> pointer) : pointer(std::move(pointer)) { }
 
             virtual ~Scalar() = default;
         public:
@@ -324,6 +324,8 @@ namespace Construction {
             Scalar& operator=(double d);
         public:
             virtual ExpressionPointer Clone() const override { return std::move(ExpressionPointer(new Scalar(*this))); }
+
+            virtual bool IsScalarExpression() const override { return true; }
         public:
             inline AbstractScalar::Type GetType() const { return pointer->GetType(); }
             inline std::string TypeToString() const { return pointer->TypeToString(); }
