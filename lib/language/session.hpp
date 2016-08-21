@@ -4,6 +4,7 @@
 #include <sstream>
 #include <map>
 #include <fstream>
+#include <mutex>
 
 #include <common/singleton.hpp>
 #include <common/error.hpp>
@@ -33,10 +34,18 @@ namespace Construction {
 
         class Session : public Singleton<Session> {
         public:
-            Session() { }
+            Session() : current(Expression::Void()) { }
         public:
             Expression GetCurrent() const {
-                return current;
+                Expression result;
+
+                // Scope based locking
+                {
+                    std::unique_lock<std::mutex> lock(mutex);
+                    result = current;
+                }
+
+                return result;
             }
 
             std::string GetLastCommandString() const {
@@ -46,6 +55,8 @@ namespace Construction {
             Notebook& GetNotebook() { return notebook; }
 
             void SetCurrent(const std::string& cmd, const Expression& tensors) {
+                std::unique_lock<std::mutex> lock(mutex);
+
                 lastCmd = cmd;
                 current = tensors;
             }
@@ -61,6 +72,8 @@ namespace Construction {
             size_t Size() const { return memory.size(); }
         public:
             void SaveToFile(const std::string& filename) const {
+                std::unique_lock<std::mutex> lock(mutex);
+
                 std::stringstream os;
 
                 // Store the notebook
@@ -141,6 +154,8 @@ namespace Construction {
                 \throws CannotOpenSessionException
              */
             void LoadFromFile(const std::string& filename) {
+                std::unique_lock<std::mutex> lock(mutex);
+
                 std::ifstream file (filename);
                 std::stringstream is;
 
@@ -266,6 +281,7 @@ namespace Construction {
         private:
             Notebook notebook;
 
+            mutable std::mutex mutex;
             std::string lastCmd;
             Expression current;
             std::map<std::string, Expression> memory;
