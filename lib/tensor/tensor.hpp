@@ -585,6 +585,11 @@ namespace Construction {
 					newSummands.push_back(std::move(tensor->Canonicalize()));
 				}
 
+				// Sort the summands by their indices
+				std::sort(newSummands.begin(), newSummands.end(), [](const TensorPointer& a, const TensorPointer& b) {
+					return a->GetIndices() < b->GetIndices();
+				});
+
 				return std::move(TensorPointer(new AddedTensor(std::move(newSummands), indices)));
 			}
 		private:
@@ -2549,22 +2554,42 @@ namespace Construction {
 							}
 						}
 
-						for (auto& pair : reduced) {
-							if (allTheSameScale) result += pair.second;
-							else result += pair.first * pair.second;
+						// Add them together
+						{
+							std::vector<Tensor> combined;
+
+							for (auto& pair : reduced) {
+								// Ignore zeroes
+								if (pair.second.IsZeroTensor()) continue;
+
+								if (allTheSameScale) combined.push_back(pair.second);
+								else combined.push_back(pair.first * pair.second);
+							}
+
+							result = Tensor::Add(std::move(combined));
 						}
 
-						if (allTheSameScale) result *= lastScale;
+						if (allTheSameScale) {
+							// Sort the terms
+							result = result.Canonicalize();
+
+							result *= lastScale;
+						}
 
 						return overalScale * result;
 
 					} else {
+						std::vector<Tensor> combined;
+
 						// Iterate over all symmetrized pairs
 						for (auto& pair : symmetrizedSummands) {
-							result += pair.first * pair.second;
+							// Ignore zeroes
+							if (pair.second.IsZeroTensor()) continue;
+
+							combined.push_back(pair.first * pair.second);
 						}
 
-						return result;
+						return std::move(Tensor::Add(std::move(combined)));
 					}
 				}
 
@@ -2602,6 +2627,8 @@ namespace Construction {
 						});
 					}
 
+					std::vector<Tensor> combined;
+
 					// Iterate over all
 					while (stack.size() > 0) {
 						// Get the first element from the stack
@@ -2629,9 +2656,11 @@ namespace Construction {
 						}
 
 						if (!scale.IsNumeric() || scale.ToDouble() != 0) {
-							result += scale * current;
+							if (!current.IsZeroTensor()) combined.push_back(scale * current);
 						}
 					}
+
+					result = Tensor::Add(std::move(combined));
 				}
 
 				// Scale
@@ -3105,6 +3134,40 @@ namespace Construction {
 
 			Tensor operator*(const Tensor& other) const {
 				return Tensor(std::move(AbstractTensor::Multiply(*pointer, *other.pointer)));
+			}
+		public:
+			/**
+			 	This adds multiple tensors efficiently into one.
+
+			 	NOTE: DO NOT USE THIS WHEN YOU ARE NOT ABSOLUTELY SURE
+			 		  THAT YOU KNOW WHAT YOU ARE DOING, THIS WILL
+			 		  NOT USE ANY OF THE SIMPLIFICATION HEURISTICS
+			 */
+		    static Tensor Add(const std::vector<Tensor>& factors) {
+				if (factors.size() == 0) return Tensor::Zero();
+
+				std::vector<TensorPointer> pointers;
+				for (auto& tensor : factors) {
+					pointers.push_back(std::move(tensor.pointer->Clone()));
+				}
+
+				return Tensor(TensorPointer(new AddedTensor(std::move(pointers), factors[0].GetIndices())));
+			}
+
+			Tensor ForEachOnSummands(std::function<Tensor(const Tensor&)> fn) const {
+				// Split into the summands
+				auto summands = GetSummands();
+
+				Common::TaskPool pool(8);
+
+				// Map in parallel
+				std::vector<Tensor> result = pool.Map<Tensor,Tensor>(summands, [&](const Tensor& tensor, std::function<void(Tensor&&)> emit) -> void {
+					auto transformed = fn(std::move(tensor));
+
+					if (!transformed.IsZeroTensor()) emit(std::move(transformed));
+				});
+
+				return Tensor::Add(std::move(result));
 			}
 		public:
 			size_t Size() const {

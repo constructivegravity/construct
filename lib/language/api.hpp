@@ -136,34 +136,43 @@ namespace Construction {
                 indices.Append(block3);
                 indices.Append(block4);
 
-                // Generate the tensor
-                auto tensor = API::Arbitrary(indices);
-
-                // Symmetrize the tensor
-                if (l > 1) {
-                    tensor = std::move(tensor.Symmetrize(block1));
-                }
-
-                if (ld > 1) {
-                    tensor = std::move(tensor.Symmetrize(block2));
-                }
-
-                if (r > 1) {
-                    tensor = std::move(tensor.Symmetrize(block3));
-                }
-
-                if (rd > 1) {
-                    tensor = std::move(tensor.Symmetrize(block4));
-                }
-
                 // Build indices for block symmetries
                 auto block = block3;
                 block.Append(block4);
                 block.Append(block1);
                 block.Append(block2);
 
-                // Exchange symmetrize
-                tensor = tensor.ExchangeSymmetrize(indices, block);
+                // Generate the tensor
+                auto tensor = API::Arbitrary(indices);
+
+                // Do all the symmetrization in parallel
+                tensor = tensor.ForEachOnSummands([&](const Construction::Tensor::Tensor& tensor) {
+                    auto pair = tensor.SeparateScalefactor();
+                    auto tensor_ = pair.second;
+                    auto factor = pair.first;
+
+                    // Symmetrize the tensor
+                    if (l > 1) {
+                        tensor_ = std::move(tensor_.Symmetrize(block1));
+                    }
+
+                    if (ld > 1) {
+                        tensor_ = std::move(tensor_.Symmetrize(block2));
+                    }
+
+                    if (r > 1) {
+                        tensor_ = std::move(tensor_.Symmetrize(block3));
+                    }
+
+                    if (rd > 1) {
+                        tensor_ = std::move(tensor_.Symmetrize(block4));
+                    }
+
+                    // Exchange symmetrize
+                    tensor_ = tensor_.ExchangeSymmetrize(indices, block);
+
+                    return factor * tensor_;
+                });
 
                 // Collect terms
                 tensor = tensor.Simplify().RedefineVariables("e");

@@ -151,6 +151,35 @@ namespace Construction {
                 return result;
             }
 
+            template<typename S, typename T>
+            std::vector<S> Map(std::vector<T> elements, std::function<void(const T&, std::function<void(S&&)>)> fn) {
+                std::map<unsigned, S> results;
+                std::mutex resultsMutex;
+
+                // Enqueue all elements
+                for (int i=0; i<elements.size(); i++) {
+                    Enqueue([&results, &fn, &resultsMutex](unsigned id, const T& value) {
+                        // Calculate the element
+                        fn(value, [&](S&& value) {
+                            // Lock the mutex
+                            std::unique_lock<std::mutex> lock(resultsMutex);
+
+                            results.insert({ id, std::move(value) });
+                        });
+                    }, i, elements[i]);
+                }
+
+                // Wait for all tasks to finish
+                Wait();
+
+                std::vector<S> result;
+                for (auto& pair : results) {
+                    result.push_back(std::move(pair.second));
+                }
+
+                return result;
+            }
+
             // Wait for all tasks to finish
             void Wait() {
                 std::unique_lock<std::mutex> lock(tasksMutex);

@@ -626,6 +626,19 @@ namespace Construction {
                 return std::move(result);
             }
 
+            /**
+                \brief Parses a primary expression
+
+                Parses a primary expression
+
+                    primary ::=
+                            | literal
+                            | string
+                            | indices
+                            | previous
+                            | numeric
+                            ;
+             */
             std::shared_ptr<Node> ParsePrimary() {
                 BacktrackingRAII backtracking(*this);
 
@@ -890,7 +903,7 @@ namespace Construction {
             /**
                 Parses an assignment
 
-                    assignment ::= literal '=' rhsexpression
+                    assignment ::= literal '=' rhs_expression
              */
             std::shared_ptr<AssignmentNode> ParseAssignment() {
                 BacktrackingRAII backtracking(*this);
