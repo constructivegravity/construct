@@ -77,10 +77,27 @@ namespace Construction {
                 }
             }
 
+            void Set(const std::string& name, const Expression& expression) {
+                std::unique_lock<std::mutex> lock(mutex);
+
+                memory[name] = expression;
+            }
+
             void Set(const std::string& name, Expression&& expression) {
                 std::unique_lock<std::mutex> lock(mutex);
 
                 memory[name] = std::move(expression);
+            }
+
+            void TurnCurrentIntoAVariable(const std::string& name) {
+                std::unique_lock<std::mutex> lock(mutex);
+
+                auto it = memory.find(name);
+                if (it == memory.end()) {
+                    memory.insert({ name, current });
+                } else {
+                    it->second = current;
+                }
             }
 
             Expression& operator[](const std::string& name) {

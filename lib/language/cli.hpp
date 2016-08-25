@@ -421,7 +421,7 @@ namespace Construction {
                     lastResult = Session::Instance()->GetCurrent();
 
                     // Store the variable in memory
-                    Session::Instance()->Get(id) = lastResult;
+                    Session::Instance()->Set(id, lastResult);
 
                     definition[id] = lastCmd;
                     //database[lastCmd] = lastResult;
