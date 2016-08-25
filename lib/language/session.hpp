@@ -61,8 +61,26 @@ namespace Construction {
                 current = tensors;
             }
 
-            Expression& Get(const std::string& name) {
+            /*Expression& Get(const std::string& name) {
                 return memory[name];
+            }*/
+
+            Expression Get(const std::string& name) const {
+                std::unique_lock<std::mutex> lock(mutex);
+
+                auto it = memory.find(name);
+
+                if (it == memory.end()) {
+                    return Expression::Void();
+                } else {
+                    return it->second;
+                }
+            }
+
+            void Set(const std::string& name, Expression&& expression) {
+                std::unique_lock<std::mutex> lock(mutex);
+
+                memory[name] = std::move(expression);
             }
 
             Expression& operator[](const std::string& name) {

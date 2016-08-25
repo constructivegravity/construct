@@ -640,7 +640,23 @@ namespace Construction {
 		public:
 			virtual std::string ToString() const override {
 				std::stringstream ss;
-				ss << A->ToString() << B->ToString();
+
+				if (A->IsAddedTensor()) {
+					ss << "(";
+				}
+				ss << A->ToString();
+				if (A->IsAddedTensor()) {
+					ss << ")";
+				}
+
+				if (B->IsAddedTensor()) {
+					ss << "(";
+				}
+				ss << B->ToString();
+				if (B->IsAddedTensor()) {
+					ss << ")";
+				}
+
 				return ss.str();
 			}
 
@@ -2244,7 +2260,7 @@ namespace Construction {
             }
 
 			Tensor SubstituteVariable(const scalar_type& variable, const scalar_type& expression) const {
-                if (IsZero()) return *this;
+                if (IsZeroTensor()) return *this;
 
 				auto summands = GetSummands();
 
@@ -2356,7 +2372,7 @@ namespace Construction {
 			 */
 			std::pair< Vector::Matrix, std::vector<scalar_type> > ToHomogeneousLinearSystem() const {
                 // Ignore zero tensors
-                if (IsZero()) {
+                if (IsZeroTensor()) {
                     return { Vector::Matrix(0,0), { } };
                 }
 
