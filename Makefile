@@ -7,7 +7,7 @@ rebuild:
 	@cd build && make && cd ..
 
 clean:
-	@rm -r build && rm -r bin && rm /usr/local/bin/construct
+	@rm -r build && rm -r bin
 
 update:
 	git pull origin master
