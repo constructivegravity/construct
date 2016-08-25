@@ -3177,7 +3177,7 @@ namespace Construction {
 				Common::TaskPool pool(8);
 
 				// Map in parallel
-				std::vector<Tensor> result = pool.Map<Tensor,Tensor>(summands, [&](const Tensor& tensor, std::function<void(Tensor&&)> emit) -> void {
+				std::vector<Tensor> result = pool.MapEmit<Tensor,Tensor>(summands, [&](const Tensor& tensor, std::function<void(Tensor&&)> emit) -> void {
 					auto transformed = fn(std::move(tensor));
 
 					if (!transformed.IsZeroTensor()) emit(std::move(transformed));

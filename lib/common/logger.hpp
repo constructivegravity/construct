@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <unordered_map>
 #include <mutex>
 #include <iostream>
@@ -222,7 +223,7 @@ namespace Construction {
         public:
             ScreenLogger() : AbstractLogger(true, false, DebugLevel::ERROR) { }
 
-            virtual ~ScreenLogger() = default;
+            virtual ~ScreenLogger() throw() = default;
         public:
             virtual void Print(const std::string& content) const override {
                 std::cout << content;
@@ -233,7 +234,7 @@ namespace Construction {
         public:
             FileLogger(const std::string& filename) : AbstractLogger(false, true, DebugLevel::DEBUG), filename(filename) { }
 
-            virtual ~FileLogger() = default;
+            virtual ~FileLogger() throw() { }
         public:
             virtual void Print(const std::string& content) const override {
                 std::ofstream file (filename, std::fstream::out | std::fstream::app);
@@ -488,18 +489,22 @@ namespace Construction {
 
         struct Line {
             Flag flag;
-            std::stringstream ss;
+            std::string content;
         };
 
         template<typename T>
         friend Logger& operator<<(Logger& logger, const T& content) {
-            logger.currentLine.ss << content;
+	    {
+		std::stringstream ss;
+		ss << logger.currentLine.content << content;
+		logger.currentLine.content = ss.str();
+	    }
             return logger;
         }
 
         friend Logger& operator<<(Logger& logger, const Flag& flag) {
             if (flag == endl) {
-                std::string msg = logger.currentLine.ss.str();
+                std::string msg = logger.currentLine.content;
 
                 // Assemble the message
                 switch (logger.currentLine.flag) {
