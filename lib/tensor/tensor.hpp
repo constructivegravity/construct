@@ -2244,7 +2244,7 @@ namespace Construction {
             }
 
 			Tensor SubstituteVariable(const scalar_type& variable, const scalar_type& expression) const {
-                if (IsZero()) return *this;
+                if (IsZeroTensor()) return *this;
 
 				auto summands = GetSummands();
 
@@ -2267,7 +2267,7 @@ namespace Construction {
 					result = std::move(result.SubstituteVariable(substitution.first, substitution.second));
 				}
 
-                Construction::Logger::Debug("Finished substitution into ", ToString(), ". Collect by variables ...");
+                Construction::Logger::Debug("Finished substitution into ", result.ToString(), ". Collect by variables ...");
 
 				return result.CollectByVariables();
 			}
@@ -2356,7 +2356,7 @@ namespace Construction {
 			 */
 			std::pair< Vector::Matrix, std::vector<scalar_type> > ToHomogeneousLinearSystem() const {
                 // Ignore zero tensors
-                if (IsZero()) {
+                if (IsZeroTensor()) {
                     return { Vector::Matrix(0,0), { } };
                 }
 
