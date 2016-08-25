@@ -640,7 +640,23 @@ namespace Construction {
 		public:
 			virtual std::string ToString() const override {
 				std::stringstream ss;
-				ss << A->ToString() << B->ToString();
+
+				if (A->IsAddedTensor()) {
+					ss << "(";
+				}
+				ss << A->ToString();
+				if (A->IsAddedTensor()) {
+					ss << ")";
+				}
+
+				if (B->IsAddedTensor()) {
+					ss << "(";
+				}
+				ss << B->ToString();
+				if (B->IsAddedTensor()) {
+					ss << ")";
+				}
+
 				return ss.str();
 			}
 

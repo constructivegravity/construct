@@ -138,7 +138,7 @@ namespace Construction {
                         ref->SetTensor(merged(*ref->GetAsync()));
 
                         // Overwrite the tensor in the session
-                        Session::Instance()->Get(ref->GetName()) = *ref->GetAsync();
+                        Session::Instance()->Set(ref->GetName(), *ref->GetAsync());
                     }
                 }
 

@@ -65,6 +65,10 @@ namespace Construction {
                 return memory[name];
             }
 
+            void Set(const std::string& name, Expression&& expression) {
+                memory[name] = std::move(expression);
+            }
+
             Expression& operator[](const std::string& name) {
                 return memory[name];
             }
