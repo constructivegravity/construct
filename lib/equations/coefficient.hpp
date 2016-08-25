@@ -277,7 +277,7 @@ namespace Construction {
                         Notify();
                     }
 
-                    Session::Instance()->Get(name) = *tensor;
+                    Session::Instance()->Set(name, std::move(*tensor));
 
                     //session.SetCurrent(currentCmd, *tensor);
                 } catch(...) {
