@@ -298,9 +298,8 @@ namespace Construction {
             Substitution HomogeneousSystem(const Tensor::Tensor& tensor) {
                 auto system = tensor.ToHomogeneousLinearSystem();
 
-                Construction::Logger logger;
-                logger << Construction::Logger::DEBUG << "Turned equation into tensor `" << tensor << "`" << Construction::Logger::endl;
-
+		Construction::Logger::Debug("Turned equation into tensor `", tensor, "`");
+            
                 // Reduce
                 system.first.ToRowEchelonForm();
 

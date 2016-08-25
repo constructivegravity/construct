@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <thread>
 #include <mutex>
 #include <memory>
@@ -152,7 +153,7 @@ namespace Construction {
             }
 
             template<typename S, typename T>
-            std::vector<S> Map(std::vector<T> elements, std::function<void(const T&, std::function<void(S&&)>)> fn) {
+            std::vector<S> MapEmit(std::vector<T> elements, std::function<void(const T&, std::function<void(S&&)>)> fn) {
                 std::map<unsigned, S> results;
                 std::mutex resultsMutex;
 
