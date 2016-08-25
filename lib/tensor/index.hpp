@@ -529,7 +529,25 @@ namespace Construction {
 					if (indices[i] == index) return i;
 				return -1;
 			}
- 		public:
+        public:
+            bool operator<(const Indices& other) const {
+                for (int i=0; i<std::min(Size(), other.Size()); ++i) {
+                    if (indices[i] < other[i]) return true;
+                }
+
+                // The indices so far were equal
+                return Size() < other.Size();
+            }
+
+            bool operator>(const Indices& other) const {
+                for (int i = 0; i < std::min(Size(), other.Size()); ++i) {
+                    if (indices[i] > other[i]) return true;
+                }
+
+                // The indices so far were equal
+                return Size() > other.Size();
+            }
+        public:
 			virtual std::string ToString() const {
 				std::stringstream ss;
 

@@ -153,14 +153,16 @@ namespace Construction {
                     possibleIndices = GenerateEvenRank(indices);
                 }
 
+                std::vector<Tensor::Tensor> tensors;
+
                 for (auto& newIndices : possibleIndices) {
                     // Create variable
                     Tensor::Scalar variable ("e", ++variableCounter);
 
-                    result += variable * Tensor::Tensor::EpsilonGamma(numEpsilon, numGammas, newIndices);
+                    tensors.push_back(variable * Tensor::Tensor::EpsilonGamma(numEpsilon, numGammas, newIndices));
                 }
 
-                return result;
+                return Tensor::Tensor::Add(tensors);
             }
         };
 
