@@ -145,37 +145,28 @@ namespace Construction {
                 // Generate the tensor
                 auto tensor = API::Arbitrary(indices);
 
-                // Do all the symmetrization in parallel
-                tensor = tensor.ForEachOnSummands([&](const Construction::Tensor::Tensor& tensor) {
-                    auto pair = tensor.SeparateScalefactor();
-                    auto tensor_ = pair.second;
-                    auto factor = pair.first;
+                // Symmetrize the tensor
+                if (l > 1) {
+                    tensor = std::move(tensor.Symmetrize(block1));
+                }
 
-                    // Symmetrize the tensor
-                    if (l > 1) {
-                        tensor_ = std::move(tensor_.Symmetrize(block1));
-                    }
+                if (ld > 1) {
+                    tensor = std::move(tensor.Symmetrize(block2));
+                }
 
-                    if (ld > 1) {
-                        tensor_ = std::move(tensor_.Symmetrize(block2));
-                    }
+                if (r > 1) {
+                    tensor = std::move(tensor.Symmetrize(block3));
+                }
 
-                    if (r > 1) {
-                        tensor_ = std::move(tensor_.Symmetrize(block3));
-                    }
+                if (rd > 1) {
+                    tensor = std::move(tensor.Symmetrize(block4));
+                }
 
-                    if (rd > 1) {
-                        tensor_ = std::move(tensor_.Symmetrize(block4));
-                    }
-
-                    // Exchange symmetrize
-                    tensor_ = tensor_.ExchangeSymmetrize(indices, block);
-
-                    return factor * tensor_;
-                });
+                // Exchange symmetrize
+                tensor = std::move(tensor.ExchangeSymmetrize(indices, block));
 
                 // Collect terms
-                tensor = tensor.Simplify().RedefineVariables("e");
+                tensor = std::move(tensor.Simplify().RedefineVariables("e"));
 
                 return tensor;
             }

@@ -2508,6 +2508,11 @@ namespace Construction {
 
 							return result;
 						});
+
+                        // Sort by indices
+                        std::sort(symmetrizedSummands.begin(), symmetrizedSummands.end(), [&](const std::pair<scalar_type, Tensor>& a, const std::pair<scalar_type, Tensor>& b) {
+                            return a.second.GetIndices() < b.second.GetIndices();
+                        });
 					}
 
 					Tensor result = Tensor::Zero();
@@ -2582,13 +2587,16 @@ namespace Construction {
 								else combined.push_back(pair.first * pair.second);
 							}
 
+                            if (allTheSameScale) {
+                                std::sort(combined.begin(), combined.end(), [](const Tensor& a, const Tensor& b) {
+                                    return a.GetIndices() < b.GetIndices();
+                                });
+                            }
+
 							result = Tensor::Add(std::move(combined));
 						}
 
 						if (allTheSameScale) {
-							// Sort the terms
-							result = result.Canonicalize();
-
 							result *= lastScale;
 						}
 
@@ -2597,13 +2605,28 @@ namespace Construction {
 					} else {
 						std::vector<Tensor> combined;
 
+                        std::vector<Tensor> map_keys;
+                        std::vector<scalar_type> map_values;
+
 						// Iterate over all symmetrized pairs
 						for (auto& pair : symmetrizedSummands) {
 							// Ignore zeroes
 							if (pair.second.IsZeroTensor()) continue;
 
-							combined.push_back(pair.first * pair.second);
+							//combined.push_back(pair.first * pair.second);
+                            auto it = std::find(map_keys.begin(), map_keys.end(), pair.second);
+
+                            if (it == map_keys.end()) {
+                                map_keys.push_back(pair.second);
+                                map_values.push_back(pair.first);
+                            } else {
+                                map_values[std::distance(map_keys.begin(), it)] += pair.first;
+                            }
 						}
+
+                        for (int i=0; i<map_keys.size(); ++i) {
+                            combined.push_back(map_keys[i] * map_values[i]);
+                        }
 
 						return std::move(Tensor::Add(std::move(combined)));
 					}
@@ -2676,7 +2699,16 @@ namespace Construction {
 						}
 					}
 
-					result = Tensor::Add(std::move(combined));
+                    // Sort
+                    std::sort(combined.begin(), combined.end(), [&](const Tensor& a, const Tensor& b) {
+                        return a.GetIndices() < b.GetIndices();
+                    });
+
+                    if (combined.size() == 1) {
+                        result = std::move(combined[0]);
+                    } else {
+                        result = Tensor::Add(std::move(combined));
+                    }
 				}
 
 				// Scale
@@ -2913,6 +2945,7 @@ namespace Construction {
 
                     std::vector<std::pair<scalar_type,Tensor>> symmetrizedSummands;
 					bool hasSameScale=true;
+                    bool hasVariables=false;
 					scalar_type overalScale = 0;
 
 					// Symmetrize all the summands in parallel
@@ -2944,9 +2977,31 @@ namespace Construction {
 
 							// If this has a different scale, remember this
                             if (overalScale != result.first && overalScale != -result.first) hasSameScale = false;
+                            if (!hasVariables) {
+                                if (result.first.HasVariables()) hasVariables = true;
+                            }
 
-							return result;
-						});
+                            return result;
+                        });
+
+                        // If all have the same scale, expand the sum and sort by indices
+                        if (!hasVariables) {
+                            auto symmetrizedSummandsClone = symmetrizedSummands;
+                            symmetrizedSummands.clear();
+
+                            for (auto& pair : symmetrizedSummandsClone) {
+                                auto summands_ = pair.second.GetSummands();
+
+                                for (auto& s : summands_) {
+                                    symmetrizedSummands.push_back({ pair.first, s });
+                                }
+                            }
+
+                            // Canonicalize
+                            std::sort(symmetrizedSummands.begin(), symmetrizedSummands.end(), [&](const std::pair<scalar_type,Tensor>& a, const std::pair<scalar_type,Tensor>& b) {
+                                return a.second.GetIndices() < b.second.GetIndices();
+                            });
+                        }
 					}
 
 					Tensor result = Tensor::Zero();
@@ -3026,12 +3081,30 @@ namespace Construction {
 						return overalScale * result;
 
                     } else {
+                        std::vector<Tensor> map_keys;
+                        std::vector<scalar_type> map_values;
+
                         // Iterate over all symmetrized pairs
 						for (auto& pair : symmetrizedSummands) {
-							result += pair.first * pair.second;
+                            // Ignore zeroes
+                            if (pair.second.IsZeroTensor()) continue;
+
+                            auto it = std::find(map_keys.begin(), map_keys.end(), pair.second);
+                            if (it == map_keys.end()) {
+                                map_keys.push_back(pair.second);
+                                map_values.push_back(pair.first);
+                            } else {
+                                map_values[std::distance(map_keys.begin(), it)] += pair.first;
+                            }
 						}
 
-						return result;
+                        // Combine
+                        std::vector<Tensor> combined;
+                        for (int i=0; i<map_keys.size(); ++i) {
+                            combined.push_back(map_keys[i] * map_values[i]);
+                        }
+
+						return Tensor::Add(combined);
                     }
                 }
 
@@ -3061,7 +3134,7 @@ namespace Construction {
                     // Return the exchange symmetrized tensor
                     return newScale * s_.second;
                 } else {
-                    return Scalar(1,2) * ( *this + clone );
+                    return Scalar(1,2) * ( *this + clone ).Canonicalize();
                 }
             }
         public:
