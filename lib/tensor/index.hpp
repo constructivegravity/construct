@@ -533,6 +533,7 @@ namespace Construction {
             bool operator<(const Indices& other) const {
                 for (int i=0; i<std::min(Size(), other.Size()); ++i) {
                     if (indices[i] < other[i]) return true;
+                    else if (indices[i] > other[i]) return false;
                 }
 
                 // The indices so far were equal
@@ -542,6 +543,7 @@ namespace Construction {
             bool operator>(const Indices& other) const {
                 for (int i = 0; i < std::min(Size(), other.Size()); ++i) {
                     if (indices[i] > other[i]) return true;
+                    else if (indices[i] < other[i]) return false;
                 }
 
                 // The indices so far were equal
