@@ -852,6 +852,16 @@ namespace Construction {
 				}
 				return result;
 			}
+
+            static Indices GetNamed(const std::vector<std::string>& indices, const Range& range = {1,3}) {
+                Indices result;
+
+                for (auto& index : indices) {
+                    result.Insert(Index(index, range));
+                }
+
+                return result;
+            }
         public:
             Indices Shuffle(std::map<Index, Index> transformation) const {
                 Indices result;
@@ -867,7 +877,7 @@ namespace Construction {
 
                 return result;
             }
-		public:
+        public:
 			/**
 				\brief Returns if the given indices are a permutation of the given ones
 

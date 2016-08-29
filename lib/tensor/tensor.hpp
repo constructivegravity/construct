@@ -2025,9 +2025,13 @@ namespace Construction {
 					//
 					if (tensor.IsScaled()) {
 						ScaledTensor* _tensor = static_cast<ScaledTensor*>(tensor.pointer.get());
-						scalar_type c = _tensor->GetScale();
+						auto scalar_summands = _tensor->GetScale().GetSummands();
 						auto _summands = Tensor(std::move(_tensor->GetTensor()->Clone())).GetSummands();
-						for (auto& _tensor : _summands) result += c * _tensor;
+						for (auto& c : scalar_summands) {
+                            for (auto& _tensor : _summands) {
+                                result += c * _tensor;
+                            }
+                        }
 					} else if (tensor.IsMultiplied()) {
 						MultipliedTensor* _tensor = static_cast<MultipliedTensor*>(tensor.pointer.get());
 
