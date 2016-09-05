@@ -584,14 +584,14 @@ namespace Construction {
 
 			std::string ToCommand() const {
 				std::stringstream ss;
-				ss << "\"";
+				ss << "{";
 
 				for (int i=0; i< indices.size(); i++) {
 					ss << indices[i];
 					if (i != indices.size()-1) ss << " ";
 				}
 
-				ss << "\"";
+				ss << "}";
 
 				return ss.str();
 			}
@@ -943,6 +943,47 @@ namespace Construction {
 			bool ContainsIndex(const Index& index) const {
 				return std::find(indices.begin(), indices.end(), index) != indices.end();
 			}
+        public:
+            static Indices FromString(std::string code) {
+                Indices indices;
+
+                std::string current;
+
+                // Ignore brackets at the beginning and end if present
+                if (code[0] == '{') code = code.substr(1);
+                if (code[code.size()-1] == '}') code = code.substr(0, code.size()-1);
+
+                for (int pos=0; pos<code.length(); pos++) {
+                    char c = code[pos];
+
+                    if (c == ' ') {
+                        if (current.length() == 0) break;
+
+                        Tensor::Index index(current, current, {1,3});
+                        if (indices.ContainsIndex(index)) {
+                            // throw error
+                            return indices;
+                        }
+
+                        indices.Insert(index);
+                        current = "";
+                    } else {
+                        current.append(std::string(1,c));
+                    }
+                }
+
+                if (current.length() != 0) {
+                    Tensor::Index index(current, current, {1, 3});
+                    if (indices.ContainsIndex(index)) {
+                        // throw error
+                        return indices;
+                    }
+
+                    indices.Insert(index);
+                }
+
+                return indices;
+            }
 		public:
 			/**
 				\brief Check if the indices are in order
