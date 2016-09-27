@@ -289,16 +289,43 @@ namespace Construction {
             Substitution HomogeneousSystem(const Tensor::Tensor& tensor) {
                 auto system = tensor.ToHomogeneousLinearSystem();
 
-		Construction::Logger::Debug("Turned equation into tensor `", tensor, "`");
-            
+                Construction::Logger::Debug("Start reducing the equation ...");
+
+                // Remove double lines
+                {
+                    std::vector<Construction::Vector::Vector> vector;
+                    for (int i = 0; i < system.first.GetNumberOfRows(); ++i) {
+                        auto v = system.first.GetRowVector(i);
+
+                        auto it = std::find(vector.begin(), vector.end(), v);
+                        if (it == vector.end()) {
+                            vector.push_back(v);
+                            continue;
+                        }
+
+                        // Set all entries in the row to zero
+                        for (int j = 0; j < system.first.GetNumberOfColumns(); ++j) {
+                            system.first(i, j) = 0;
+                        }
+                    }
+                }
+
+                Construction::Logger::Debug("Matrix is ", system.first.ToString(false));
+
                 // Reduce
                 system.first.ToRowEchelonForm();
+
+                Construction::Logger::Debug("Matrix is ", system.first.ToString(false));
+
+                Construction::Logger::Debug("Finished Gaussian elimination.");
 
                 Substitution result;
 
                 // Extract the results
                 for (int i=0; i<system.first.GetNumberOfRows(); i++) {
                     auto vec = system.first.GetRowVector(i);
+
+                    Construction::Logger::Debug("Row = ", vec);
 
                     // If the vector has zero norm, we get no further information => quit
                     if (vec * vec == 0) break;
@@ -309,6 +336,8 @@ namespace Construction {
 
                     // Iterate over all the components
                     for (int j=0; j<vec.GetDimension(); j++) {
+                        Construction::Logger::Debug("j = ", j, ", vec[j] = ", vec[j], ", isZero = ", (isZero) ? "yes" : "no");
+
                         if (vec[j] == 0 && isZero) continue;
                         if (vec[j] == 1 && isZero) {
                             lhs = system.second[j];
@@ -318,6 +347,8 @@ namespace Construction {
                         }
                     }
 
+                    Construction::Logger::Debug("Found ", lhs, " = ", rhs);
+
                     // If the left hand side is not a variable, throw exception
                     if (lhs.IsNumeric() && lhs.ToDouble() == 0) {
                         throw Tensor::InvalidSubstitutionException();
@@ -326,6 +357,8 @@ namespace Construction {
                     // Add to the result
                     result.Insert(lhs, rhs);
                 }
+
+                Construction::Logger::Debug("Created substitution");
 
                 return result;
             }

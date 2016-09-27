@@ -134,7 +134,11 @@ namespace Construction {
                 return result;
             }
 
-            inline Fraction operator/(int i) const { return Fraction(numerator, denominator * i); }
+            inline Fraction operator/(int i) const {
+                Fraction result(numerator, denominator * i);
+                result.Reduce();
+                return result;
+            }
 
             operator double() {
                 return static_cast<double>(numerator) / denominator;
@@ -189,11 +193,15 @@ namespace Construction {
                 double rest = f - integer;
 
                 values.push_back(integer);
+                int counter = 0;
 
-                while (rest != 0 && rest > 1e-8) {
+                while (rest != 0 && rest > 1e-6) {
                     double x = 1.0/rest;
 
                     integer = static_cast<int>(x);
+                    double diff = 1-(x - static_cast<int>(x));
+                    if (diff < 1e-6) ++integer;
+
                     rest = x - integer;
 
                     values.push_back(integer);

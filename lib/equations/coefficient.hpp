@@ -11,6 +11,7 @@
 #include <language/session.hpp>
 #include <tensor/index.hpp>
 #include <tensor/tensor.hpp>
+#include <tensor/expression_database.hpp>
 #include <language/api.hpp>
 
 using Construction::Common::Unique;
@@ -208,10 +209,23 @@ namespace Construction {
                         indices.Append(block4);
 
                         // Generate current string
-                        std::string currentCmd = "Arbitrary({" + indices.ToString().substr(1) + ")";
+                        std::string currentCmd = "Arbitrary(" + indices.ToCommand() + ")";
 
                         // Generate the tensors
-                        tensor = std::make_shared<Construction::Tensor::Tensor>(Construction::Language::API::Arbitrary(indices));
+                        //if (!Construction::Tensor::ExpressionDatabase::Instance()->Contains(currentCmd)) {
+                            tensor = std::make_shared<Construction::Tensor::Tensor>(Construction::Language::API::Arbitrary(indices));
+
+                            // Insert into the database
+                        //    Construction::Tensor::ExpressionDatabase::Instance()->Insert(currentCmd, *tensor);
+                        //} else {
+                        /*    Construction::Logger::Debug("Found coefficient in database");
+
+                            auto expr = Construction::Tensor::ExpressionDatabase::Instance()->Get(currentCmd).As<Construction::Tensor::Tensor>();
+                            Construction::Logger::Debug("Found ", expr);
+
+                            // Copy from database
+                            tensor = std::make_shared<Construction::Tensor::Tensor>(expr);
+                        }*/
 
                         Notify();
 
@@ -220,7 +234,7 @@ namespace Construction {
 
                         // Symmetrize first block if necessary
                         if (block1.Size() > 1) {
-                            currentCmd = "Symmetrize(%, " + block1.ToString().substr(1) + "})";
+                            currentCmd = "Symmetrize(" + currentCmd + ", " + block1.ToCommand() + ")";
                             tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Symmetrize(block1));
 
                             //session.SetCurrent(currentCmd, *tensor);
@@ -230,7 +244,7 @@ namespace Construction {
 
                         // Symmetrize second block if necessary
                         if (block2.Size() > 1) {
-                            currentCmd = "Symmetrize(%, " + block2.ToString().substr(1) + "})";
+                            currentCmd = "Symmetrize(" + currentCmd + ", " + block2.ToCommand() + ")";
                             tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Symmetrize(block2));
 
                             //session.SetCurrent(currentCmd, *tensor);
@@ -240,7 +254,7 @@ namespace Construction {
 
                         // Symmetrize first block if necessary
                         if (block3.Size() > 1) {
-                            currentCmd = "Symmetrize(%, " + block3.ToString().substr(1) + "})";
+                            currentCmd = "Symmetrize(" + currentCmd + ", " + block3.ToCommand() + ")";
                             tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Symmetrize(block3));
 
                             //session.SetCurrent(currentCmd, *tensor);
@@ -250,7 +264,7 @@ namespace Construction {
 
                         // Symmetrize first block if necessary
                         if (block4.Size() > 1) {
-                            currentCmd = "Symmetrize(%, " + block4.ToString().substr(1) + "})";
+                            currentCmd = "Symmetrize(" + currentCmd + ", " + block4.ToCommand() + ")";
                             tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Symmetrize(block4));
 
                             //session.SetCurrent(currentCmd, *tensor);
@@ -264,14 +278,14 @@ namespace Construction {
                         exchanged.Append(block1);
                         exchanged.Append(block2);
 
-                        currentCmd = "ExchangeSymmetrize(%, " + indices.ToString().substr(1) + "}, " + exchanged.ToString().substr(1) +"})";
+                        currentCmd = "ExchangeSymmetrize(" + currentCmd + ", " + indices.ToCommand() + ", " + exchanged.ToCommand() +")";
                         tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->ExchangeSymmetrize(indices, exchanged));
 
                         Notify();
                         //session.SetCurrent(currentCmd, *tensor);
 
                         // Simplify and redefine variables
-                        currentCmd = "LinearIndependent(%)";
+                        currentCmd = "LinearIndependent(" + currentCmd + ")";
                         tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Simplify().RedefineVariables(GetRandomString()));
 
                         Notify();
