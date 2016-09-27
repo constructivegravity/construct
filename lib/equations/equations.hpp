@@ -103,7 +103,7 @@ namespace Construction {
 
                 // If the number of tickets is equal to a threshold
                 // set the state to LOCKED
-                if (tickets.size() == 4) {
+                if (tickets.size() == 1) {
                     state = LOCKED;
                 }
 
@@ -135,7 +135,7 @@ namespace Construction {
                     auto ref = pair.second;
 
                     if (ref->IsFinished()) {
-                        ref->SetTensor(merged(*ref->GetAsync()));
+                        ref->SetTensor(merged(*ref->GetAsync()).Simplify());
 
                         // Overwrite the tensor in the session
                         Session::Instance()->Set(ref->GetName(), *ref->GetAsync());
@@ -289,6 +289,15 @@ namespace Construction {
                             tmp = ld;
                             ld = rd;
                             rd = tmp;
+
+                            auto indices = Indices::FromString(temp);
+
+                            auto block1 = indices.Partial({0, r+rd-1});
+                            auto block2 = indices.Partial({r+rd, r+rd+l+ld-1});
+
+                            block2.Append(block1);
+
+                            temp = block2.ToCommand();
                         }
 
                         // Get the coefficient reference
@@ -394,7 +403,7 @@ namespace Construction {
                 CLI cli;
 
                 // Set the coefficient of the session
-                try {
+                //try {
                     cli(eq);
 
                     // III. Convert the output into a substitution
@@ -406,17 +415,19 @@ namespace Construction {
                     //  IV. Give the substitution to the ticket
                     // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
                     ticket->Fulfill(subst);
-                } catch (const Exception& e) {
+                /*} catch (const Exception& e) {
                     state = ABORTED;
 
                     // TODO: THROW EXCEPTION
                     Construction::Logger::Error("Error in equation `", eq, "`: ", e.what());
 
+                    throw;
+
                     variable.notify_all();
                     Notify();
 
                     return;
-                }
+                }*/
 
                 // Set the state to solved
                 state = SOLVED;

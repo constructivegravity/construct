@@ -19,7 +19,7 @@ Scalar::Scalar(const std::string& name, unsigned id) {
     pointer = ScalarPointer(new Tensor::Variable(ss.str()));
 }
 
-Scalar Scalar::Fraction(float f) {
+Scalar Scalar::Fraction(double f) {
     return Scalar(ScalarPointer(new Tensor::Fraction(std::move(Tensor::Fraction::FromDouble(f)))));
 }
 
@@ -345,4 +345,24 @@ std::unique_ptr<AbstractExpression> Scalar::Deserialize(std::istream& is) {
     }
 
     return std::unique_ptr<AbstractExpression>(new Scalar(std::move(result)));
+}
+
+bool Scalar::IsProportionalTo(const Scalar& other, Scalar* factor) {
+    // If not both scalars are numerics, return false
+    // TODO: also handle multiples of a scalar and sums
+    if (!IsNumeric() || !other.IsNumeric()) return false;
+
+    // Handle fractions
+    if (IsFraction() && other.IsFraction()) {
+        Scalar result = Scalar(*static_cast<Construction::Tensor::Fraction*>(pointer.get()) / *static_cast<Construction::Tensor::Fraction*>(other.pointer.get()));
+        if (factor) *factor = std::move(result);
+        return true;
+    }
+
+    double f = ToDouble() / other.ToDouble();
+    Scalar result = Scalar(f);
+
+    if (factor) *factor = std::move(result);
+
+    return true;
 }

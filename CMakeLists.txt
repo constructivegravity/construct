@@ -10,7 +10,7 @@ SET(CMAKE_COLOR_MAKEFILE ON)
 SET(CMAKE_VERBOSE_MAKEFILE OFF)
 SET(CMAKE_BUILD_TYPE Debug)
 
-add_definitions(-std=c++11 -O3 -g -lpthread -fno-limit-debug-info)
+add_definitions(-std=c++11 -O0 -g -lpthread -fno-limit-debug-info)
 
 set(CONSTRUCTION_MAIN_DIRECTORY ${PROJECT_SOURCE_DIR})
 set(CONSTRUCTION_LIBRARY_DIRECTORY "${CONSTRUCTION_MAIN_DIRECTORY}/lib")

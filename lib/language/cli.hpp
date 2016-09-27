@@ -118,7 +118,7 @@ namespace Construction {
                 }
             }
 
-            void Execute(const std::shared_ptr<Node>& document, bool silent=false) {
+            Expression Execute(const std::shared_ptr<Node>& document, bool silent=false) {
                 // Copy the most recent expression;
                 Expression lastResult = Session::Instance()->GetCurrent();
                 Expression previousResult = lastResult;
@@ -127,30 +127,22 @@ namespace Construction {
 
                 // Previous token
                 if (document->IsPrevious()) {
-                    if (!silent) {
-                        PrintExpression(lastResult);
-                    }
-                    return;
+                    return lastResult;
                 }
                 // Literals
                 else if (document->IsLiteral()) {
                     auto id = std::dynamic_pointer_cast<LiteralNode>(document)->GetText();
-                    Session::Instance()->SetCurrent(definition[id], Session::Instance()->Get(id));
-
-                    // Update current
-                    lastResult = Session::Instance()->GetCurrent();
-
-                    if (!silent) PrintExpression(lastResult);
-                    return;
+                    lastResult = Session::Instance()->Get(id);
+                    Session::Instance()->SetCurrent(definition[id], lastResult);
+;
+                    return lastResult;
                 }
                 // Numerics
                 else if (document->IsNumeric()) {
                     lastResult = Scalar(std::atof(std::dynamic_pointer_cast<NumericNode>(document)->GetText().c_str()));
                     Session::Instance()->SetCurrent("", lastResult);
 
-                    if (!silent) PrintExpression(lastResult);
-
-                    return;
+                    return lastResult;
                 }
                 // Indices
                 else if (document->IsIndices()) {
@@ -163,9 +155,7 @@ namespace Construction {
                     // Update the session
                     Session::Instance()->SetCurrent("", lastResult);
 
-                    if (!silent) PrintExpression(lastResult);
-
-                    return;
+                    return lastResult;
                 }
                 // String
                 else if (document->IsString()) {
@@ -175,9 +165,7 @@ namespace Construction {
                     // Update the session
                     Session::Instance()->SetCurrent("", lastResult);
 
-                    if (!silent) PrintExpression(lastResult);
-
-                    return;
+                    return lastResult;
                 }
                 // Binary operations
                 else if (document->IsBinary()) {
@@ -185,19 +173,13 @@ namespace Construction {
                     auto rhs = std::dynamic_pointer_cast<BinaryNode>(document)->GetRight();
 
                     // Execute the left command
-                    Execute(lhs, true);
-
-                    // Get the result
-                    auto leftResult = Session::Instance()->GetCurrent();
+                    auto leftResult = Execute(lhs, true);
 
                     // Reset the current instance to get the same initial conditions
                     Session::Instance()->SetCurrent("", lastResult);
 
                     // Execute the right command
-                    Execute(rhs, true);
-
-                    // Get the result
-                    auto rightResult = Session::Instance()->GetCurrent();
+                    auto rightResult = Execute(rhs, true);
 
                     // Do add them
                     switch (std::dynamic_pointer_cast<BinaryNode>(document)->GetOperator()) {
@@ -207,11 +189,11 @@ namespace Construction {
                             }
 
                             if (leftResult.IsTensor()) {
-                                Session::Instance()->SetCurrent("", leftResult.As<Tensor::Tensor>() + rightResult.As<Tensor::Tensor>());
+                                lastResult = leftResult.As<Tensor::Tensor>() + rightResult.As<Tensor::Tensor>();
                             } else if (leftResult.IsScalar()) {
-                                Session::Instance()->SetCurrent("", leftResult.As<Tensor::Scalar>() + rightResult.As<Tensor::Scalar>());
+                                lastResult = leftResult.As<Tensor::Scalar>() + rightResult.As<Tensor::Scalar>();
                             } else if (leftResult.IsSubstitution()) {
-                                Session::Instance()->SetCurrent("", Tensor::Substitution::Merge({ leftResult.As<Tensor::Substitution>(), rightResult.As<Tensor::Substitution>() }));
+                                lastResult = Tensor::Substitution::Merge({ leftResult.As<Tensor::Substitution>(), rightResult.As<Tensor::Substitution>() });
                             }
                             break;
                         case '-':
@@ -220,9 +202,9 @@ namespace Construction {
                             }
 
                             if (leftResult.IsTensor()) {
-                                Session::Instance()->SetCurrent("", leftResult.As<Tensor::Tensor>() - rightResult.As<Tensor::Tensor>());
+                                lastResult = leftResult.As<Tensor::Tensor>() - rightResult.As<Tensor::Tensor>();
                             } else if (leftResult.IsScalar()) {
-                                Session::Instance()->SetCurrent("", leftResult.As<Tensor::Scalar>() - rightResult.As<Tensor::Scalar>());
+                                lastResult = leftResult.As<Tensor::Scalar>() - rightResult.As<Tensor::Scalar>();
                             }
                             break;
                         case '*':
@@ -242,7 +224,7 @@ namespace Construction {
                                     newExpression = (*newExpression.As<Tensor::Tensor>().As<Tensor::ScalarTensor>())();
                                 }
 
-                                Session::Instance()->SetCurrent("", newExpression);
+                                lastResult = newExpression;
                             } else if (leftResult.IsScalar()) {
                                 auto newExpression = Expression::Void();
 
@@ -253,24 +235,20 @@ namespace Construction {
                                     newExpression = multiplied;
                                 }
 
-                                Session::Instance()->SetCurrent("", newExpression);
+                                lastResult = newExpression;
                             }
                             break;
                     }
 
-                    if (!silent) {
-                        PrintExpression(Session::Instance()->GetCurrent());
-                    }
+                    Session::Instance()->SetCurrent("", lastResult);
 
-                    return;
+                    return lastResult;
+
                 } else if (document->IsNegation()) {
                     auto node = std::dynamic_pointer_cast<NegationNode>(document)->GetNode();
 
                     // Execute the command and load the latest content to memory
-                    Execute(node, true);
-
-                    // Get last result
-                    auto last = Session::Instance()->GetCurrent();
+                    auto last = Execute(node, true);
 
                     if (last.IsScalar()) {
                         lastResult = -last.As<Tensor::Scalar>();
@@ -281,12 +259,7 @@ namespace Construction {
                     // Update the value
                     Session::Instance()->SetCurrent("", lastResult);
 
-                    // Print the negated expression
-                    if (!silent) {
-                        PrintExpression(lastResult);
-                    }
-
-                    return;
+                    return lastResult;
                 } else if (document->IsCommand()) {
                     auto commandName = std::dynamic_pointer_cast<CommandNode>(document)->GetIdentifier()->GetText();
 
@@ -310,7 +283,7 @@ namespace Construction {
                         command = CommandManagement::Instance()->CreateCommand(commandName);
                     } catch (UnknownCommandException& err) {
                         Error("I do not know this command");
-                        return;
+                        return Expression::Void();
                     }
 
                     // Apply arguments
@@ -318,10 +291,7 @@ namespace Construction {
 
                     for (auto& arg : *args) {
                         // Execute again to load this
-                        Execute(arg, true);
-
-                        // Load the expression
-                        Expression expr = Session::Instance()->GetCurrent();
+                        auto expr = Execute(arg, true);
 
                         // Set the last expression back
                         Session::Instance()->SetCurrent("", lastResult);
@@ -402,23 +372,12 @@ namespace Construction {
                         database[lastCmd] = lastResult;
                     }*/
 
-                    // Print tensors unless in silent mode
-                    if (!silent) {
-                        PrintExpression(newResult);
-
-                        // Print the required time
-                        std::cout << "\033[90m   " << time << "\033[0m" << std::endl;
-                    }
-
-                    return;
+                    return lastResult;
                 } else if (document->IsAssignment()) {
                     auto id = std::dynamic_pointer_cast<AssignmentNode>(document)->GetIdentifier()->GetText();
                     auto expression = std::dynamic_pointer_cast<AssignmentNode>(document)->GetExpression();
 
-                    Execute(expression, true);
-
-                    // Update current
-                    lastResult = Session::Instance()->GetCurrent();
+                    lastResult = Execute(expression, true);
 
                     // Store the variable in memory
                     Session::Instance()->Set(id, lastResult);
@@ -427,16 +386,16 @@ namespace Construction {
                     //database[lastCmd] = lastResult;
 
                     // Print tensors unless in silent mode
-                    if (!silent) {
+                    /*if (!silent) {
                         PrintExpression(lastResult);
 
                         time.Stop();
 
                         // Print the required time
                         std::cout << "\033[90m   " << time << "\033[0m" << std::endl;
-                    }
+                    }*/
 
-                    return;
+                    return lastResult;
                 } else {
                     Error("Cannot execute this :'(");
                 }
@@ -463,8 +422,21 @@ namespace Construction {
                 #if RECOVER_FROM_EXCEPTIONS == 1
                 try {
                 #endif
-                    Execute(document, silent);
+                    Common::TimeMeasurement time;
+
+                    auto lastResult = Execute(document, silent);
                     Session::Instance()->GetNotebook().Append(code);
+
+                    time.Stop();
+
+                    // Print tensors unless in silent mode
+                    if (!silent) {
+                        PrintExpression(lastResult);
+
+                        // Print the required time
+                        std::cout << "\033[90m   " << time << "\033[0m" << std::endl;
+                    }
+
                 #if RECOVER_FROM_EXCEPTIONS == 1
                 } catch (const std::bad_alloc& e) {
                     Error("Out of memory. :(");

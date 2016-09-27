@@ -167,7 +167,10 @@ namespace Construction {
 
                 for (int i=0; i<arguments.size(); i++) {
                     if (!ArgumentDictionary::Instance()->IsA(name, i, arguments[i]->GetType())) {
-                        throw WrongArgumentTypeException(name, ArgumentDictionary::Instance()->TypeToString(arguments[i]->GetType()));
+                        throw WrongArgumentTypeException(
+                                ArgumentDictionary::Instance()->TypeToString(ArgumentDictionary::Instance()->Type(name, i)),
+                                ArgumentDictionary::Instance()->TypeToString(arguments[i]->GetType())
+                        );
                     }
                 }
             }

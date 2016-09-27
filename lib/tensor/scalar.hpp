@@ -304,7 +304,7 @@ namespace Construction {
             // Syntactic sugar
             inline static Scalar Integer(int v) { return Scalar(v); }
             inline static Scalar Fraction(int numerator, unsigned denominator) { return Scalar(numerator, denominator); }
-            static Scalar Fraction(float f);
+            static Scalar Fraction(double f);
             inline static Scalar FloatingPoint(double v) { return Scalar(v); }
 
             inline static Scalar Variable(const std::string& name) { return Scalar(name); }
@@ -545,6 +545,8 @@ namespace Construction {
 
                 return { result, rest };
             }
+        public:
+            bool IsProportionalTo(const Scalar& other, Scalar* factor = nullptr);
         public:
             void Serialize(std::ostream& os) const override;
             static std::unique_ptr<AbstractExpression> Deserialize(std::istream& is);

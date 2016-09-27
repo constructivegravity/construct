@@ -3,12 +3,27 @@
 #include <common/logger.hpp>
 
 #include <equations/equations.hpp>
+#include <tensor/expression_database.hpp>
 #include <common/progressbar.hpp>
 
 int main(int argc, char** argv) {
     std::cerr << "The infamous Apple Program" << std::endl;
     std::cerr << "(c) 2016 Constructive Gravity Group Erlangen" << std::endl;
     std::cerr << "All rights reserved." << std::endl << std::endl;
+
+    std::cerr << "        ,---,_          ,          " << std::endl;
+    std::cerr << "         _>   `'-.  .--'/          " << std::endl;
+    std::cerr << "    .--'` ._      `/   <_          " << std::endl;
+    std::cerr << "     >,-' ._'.. ..__ . ' '-.       " << std::endl;
+    std::cerr << "  .-'   .'`         `'.     '.     " << std::endl;
+    std::cerr << "   >   / >`-.     .-'< \\ , '._\\  " << std::endl;
+    std::cerr << "  /    ; '-._>   <_.-' ;  '._>     " << std::endl;
+    std::cerr << "  `>  ,/  /___\\ /___\\  \\_  /    " << std::endl;
+    std::cerr << "  `.-|(|  \\o_/  \\o_/   |)|`      " << std::endl;
+    std::cerr << "      \\;        \\      ;/        " << std::endl;
+    std::cerr << "        \\  .-,   )-.  /           " << std::endl;
+    std::cerr << "         /`  .'-'.  `\\            " << std::endl;
+    std::cerr << "        ;_.-`.___.'-.;             " << std::endl << std::endl;
 
     Construction::Logger::Screen("screen");
     Construction::Logger::File("file", "apple.log");
@@ -22,6 +37,11 @@ int main(int argc, char** argv) {
     }
 
     logger << Construction::Logger::DEBUG << "Start to solve file `" << argv[1] << "`" << Construction::Logger::endl;
+
+    Construction::Common::TimeMeasurement time;
+
+    // Initialize database
+    Construction::Tensor::ExpressionDatabase::Instance()->Initialize("construct.db");
 
     // Open file
     std::ifstream file (argv[1]);
@@ -86,10 +106,28 @@ int main(int argc, char** argv) {
     }
     std::cerr << "\r";
 
+    // Collect all the variables in the coefficients
+    std::vector<Construction::Tensor::Scalar> variables;
+    for (auto it = Construction::Equations::Coefficients::Instance()->begin(); it != Construction::Equations::Coefficients::Instance()->end(); ++it) {
+        auto tensor = *it->second->Get();
+        auto stuff = tensor.ExtractVariables();
+        for (auto& pair : stuff) {
+            auto _it = std::find(variables.begin(), variables.end(), pair.first);
+            if (_it == variables.end()) variables.push_back(pair.first);
+        }
+    }
+
+    // Build a substitution
+    Construction::Tensor::Substitution substitution;
+    int pos = 1;
+    for (auto& variable : variables) {
+        substitution.Insert(variable, Construction::Tensor::Scalar::Variable("e", pos++));
+    }
+
     // Print the results
     for (auto it = Construction::Equations::Coefficients::Instance()->begin(); it != Construction::Equations::Coefficients::Instance()->end(); ++it) {
         //auto tensor = it->second->Get()->RedefineVariables("e", offset);
-        auto tensor = *it->second->Get();
+        auto tensor = substitution(*it->second->Get());
 
         auto summands = tensor.GetSummands();
 
@@ -124,6 +162,9 @@ int main(int argc, char** argv) {
 
         std::cout << std::endl;
     }
+
+    time.Stop();
+    std::cerr << time << std::endl;
 
     std::cerr << "Finished." << std::endl;
 }
