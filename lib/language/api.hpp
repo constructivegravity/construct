@@ -162,8 +162,10 @@ namespace Construction {
                     tensor = std::move(tensor.Symmetrize(block4));
                 }
 
-                // Exchange symmetrize
-                tensor = std::move(tensor.ExchangeSymmetrize(indices, block));
+                // Exchange symmetrize if necessary
+                if (l == r && ld == rd) {
+                    tensor = std::move(tensor.ExchangeSymmetrize(indices, block));
+                }
 
                 // Collect terms
                 tensor = std::move(tensor.Simplify().RedefineVariables("e"));
