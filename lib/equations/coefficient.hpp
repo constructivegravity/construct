@@ -272,14 +272,16 @@ namespace Construction {
 
                         Notify();
 
-                        // Do the block exchange
-                        auto exchanged = block3;
-                        exchanged.Append(block4);
-                        exchanged.Append(block1);
-                        exchanged.Append(block2);
+                        // Do the block exchange if necessary
+                        if (l == r && ld == rd) {
+                            auto exchanged = block3;
+                            exchanged.Append(block4);
+                            exchanged.Append(block1);
+                            exchanged.Append(block2);
 
-                        currentCmd = "ExchangeSymmetrize(" + currentCmd + ", " + indices.ToCommand() + ", " + exchanged.ToCommand() +")";
-                        tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->ExchangeSymmetrize(indices, exchanged));
+                            currentCmd = "ExchangeSymmetrize(" + currentCmd + ", " + indices.ToCommand() + ", " + exchanged.ToCommand() +")";
+                            tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->ExchangeSymmetrize(indices, exchanged));
+                        }
 
                         Notify();
                         //session.SetCurrent(currentCmd, *tensor);
