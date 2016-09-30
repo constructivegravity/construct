@@ -5,6 +5,8 @@
 #include <unordered_map>
 #include <mutex>
 
+#include <iostream>
+
 #include <common/singleton.hpp>
 #include <common/scope_guard.hpp>
 #include <common/logger.hpp>
@@ -85,6 +87,26 @@ namespace Construction {
             void Initialize(const std::string& filename) {
                 this->filename = filename;
 
+                // Check if there is a temp file, if yes, rename to given filename.
+                // This leads to the database always being restored automatically,
+                // even if there was a crash inbetween resulting in the `filename`
+                // to be broken and the temp file still being on the hard disk.
+                {
+                    bool tempExists = false;
+                    {
+                        std::ifstream file(filename + "temp");
+                        tempExists = file.good();
+                    }
+
+                    if (tempExists) {
+                        // Remove original file
+                        std::remove(filename.c_str());
+
+                        // Rename the temp file
+                        std::rename((filename + "temp").c_str(), filename.c_str());
+                    }
+                }
+
                 // Check if the file exists
                 bool exists=false;
                 {
@@ -93,9 +115,22 @@ namespace Construction {
                 }
 
                 if (exists) ReadKeysFromFile(filename);
+
+                // Set initialized
+                initialized = true;
+            }
+        public:
+            void Deactivate() {
+                active = false;
+            }
+
+            void Activate() {
+                active = true;
             }
         private:
             void ReadKeysFromFile(const std::string& filename) {
+                assert(initialized && "The expression database needs to be initialized first");
+
                 // Open the file
                 std::ifstream file(filename.c_str(), std::ios::binary);
 
@@ -163,6 +198,10 @@ namespace Construction {
             }
         public:
             bool Contains(const std::string& name) const {
+                assert(initialized && "The expression database needs to be initialized first");
+
+                if (!active) return false;
+
                 std::unique_lock<std::mutex> lock(mutex);
 
                 auto it = definitions.find(name);
@@ -176,11 +215,16 @@ namespace Construction {
                 \returns The expression
              */
             Expression Get(const std::string& name) const {
+                assert(initialized && "The expression database needs to be initialized first");
+
+                // If not active, return void
+                if (!active) return Expression::Void();
+
                 // Lock the mutex
                 std::unique_lock<std::mutex> lock(mutex);
 
+                // Check if the expression is in the database
                 auto it = definitions.find(name);
-
                 if (it == definitions.end()) return Expression::Void();
 
                 // Look in the cache
@@ -294,6 +338,9 @@ namespace Construction {
                 // Lock the mutex
                 std::unique_lock<std::mutex> lock(mutex);
 
+                // If not active, return
+                if (!active) return false;
+
                 // Copy the definitions for rollback
                 std::unordered_map<std::string, size_t> oldDefinitions = definitions;
 
@@ -383,28 +430,27 @@ namespace Construction {
 
                     // Allocate empty space for the buffer
                     {
-                        char *buffer = new char[headerSize];
-                        file.write(buffer, sizeof(buffer));
-                        delete[] buffer;
+                        unsigned char buffer [headerSize];
+                        file.write((char*) buffer, headerSize);
                     }
 
                     pos += headerSize;
 
                     // Write the expressions and update the positions
-                    for (auto it = definitions.begin(); it != definitions.end(); ++it) {
+                    for (auto& it : definitions) {
                         Expression expr;
 
                         // If the definition is one of the old values ...
-                        if (it->first != definition) {
+                        if (it.first != definition) {
                             // ... read data from saved database
-                            expr = ReadExpressionFromFile(filename + "temp", it->second);
+                            expr = ReadExpressionFromFile(filename + "temp", it.second);
                         } else {
                             // ... else just use the existing expression
                             expr = expression;
                         }
 
                         // Update the position in the list of definitions
-                        it->second = pos;
+                        it.second = pos;
 
                         // Serialize the expression
                         std::string content;
@@ -481,6 +527,31 @@ namespace Construction {
 
                 return true;
             }
+        public:
+            /**
+                \brief Clear the database
+
+                Clear the database. This also deletes everything that is stored
+                on disk. Note, that one cannot undo this step!
+             */
+            void Clear() {
+                // Remove the file from disk
+                std::remove(filename.c_str());
+
+                // Clear the definitions
+                definitions.clear();
+
+                // Clear cache
+                cache_keys.clear();
+                cache_values.clear();
+            }
+
+            /**
+                \brief Return the size of the database
+             */
+            size_t Size() const {
+                return definitions.size();
+            }
         private:
             std::unordered_map<std::string, size_t> definitions;
 
@@ -493,6 +564,9 @@ namespace Construction {
             unsigned maximalCacheSize = 128;
 
             mutable std::mutex mutex;
+
+            bool initialized=false;
+            bool active=true;
         };
 
     }

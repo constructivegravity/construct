@@ -42,6 +42,7 @@ int main(int argc, char** argv) {
 
     // Initialize database
     Construction::Tensor::ExpressionDatabase::Instance()->Initialize("construct.db");
+    Construction::Tensor::ExpressionDatabase::Instance()->Deactivate(); // Deactivate for now
 
     // Open file
     std::ifstream file (argv[1]);

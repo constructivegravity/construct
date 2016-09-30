@@ -196,6 +196,8 @@ namespace Construction {
                         Notify(); // Exchange Symmetrize
                         Notify(); // Simplify
                     } else {
+                        auto db = Construction::Tensor::ExpressionDatabase::Instance();
+
                         // Get index blocks
                         auto block1 = Construction::Tensor::Indices::GetRomanSeries(l, {1,3});
                         auto block2 = Construction::Tensor::Indices::GetRomanSeries(ld, {1,3}, l);
@@ -212,20 +214,20 @@ namespace Construction {
                         std::string currentCmd = "Arbitrary(" + indices.ToCommand() + ")";
 
                         // Generate the tensors
-                        //if (!Construction::Tensor::ExpressionDatabase::Instance()->Contains(currentCmd)) {
+                        if (!db->Contains(currentCmd)) {
                             tensor = std::make_shared<Construction::Tensor::Tensor>(Construction::Language::API::Arbitrary(indices));
 
                             // Insert into the database
-                        //    Construction::Tensor::ExpressionDatabase::Instance()->Insert(currentCmd, *tensor);
-                        //} else {
-                        /*    Construction::Logger::Debug("Found coefficient in database");
+                            db->Insert(currentCmd, *tensor);
+                        } else {
+                            Construction::Logger::Debug("Found coefficient in database");
 
-                            auto expr = Construction::Tensor::ExpressionDatabase::Instance()->Get(currentCmd).As<Construction::Tensor::Tensor>();
+                            auto expr = db->Get(currentCmd).As<Construction::Tensor::Tensor>();
                             Construction::Logger::Debug("Found ", expr);
 
                             // Copy from database
                             tensor = std::make_shared<Construction::Tensor::Tensor>(expr);
-                        }*/
+                        }
 
                         Notify();
 
@@ -235,7 +237,13 @@ namespace Construction {
                         // Symmetrize first block if necessary
                         if (block1.Size() > 1) {
                             currentCmd = "Symmetrize(" + currentCmd + ", " + block1.ToCommand() + ")";
-                            tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Symmetrize(block1));
+
+                            if (!db->Contains(currentCmd)) {
+                                tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Symmetrize(block1));
+                                db->Insert(currentCmd, *tensor);
+                            } else {
+                                tensor = std::make_shared<Construction::Tensor::Tensor>(db->Get(currentCmd).As<Construction::Tensor::Tensor>());
+                            }
 
                             //session.SetCurrent(currentCmd, *tensor);
                         }
@@ -245,9 +253,13 @@ namespace Construction {
                         // Symmetrize second block if necessary
                         if (block2.Size() > 1) {
                             currentCmd = "Symmetrize(" + currentCmd + ", " + block2.ToCommand() + ")";
-                            tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Symmetrize(block2));
 
-                            //session.SetCurrent(currentCmd, *tensor);
+                            if (!db->Contains(currentCmd)) {
+                                tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Symmetrize(block2));
+                                db->Insert(currentCmd, *tensor);
+                            } else {
+                                tensor = std::make_shared<Construction::Tensor::Tensor>(db->Get(currentCmd).As<Construction::Tensor::Tensor>());
+                            }
                         }
 
                         Notify();
@@ -255,8 +267,13 @@ namespace Construction {
                         // Symmetrize first block if necessary
                         if (block3.Size() > 1) {
                             currentCmd = "Symmetrize(" + currentCmd + ", " + block3.ToCommand() + ")";
-                            tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Symmetrize(block3));
 
+                            if (!db->Contains(currentCmd)) {
+                                tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Symmetrize(block3));
+                                db->Insert(currentCmd, *tensor);
+                            } else {
+                                tensor = std::make_shared<Construction::Tensor::Tensor>(db->Get(currentCmd).As<Construction::Tensor::Tensor>());
+                            }
                             //session.SetCurrent(currentCmd, *tensor);
                         }
 
@@ -265,7 +282,13 @@ namespace Construction {
                         // Symmetrize first block if necessary
                         if (block4.Size() > 1) {
                             currentCmd = "Symmetrize(" + currentCmd + ", " + block4.ToCommand() + ")";
-                            tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Symmetrize(block4));
+
+                            if (!db->Contains(currentCmd)) {
+                                tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Symmetrize(block4));
+                                db->Insert(currentCmd, *tensor);
+                            } else {
+                                tensor = std::make_shared<Construction::Tensor::Tensor>(db->Get(currentCmd).As<Construction::Tensor::Tensor>());
+                            }
 
                             //session.SetCurrent(currentCmd, *tensor);
                         }
@@ -280,7 +303,14 @@ namespace Construction {
                             exchanged.Append(block2);
 
                             currentCmd = "ExchangeSymmetrize(" + currentCmd + ", " + indices.ToCommand() + ", " + exchanged.ToCommand() +")";
-                            tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->ExchangeSymmetrize(indices, exchanged));
+
+                            if (!db->Contains(currentCmd)) {
+                                tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->ExchangeSymmetrize(indices, exchanged));
+
+                                db->Insert(currentCmd, *tensor);
+                            } else {
+                                tensor = std::make_shared<Construction::Tensor::Tensor>(db->Get(currentCmd).As<Construction::Tensor::Tensor>());
+                            }
                         }
 
                         Notify();
@@ -288,7 +318,13 @@ namespace Construction {
 
                         // Simplify and redefine variables
                         currentCmd = "LinearIndependent(" + currentCmd + ")";
-                        tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Simplify().RedefineVariables(GetRandomString()));
+                        if (!db->Contains(currentCmd)) {
+                            tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Simplify().RedefineVariables(GetRandomString()));
+
+                            db->Insert(currentCmd, *tensor);
+                        } else {
+                            tensor = std::make_shared<Construction::Tensor::Tensor>(db->Get(currentCmd).As<Construction::Tensor::Tensor>());
+                        }
 
                         Notify();
                     }
