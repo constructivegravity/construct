@@ -285,6 +285,21 @@ namespace Construction {
             virtual std::unique_ptr<AbstractTensor> ContractionHeuristics(const AbstractTensor& other) const {
                 return nullptr;
             }
+
+            /**
+                \brief Method that allows to simplify expressions on multiplications
+
+                Method that allows to simplify expressions on regular multiplication.
+                For example, multipliying an EpsilonGamma tensor by a Gamma just adds the
+                indies to the tensor and increases numGamma by one.
+
+                If nothing can be done, it returns nullptr.
+
+                PRECONDITION: there are no equal indices in both indices
+             */
+            virtual std::unique_ptr<AbstractTensor> MultiplicationHeuristics(const AbstractTensor& other) const {
+                return nullptr;
+            }
         public:
             bool IsCustomTensor() const { return type == TensorType::CUSTOM; }
 
@@ -605,6 +620,20 @@ namespace Construction {
 
 				return std::move(TensorPointer(new AddedTensor(std::move(newSummands), indices)));
 			}
+        public:
+            virtual std::unique_ptr<AbstractTensor> MultiplicationHeuristics(const AbstractTensor& other) const {
+                // Create new list
+                std::vector<TensorPointer> newSummands;
+
+                for (auto& tensor : summands) {
+                    auto newTensor = tensor->MultiplicationHeuristics(other);
+                    if (!newTensor) return nullptr;
+
+                    newSummands.push_back(std::move(newTensor));
+                }
+
+                return std::move(TensorPointer(new AddedTensor(std::move(newSummands), indices)));
+            }
 		private:
 			std::vector<TensorPointer> summands;
 		};
@@ -769,6 +798,22 @@ namespace Construction {
             virtual TensorPointer Canonicalize() const override {
                 return TensorPointer(new MultipliedTensor(std::move(A->Canonicalize()), std::move(B->Canonicalize())));
             }
+
+            virtual std::unique_ptr<AbstractTensor> MultiplicationHeuristics(const AbstractTensor& other) const {
+                // Try to apply heuristics to first one
+                auto heuristics = A->MultiplicationHeuristics(other);
+                if (heuristics) {
+                    return TensorPointer(new MultipliedTensor(std::move(heuristics), std::move(B->Clone())));
+                }
+
+                // Try to apply heuristics to the second one
+                heuristics = B->MultiplicationHeuristics(other);
+                if (heuristics) {
+                    return TensorPointer(new MultipliedTensor(std::move(A->Clone()), std::move(heuristics)));
+                }
+
+                return nullptr;
+            }
         public:
             virtual bool operator==(const AbstractTensor& other) const override {
                 if (!other.IsMultipliedTensor()) return false;
@@ -831,6 +876,16 @@ namespace Construction {
 				}
 				return std::move(newA);
 			}
+
+            virtual std::unique_ptr<AbstractTensor> MultiplicationHeuristics(const AbstractTensor& other) const {
+                // Try to apply heuristics to the tensor one
+                auto heuristics = A->MultiplicationHeuristics(other);
+                if (heuristics) {
+                    return TensorPointer(new ScaledTensor(std::move(heuristics), c));
+                }
+
+                return nullptr;
+            }
 
 			virtual std::string ToString() const override {
 				std::stringstream ss;
@@ -1192,13 +1247,22 @@ namespace Construction {
             }
 
             // Try to apply heuristics
-            {
+            if (containsContractions) {
                 auto heuristics = one.ContractionHeuristics(second);
                 if (heuristics != nullptr) return std::move(heuristics);
 
                 heuristics = second.ContractionHeuristics(one);
                 if (heuristics != nullptr) return std::move(heuristics);
             }
+
+            // Try to apply multiplication heuristics
+            /*{
+                auto heuristics = one.MultiplicationHeuristics(second);
+                if (heuristics != nullptr) return std::move(heuristics);
+
+                heuristics = second.MultiplicationHeuristics(one);
+                if (heuristics != nullptr) return std::move(heuristics);
+            }*/
 
 			// If one of the tensors is zero, return zero
 			if (one.IsZeroTensor() || second.IsZeroTensor()) {
@@ -1638,6 +1702,56 @@ namespace Construction {
 			virtual TensorPointer Clone() const override {
 				return TensorPointer(new EpsilonGammaTensor(numEpsilon, numGamma, indices));
 			}
+
+            virtual std::unique_ptr<AbstractTensor> MultiplicationHeuristics(const AbstractTensor& other) const {
+                // Check if the other one is a gamma
+                if (!other.IsGammaTensor()) return nullptr;
+
+                // Increase number of gammas and append the indices of the other
+                Indices indices = this->indices;
+
+                indices.Append(other.GetIndices());
+
+                // Sort the indices
+                Indices newIndices;
+
+                unsigned pos = 0;
+
+                // Canonicalize the epsilon contribution
+                if (numEpsilon == 1) {
+                    // Sort and append the indices to the new list
+                    newIndices.Append(indices.Partial({0, 2}));
+
+                    pos += 3;
+                }
+
+                // Vector for the sorted indices of the gammas
+                std::vector<Indices> gammas;
+
+                // Canonicalize the gamma contribution
+                for (unsigned i=0; i<numGamma; i++) {
+                    auto gammaIndices = indices.Partial({pos, pos+1});
+
+                    // Sort and append the indices to the new list
+                    auto sortedIndices = gammaIndices.Ordered();
+                    gammas.push_back(sortedIndices);
+
+                    pos += 2;
+                }
+
+                // Sort the indices of the gammas to respect the
+                // commutivity of gammas
+                std::sort(gammas.begin(), gammas.end(), [](const Indices& a, const Indices& b) {
+                    return a[0] < b[0];
+                });
+
+                // Append the now sorted gammas to all indices
+                for (auto& gammaIndices : gammas) {
+                    newIndices.Append(gammaIndices);
+                }
+
+                return TensorPointer(new EpsilonGammaTensor(numEpsilon, numGamma+1, newIndices));
+            }
 		public:
 			virtual std::string ToString() const override {
 				std::stringstream ss;
