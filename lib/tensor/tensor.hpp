@@ -2317,7 +2317,7 @@ namespace Construction {
 				auto summands = GetSummands();
 
 				// Initialize
-                std::map<unsigned,Vector::Vector> vectors;
+                std::map<unsigned,Vector::Vector<double>> vectors;
 
 				// Get the indices of the resulting tensor
 				auto indices = GetIndices();
@@ -2325,7 +2325,7 @@ namespace Construction {
 
 				unsigned dimension = combinations.size();
 
-				Vector::Matrix M (dimension, summands.size());
+				Vector::Matrix<double> M (dimension, summands.size());
 
 				// Insert the values into the matrix
 				{
@@ -2620,10 +2620,10 @@ namespace Construction {
 
 
 			 */
-			std::pair< Vector::Matrix, std::vector<scalar_type> > ToHomogeneousLinearSystem() const {
+			std::pair< Vector::Matrix<double>, std::vector<scalar_type> > ToHomogeneousLinearSystem() const {
                 // Ignore zero tensors
                 if (IsZeroTensor()) {
-                    return { Vector::Matrix(0,0), { } };
+                    return { Vector::Matrix<double>(0,0), { } };
                 }
 
 				// First expand and get summands
@@ -2638,7 +2638,7 @@ namespace Construction {
 				unsigned m = variables.size();
 
 				// Create matrix
-				Vector::Matrix M(n, m);
+				Vector::Matrix<double> M(n, m);
 				std::vector<scalar_type> _variables;
 
 				// Iterate over all variables

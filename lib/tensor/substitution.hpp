@@ -113,7 +113,7 @@ namespace Construction {
                 }
 
                 // Write the elements into a matrix
-                Vector::Matrix M(data.size(), variables.size());
+                Vector::Matrix<double> M(data.size(), variables.size());
 
                 // Insert the data from above
                 for (int i=0; i<data.size(); ++i) {
@@ -140,7 +140,7 @@ namespace Construction {
                     auto vec = M.GetRowVector(i);
 
                     // If the vector has zero norm, we get no further information => quit
-                    if (vec * vec == 0) break;
+                    if (vec.IsZero()) break;
 
                     bool isZero = true;
                     Scalar lhs = 0;

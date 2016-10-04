@@ -75,6 +75,7 @@ namespace Construction {
             unsigned column;
         };
 
+        template<typename T>
         class Matrix {
         public:
             /**
@@ -90,7 +91,7 @@ namespace Construction {
              */
             ~Matrix() { }
 
-            Matrix(std::initializer_list<Vector> list) {
+            Matrix(std::initializer_list<Vector<T>> list) {
                 m = list.size();
                 n = (*list.begin()).GetDimension();
 
@@ -106,7 +107,7 @@ namespace Construction {
                 }
             }
 
-            Matrix(const std::vector<Vector>& list) {
+            Matrix(const std::vector<Vector<T>>& list) {
                 m = list.size();
                 if (m == 0) return;
 
@@ -148,27 +149,27 @@ namespace Construction {
                 return m;
             }
         public:
-            inline double& At(int i, int j) {
+            inline T& At(int i, int j) {
                 if (i >= n || j >= m || i < 0 || j < 0) throw OutOfBoundariesException();
                 return values[MatrixIndex(i,j)];
             }
 
-            inline double At(int i, int j) const {
+            inline T At(int i, int j) const {
                 if (i >= n || j >= m || i < 0 || j < 0) throw OutOfBoundariesException();
                 auto it = values.find(MatrixIndex(i,j));
-                if (it == values.end()) return 0;
+                if (it == values.end()) return T();
                 return it->second;
             }
 
-            inline double& operator()(int i, int j) {
+            inline T& operator()(int i, int j) {
                 if (i >= n || j >= m || i < 0 || j < 0) throw OutOfBoundariesException();
                 return values[MatrixIndex(i,j)];
             }
 
-            inline double operator()(int i, int j) const {
+            inline T operator()(int i, int j) const {
                 if (i >= n || j >= m || i < 0 || j < 0) throw OutOfBoundariesException();
                 auto it = values.find(MatrixIndex(i,j));
-                if (it == values.end()) return 0;
+                if (it == values.end()) return T();
                 return it->second;
             }
 
@@ -186,20 +187,20 @@ namespace Construction {
                 }
             }
         public:
-            Vector GetRowVector(int i) const {
+            Vector<T> GetRowVector(int i) const {
                 if (i >= n) throw OutOfBoundariesException();
 
-                Vector result(m);
+                Vector<T> result(m);
                 for (int j=0; j<m; j++) {
                     result[j] = At(i,j);
                 }
                 return result;
             }
 
-            Vector GetColumnVector(int i) const {
+            Vector<T> GetColumnVector(int i) const {
                 if (i >= m) throw OutOfBoundariesException();
 
-                Vector result(n);
+                Vector<T> result(n);
                 for (int j=0; j<n; j++) {
                     result[j] = At(j,i);
                 }
@@ -257,7 +258,7 @@ namespace Construction {
                     for (int j=0; j<m; j++) {
                         double x = At(i,j);
                         double y = other(i,j);
-                        if (x != 0 || y != 0) result(n,m) = x + y;
+                        if (x != T() || y != T()) result(n,m) = x + y;
                     }
                 }
                 return result;
@@ -268,7 +269,7 @@ namespace Construction {
                 for (int i=0; i<n; i++) {
                     for (int j=0; j<m; j++) {
                         double z = other(i,j);
-                        if (z != 0) At(i,j) -= z;
+                        if (z != T()) At(i,j) -= z;
                     }
                 }
                 return *this;
@@ -282,7 +283,7 @@ namespace Construction {
                     for (int j=0; j<m; j++) {
                         double x = At(i,j);
                         double y = other(i,j);
-                        if (x != 0 || y != 0) result(n,m) = x - y;
+                        if (x != T() || y != T()) result(n,m) = x - y;
                     }
                 }
                 return result;
@@ -291,7 +292,7 @@ namespace Construction {
             Matrix& operator*=(double c) {
                 for (int i=0; i<n; i++) {
                     for (int j=0; j<m; j++) {
-                        if (At(i,j) != 0) At(i,j) *= c;
+                        if (At(i,j) != T()) At(i,j) *= c;
                     }
                 }
                 return *this;
@@ -301,7 +302,7 @@ namespace Construction {
                 Matrix result (n,m);
                 for (int i=0; i<n; i++) {
                     for (int j=0; j<m; j++) {
-                        if (At(i,j) != 0) result(i,j) = c * At(i,j);
+                        if (At(i,j) != T()) result(i,j) = c * At(i,j);
                     }
                 }
                 return result;
@@ -315,7 +316,7 @@ namespace Construction {
                     for (int j=0; j<other.m; j++) {
                         for (int k=0; k<m; k++) {
                             double z = At(i,k)*other(k,j);
-                            if (z != 0) result(i,j) = z;
+                            if (z != T()) result(i,j) = z;
                         }
                     }
                 }
@@ -323,9 +324,9 @@ namespace Construction {
                 return result;
             }
 
-            Vector operator*(const Vector& v) const {
+            Vector<T> operator*(const Vector<T>& v) const {
                 if (m != v.GetDimension()) throw OutOfBoundariesException();
-                Vector result(n);
+                Vector<T> result(n);
                 for (int i=0; i<n; i++) {
                     for (int j=0; j<m; j++) {
                         result[i] = At(i,j) * v[j];
@@ -334,22 +335,20 @@ namespace Construction {
                 return result;
             }
 
-            Matrix& operator/=(double c) {
-                c = 1.0/c;
+            Matrix& operator/=(T c) {
                 for (int i=0; i<n; i++) {
                     for (int j=0; j<m; j++) {
-                        if (At(i,j) != 0) At(i,j) *= c;
+                        if (At(i,j) != T()) At(i,j) /= c;
                     }
                 }
                 return *this;
             }
 
-            Matrix operator/(double c) const {
-                c = 1.0/c;
+            Matrix operator/(T c) const {
                 Matrix result (n,m);
                 for (int i=0; i<n; i++) {
                     for (int j=0; j<m; j++) {
-                        if (At(i,j) != 0) result(i,j) = c * At(i,j);
+                        if (At(i,j) != T()) result(i,j) = At(i,j) / c;
                     }
                 }
                 return result;
@@ -360,7 +359,7 @@ namespace Construction {
 
                 for (unsigned i=0; i<std::min(n, this->n); i++) {
                     for (unsigned j=0; j<std::min(m, this->m); j++) {
-                        if (At(i,j) != 0) result(i,j) = At(i,j);
+                        if (At(i,j) != T()) result(i,j) = At(i,j);
                     }
                 }
 
@@ -371,7 +370,7 @@ namespace Construction {
                 size_t value = 0;
                 for (int r=0; r<GetNumberOfRows(); r++) {
                     for (int c=0; c<GetNumberOfColumns(); c++) {
-                        if (At(r,c) != 0) value++;
+                        if (At(r,c) != T()) value++;
                     }
                 }
 
@@ -388,7 +387,7 @@ namespace Construction {
                 for (unsigned r=0; r<result.GetNumberOfColumns(); r++) {
                     bool isZero = true;
                     for (unsigned c=0; c<result.GetNumberOfColumns(); c++) {
-                        if (result(r,c) != 0) {
+                        if (result(r,c) != T()) {
                             isZero = false;
                             break;
                         }
@@ -404,7 +403,7 @@ namespace Construction {
                     if (zeroRow[r]) continue;
 
                     unsigned i = r;
-                    while (result(i, lead) == 0) {
+                    while (result(i, lead) == T()) {
                         i++;
                         if (result.GetNumberOfRows() <= i && !zeroRow[i]) {
                             i = r;
@@ -415,16 +414,16 @@ namespace Construction {
                     result.SwapRows(i,r);
 
                     // Divide row r through M[r,lead]
-                    if (result(r, lead) != 0) {
-                        double x = result(r, lead);
+                    if (result(r, lead) != T()) {
+                        T x = result(r, lead);
                         for (int k=0; k<result.GetNumberOfColumns(); k++) result(r, k) /= x;
                     }
 
                     for (unsigned i=0; i<result.GetNumberOfRows(); i++) {
                         if (i != r) {
-                            double x = result(i, lead);
+                            T x = result(i, lead);
                             for (unsigned k=0; k<result.GetNumberOfColumns(); k++) {
-                                double y = result(r,k);
+                                T y = result(r,k);
                                 result(i,k) -= x*result(r,k);
                             }
                         }
@@ -446,7 +445,7 @@ namespace Construction {
                 for (unsigned r=0; r<numRows; ++r) {
                     bool isZero = true;
                     for (unsigned c=0; c<GetNumberOfColumns(); c++) {
-                        if (At(r,c) != 0) {
+                        if (At(r,c) != T()) {
                             isZero = false;
                             break;
                         }
@@ -472,9 +471,9 @@ namespace Construction {
 
                     // Search for first line that has a non-zero entry as pivot element
                     unsigned i = r;
-                    while (fabs(At(i, lead)) < 1e-10) {
+                    while (At(i, lead) == T()) {
                         // Set the small value to zero
-                        At(i, lead) = 0;
+                        At(i, lead) = T();
 
                         ++i;
                         if (numRows <= i) {
@@ -486,11 +485,11 @@ namespace Construction {
                     SwapRows(i,r);
 
                     // Divide row r through M[r,lead]
-                    if (At(r, lead) != 0) {
+                    if (At(r, lead) != T()) {
                         double x = At(r, lead);
 
                         for (int k=0; k<GetNumberOfColumns(); k++) {
-                            double z = At(r,k) / x;
+                            T z = At(r,k) / x;
 
                             // Update the value, remove zeros from the memory
                             // automatically
@@ -500,9 +499,9 @@ namespace Construction {
 
                     for (unsigned i=0; i<numRows; i++) {
                         if (i != r) {
-                            double x = At(i, lead);
+                            T x = At(i, lead);
                             for (unsigned k=0; k<GetNumberOfColumns(); k++) {
-                                double y = x*At(r,k);
+                                T y = x*At(r,k);
 
                                 // Update the value, remove zeros from the memory
                                 // automatically
@@ -520,15 +519,15 @@ namespace Construction {
 
                 for (int k=0; k<m; k++) {
                     auto it1 = values.find(MatrixIndex(i,k));
-                    double value1 = (it1 != values.end()) ? it1->second : 0;
+                    T value1 = (it1 != values.end()) ? it1->second : T();
                     if (it1 != values.end()) values.erase(it1);
 
                     auto it2 = values.find(MatrixIndex(j,k));
-                    double value2 = (it2 != values.end()) ? it2->second : 0;
+                    T value2 = (it2 != values.end()) ? it2->second : T();
                     if (it2 != values.end()) values.erase(it2);
 
-                    if (value1 != 0) values.insert({ MatrixIndex(j,k), value1 });
-                    if (value2 != 0) values.insert({ MatrixIndex(i,k), value2 });
+                    if (value1 != T()) values.insert({ MatrixIndex(j,k), value1 });
+                    if (value2 != T()) values.insert({ MatrixIndex(i,k), value2 });
                 }
             }
 
@@ -538,15 +537,15 @@ namespace Construction {
 
                 for (int k=0; k<n; k++) {
                     auto it1 = values.find(MatrixIndex(k,i));
-                    double value1 = (it1 != values.end()) ? it1->second : 0;
+                    double value1 = (it1 != values.end()) ? it1->second : T();
                     if (it1 != values.end()) values.erase(it1);
 
                     auto it2 = values.find(MatrixIndex(k,j));
-                    double value2 = (it2 != values.end()) ? it2->second : 0;
+                    double value2 = (it2 != values.end()) ? it2->second : T();
                     if (it2 != values.end()) values.erase(it2);
 
-                    if (value1 != 0) values.insert({ MatrixIndex(k,j), value1 });
-                    if (value2 != 0) values.insert({ MatrixIndex(k,i), value2 });
+                    if (value1 != T()) values.insert({ MatrixIndex(k,j), value1 });
+                    if (value2 != T()) values.insert({ MatrixIndex(k,i), value2 });
                 }
             }
         public:
@@ -587,7 +586,7 @@ namespace Construction {
             unsigned n;
             unsigned m;
 
-            std::map<MatrixIndex, double> values;
+            std::map<MatrixIndex, T> values;
         };
 
     }

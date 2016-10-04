@@ -315,7 +315,7 @@ namespace Construction {
 
                 // Remove double lines
                 {
-                    std::vector<Construction::Vector::Vector> vector;
+                    std::vector<Construction::Vector::Vector<double>> vector;
                     for (int i = 0; i < system.first.GetNumberOfRows(); ++i) {
                         auto v = system.first.GetRowVector(i);
 
@@ -350,7 +350,7 @@ namespace Construction {
                     Construction::Logger::Debug("Row = ", vec);
 
                     // If the vector has zero norm, we get no further information => quit
-                    if (vec * vec == 0) break;
+                    if (vec.IsZero()) break;
 
                     bool isZero = true;
                     Scalar lhs = 0;
