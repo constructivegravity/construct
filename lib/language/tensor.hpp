@@ -492,14 +492,7 @@ namespace Construction {
             }
 
             Expression Execute() const {
-                auto tensor = GetTensors(0);
-
-                // If the tensor is zero, return
-                if (tensor.IsZeroTensor()) return tensor;
-                if (tensor.IsScalar()) return tensor;
-
-                tensor.SetIndices(Tensor::Permutation::From(GetIndices(1), tensor.GetIndices())(GetIndices(2)));
-                return tensor.Canonicalize();
+                return Language::API::RenameIndices(GetTensors(0), GetIndices(1), GetIndices(2));
             }
         };
 
@@ -507,6 +500,19 @@ namespace Construction {
         REGISTER_ARGUMENT(RenameIndices, 0, ArgumentType::TENSOR);
         REGISTER_ARGUMENT(RenameIndices, 1, ArgumentType::INDEX);
         REGISTER_ARGUMENT(RenameIndices, 2, ArgumentType::INDEX);
+
+        CLI_COMMAND(Expand)
+            std::string Help() const {
+                return "Expand(<Tensor>)";
+            }
+
+            Expression Execute() const {
+                return GetTensors(0).Expand();
+            }
+        };
+
+        REGISTER_COMMAND(Expand);
+        REGISTER_ARGUMENT(Expand, 0, ArgumentType::TENSOR);
 
     }
 }

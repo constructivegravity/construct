@@ -50,6 +50,7 @@ namespace Construction {
             Tensor::Tensor Expand(const Tensor::Tensor& tensor);
             Tensor::Tensor Simplify(const Tensor::Tensor& tensor);
             Tensor::Tensor RedefineVariables(const Tensor::Tensor& tensor);
+            Tensor::Tensor RenameIndices(const Tensor::Tensor& tensor, const Indices& from, const Indices& to);
 
             Tensor::Tensor Add(const Tensor::Tensor& first, const Tensor::Tensor& second);
             Tensor::Tensor Scale(const Tensor::Tensor& first, const Scalar& scalar);
@@ -219,6 +220,25 @@ namespace Construction {
 
             Tensor::Tensor RedefineVariables(const Tensor::Tensor& tensor) {
                 return tensor.RedefineVariables("e");
+            }
+
+            Tensor::Tensor RenameIndices(const Tensor::Tensor& tensor, const Indices& from, const Indices& to) {
+                auto clone = tensor;
+
+                if (from.Size() != to.Size()) return clone;
+
+                // If the tensor is zero, return
+                if (clone.IsZeroTensor()) return clone;
+                if (clone.IsScalar()) return clone;
+
+                std::map<Tensor::Index, Tensor::Index> mapping;
+                for (unsigned i=0; i<from.Size(); ++i) {
+                    mapping[from[i]] = to[i];
+                }
+
+                clone.SetIndices(clone.GetIndices().Shuffle(mapping));
+
+                return clone.Canonicalize();
             }
 
             bool IsSymmetric(const Tensor::Tensor& tensor, const Indices& indices) {
