@@ -1,4 +1,4 @@
-#define RECOVER_FROM_EXCEPTIONS 	1
+#define RECOVER_FROM_EXCEPTIONS 	0
 
 
 #include <common/time_measurement.hpp>

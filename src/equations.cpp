@@ -29,11 +29,20 @@ int main(int argc, char** argv) {
     Construction::Logger::File("file", "apple.log");
 
     Construction::Logger logger;
-    logger.SetDebugLevel("screen", Construction::Common::DebugLevel::DEBUG);
+    logger.SetDebugLevel("screen", Construction::Common::DebugLevel::ERROR);
 
     if (argc < 2) {
         logger << Construction::Logger::ERROR << "You need to specify the file that needs to be solved" << Construction::Logger::endl;
         return -1;
+    }
+
+    // Add options for debugging
+    if (argc > 2) {
+        std::string option = argv[2];
+
+        if (option == "-d" || option == "--debug") {
+            logger.SetDebugLevel("screen", Construction::Common::DebugLevel::DEBUG);
+        }
     }
 
     logger << Construction::Logger::DEBUG << "Start to solve file `" << argv[1] << "`" << Construction::Logger::endl;

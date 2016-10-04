@@ -429,6 +429,46 @@ namespace Construction {
                 bool operator==(const Definition& other) const {
                     return l == other.l && r == other.r && ld == other.ld && rd == other.rd && id == other.id;
                 }
+
+                bool operator<(const Definition& other) const {
+                    if (l > other.l) return false;
+                    else if (l < other.l) return true;
+
+                    if (ld > other.ld) return false;
+                    else if (ld < other.ld) return true;
+
+                    if (r > other.r) return false;
+                    else if (r < other.r) return true;
+
+                    if (rd > other.rd) return false;
+                    else if (rd < other.rd) return true;
+
+                    return id < other.id;
+                }
+
+                bool operator<=(const Definition& other) const {
+                    if (l > other.l) return false;
+                    else if (l < other.l) return true;
+
+                    if (ld > other.ld) return false;
+                    else if (ld < other.ld) return true;
+
+                    if (r > other.r) return false;
+                    else if (r < other.r) return true;
+
+                    if (rd > other.rd) return false;
+                    else if (rd < other.rd) return true;
+
+                    return id <= other.id;
+                }
+
+                inline bool operator>(const Definition& other) const {
+                    return other < *this;
+                }
+
+                inline bool operator>=(const Definition& other) const {
+                    return other <= *this;
+                }
             };
         public:
             class DefinitionHasher {
@@ -468,13 +508,16 @@ namespace Construction {
 
             size_t Size() const { return map.size(); }
         public:
-            std::unordered_map<Definition, CoefficientReference, DefinitionHasher>::iterator begin() { return map.begin(); }
-            std::unordered_map<Definition, CoefficientReference, DefinitionHasher>::iterator end() { return map.end(); }
+            typedef std::map<Definition, CoefficientReference>      container_type;
+            //typedef std::unordered_map<Definition, CoefficientReference, DefinitionHasher>   container_type;
 
-            std::unordered_map<Definition, CoefficientReference, DefinitionHasher>::const_iterator begin() const { return map.begin(); }
-            std::unordered_map<Definition, CoefficientReference, DefinitionHasher>::const_iterator end() const { return map.end(); }
+            container_type::iterator begin() { return map.begin(); }
+            container_type::iterator end() { return map.end(); }
+
+            container_type::const_iterator begin() const { return map.begin(); }
+            container_type::const_iterator end() const { return map.end(); }
         private:
-            std::unordered_map<Definition, CoefficientReference, DefinitionHasher> map;
+            container_type map;
         };
 
         class CoefficientsLock {

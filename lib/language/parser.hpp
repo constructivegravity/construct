@@ -234,7 +234,7 @@ namespace Construction {
 
             virtual std::string ToString() const {
                 std::stringstream ss;
-                ss << lhs->ToString() << " " << op << " " << rhs->ToString();
+                ss << "(" << op << " " << lhs->ToString() << " " << rhs->ToString() << ")";
                 return ss.str();
             }
         private:
@@ -260,7 +260,7 @@ namespace Construction {
         public:
             virtual std::string ToString() const {
                 std::stringstream ss;
-                ss << "\'" << text << "\'";
+                ss << "\"" << text << "\"";
                 return ss.str();
             }
         private:
@@ -275,7 +275,7 @@ namespace Construction {
         public:
             virtual std::string ToString() const {
                 std::stringstream ss;
-                ss << "\"" << text << "\"";
+                ss << "{" << text << "}";
                 return ss.str();
             }
         private:
@@ -437,6 +437,7 @@ namespace Construction {
 
                     if (c == "." && inNumeric) {
                         current.append(c);
+                        continue;
                     }
 
                     if (IsNumeric(c)) {
@@ -777,7 +778,7 @@ namespace Construction {
                 Parses an expression in brackets
 
                     bracket_expression ::=
-                            | '(' expression ')'
+                            | '(' rhs_expression ')'
                             | '-' bracket_expression
                             | call_expression
                             ;
@@ -790,7 +791,7 @@ namespace Construction {
                     GetNext();
 
                     // Parse for an expression
-                    auto expression = ParseExpression();
+                    auto expression = ParseRHSExpression();
                     if (!expression) return nullptr;
 
                     if (!current.IsRightBracket()) return nullptr;
