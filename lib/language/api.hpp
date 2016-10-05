@@ -315,7 +315,7 @@ namespace Construction {
 
                 // Remove double lines
                 {
-                    std::vector<Construction::Vector::Vector> vector;
+                    std::vector<Construction::Vector::Vector<Construction::Tensor::Fraction>> vector;
                     for (int i = 0; i < system.first.GetNumberOfRows(); ++i) {
                         auto v = system.first.GetRowVector(i);
 
@@ -350,7 +350,7 @@ namespace Construction {
                     Construction::Logger::Debug("Row = ", vec);
 
                     // If the vector has zero norm, we get no further information => quit
-                    if (vec * vec == 0) break;
+                    if (vec.IsZero()) break;
 
                     bool isZero = true;
                     Scalar lhs = 0;
@@ -358,13 +358,13 @@ namespace Construction {
 
                     // Iterate over all the components
                     for (int j=0; j<vec.GetDimension(); j++) {
-                        Construction::Logger::Debug("j = ", j, ", vec[j] = ", vec[j], ", isZero = ", (isZero) ? "yes" : "no");
+                        //Construction::Logger::Debug("j = ", j, ", vec[j] = ", vec[j], ", isZero = ", (isZero) ? "yes" : "no");
 
-                        if (vec[j] == 0 && isZero) continue;
-                        if (vec[j] == 1 && isZero) {
+                        if (vec[j] == Construction::Tensor::Fraction(0) && isZero) continue;
+                        if (vec[j] == Construction::Tensor::Fraction(1) && isZero) {
                             lhs = system.second[j];
                             isZero = false;
-                        } else if (vec[j] != 0) {
+                        } else if (vec[j] != Construction::Tensor::Fraction(0)) {
                             rhs += (-system.second[j] * Tensor::Scalar::Fraction(vec[j]));
                         }
                     }
