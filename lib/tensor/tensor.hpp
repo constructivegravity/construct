@@ -2325,7 +2325,7 @@ namespace Construction {
 
 				unsigned dimension = combinations.size();
 
-				Vector::Matrix<double> M (dimension, summands.size());
+				Vector::Matrix<Construction::Tensor::Fraction> M (dimension, summands.size());
 
 				// Insert the values into the matrix
 				{
@@ -2346,10 +2346,17 @@ namespace Construction {
                         		}
 
                         		// Calculate the value of the assignment
-                        		float value = tensor(assignment).ToDouble();
+                                Construction::Tensor::Fraction value;
+
+                                {
+                                    auto _value = tensor(assignment);
+                                    if (_value.IsFraction())
+                                        value = *_value.As<Fraction>();
+                                    else value = Construction::Tensor::Fraction::FromDouble(_value.ToDouble());
+                                }
 
                         		// only lock and insert if necessary
-                        		if (value != 0) {
+                        		if (value != Construction::Tensor::Fraction(0)) {
                         			std::unique_lock<std::mutex> lock(mutex);
 
                         			// Insert the value into the matrix
@@ -2385,8 +2392,8 @@ namespace Construction {
                 	bool foundBase=false;
 
                     for (int i=k; i<summands.size(); i++) {
-                        if (M(currentRow,i) == 0) continue;
-                        else if (M(currentRow,i) == 1 && !foundBase) {
+                        if (M(currentRow,i) == Construction::Tensor::Fraction(0)) continue;
+                        else if (M(currentRow,i) == Construction::Tensor::Fraction(1) && !foundBase) {
                             // switch mode
                             foundBase = true;
                             k = i+1;
@@ -2620,10 +2627,10 @@ namespace Construction {
 
 
 			 */
-			std::pair< Vector::Matrix<double>, std::vector<scalar_type> > ToHomogeneousLinearSystem() const {
+			std::pair< Vector::Matrix<Construction::Tensor::Fraction>, std::vector<scalar_type> > ToHomogeneousLinearSystem() const {
                 // Ignore zero tensors
                 if (IsZeroTensor()) {
-                    return { Vector::Matrix<double>(0,0), { } };
+                    return { Vector::Matrix<Construction::Tensor::Fraction>(0,0), { } };
                 }
 
 				// First expand and get summands
@@ -2638,7 +2645,7 @@ namespace Construction {
 				unsigned m = variables.size();
 
 				// Create matrix
-				Vector::Matrix<double> M(n, m);
+				Vector::Matrix<Construction::Tensor::Fraction> M(n, m);
 				std::vector<scalar_type> _variables;
 
 				// Iterate over all variables
@@ -2658,7 +2665,12 @@ namespace Construction {
                         }
 
                         // Plug the value of the assignment into the matrix
-                        M(j,i) = (pair.second)(assignment).ToDouble();
+                        auto s = (pair.second)(assignment);
+                        if (s.IsFraction()) {
+                            M(j,i) = *s.As<Fraction>();
+                        } else if (s.IsFloatingPoint()) {
+                            M(j, i) = Fraction::FromDouble(s.ToDouble());
+                        }
 					}
 
 					i++;

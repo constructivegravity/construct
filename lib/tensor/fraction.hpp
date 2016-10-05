@@ -30,6 +30,8 @@ namespace Construction {
             }
 
             void Reduce() {
+                if (numerator == 0) return;
+
                 int g = gcd(numerator, denominator);
                 numerator /= g;
                 denominator /= g;
@@ -91,8 +93,12 @@ namespace Construction {
             }
 
             Fraction& operator/=(const Fraction& other) {
-                numerator   *= other.denominator;
-                denominator *= other.numerator;
+                int factor = ((numerator < 0 && other.numerator > 0) || (numerator > 0 && other.numerator < 0)) ? -1 : 1;
+                int newNumerator = factor * abs(numerator) * other.denominator;
+                int newDenominator = denominator * abs(other.numerator);
+
+                numerator   = newNumerator;
+                denominator = newDenominator;
                 return *this;
             }
 
@@ -129,13 +135,21 @@ namespace Construction {
             inline Fraction operator*(int i) const { return Fraction(numerator * i, denominator); }
 
             Fraction operator/(const Fraction& other) const {
-                Fraction result (numerator * other.denominator, denominator * other.numerator);
+                int factor = ((numerator < 0 && other.numerator > 0) || (numerator > 0 && other.numerator < 0)) ? -1 : 1;
+                int newNumerator = factor * abs(numerator) * other.denominator;
+                int newDenominator = denominator * abs(other.numerator);
+
+                Fraction result (newNumerator, newDenominator);
                 result.Reduce();
                 return result;
             }
 
             inline Fraction operator/(int i) const {
-                Fraction result(numerator, denominator * i);
+                int factor = (i < 0) ? -1 : 1;
+                int newNumerator = factor * numerator;
+                int newDenominator = denominator * i;
+
+                Fraction result(newNumerator, newDenominator);
                 result.Reduce();
                 return result;
             }
@@ -160,6 +174,11 @@ namespace Construction {
                 if (c.denominator == 1) ss << c.numerator;
                 else ss << c.numerator << "/" << c.denominator;
                 return ss.str();
+            }
+
+            friend std::ostream& operator<<(std::ostream& os, const Fraction& fraction) {
+                os << fraction.ToString();
+                return os;
             }
 
             virtual ScalarPointer Clone() const override {

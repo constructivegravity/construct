@@ -260,7 +260,7 @@ namespace Construction {
         public:
             bool IsZero() const {
                 for (int i=0; i<GetDimension(); i++) {
-                    if (data[i] != T()) return false; // Assuming that T() is the default value
+                    if (data[i] != T(0)) return false; // Assuming that T(0) is the default value
                 }
                 return true;
             }
@@ -280,7 +280,7 @@ namespace Construction {
             }
         public:
             T LengthSquared() const {
-                T result = T();
+                T result = T(0);
                 for (int i=0; i<GetDimension(); i++) {
                     result += data[i]*data[i];
                 }

@@ -72,7 +72,7 @@ namespace Construction {
                 // Turn this into a matrix
                 std::vector<Scalar> variables;
 
-                std::vector<std::pair<std::vector<Scalar>, std::vector<double> >> data;
+                std::vector<std::pair<std::vector<Scalar>, std::vector<Construction::Tensor::Fraction> >> data;
 
                 // Iterate over all substitutions
                 int i=0;
@@ -90,7 +90,7 @@ namespace Construction {
                         auto r = eq.SeparateVariablesFromRest();
 
                         std::vector<Scalar> data_variables;
-                        std::vector<double> data_factors;
+                        std::vector<Construction::Tensor::Fraction> data_factors;
 
                         // TODO: throw exception if there is a rest
 
@@ -103,7 +103,12 @@ namespace Construction {
                             }
 
                             data_variables.push_back(v.first);
-                            data_factors.push_back(v.second.ToDouble());
+
+                            if (v.second.IsFraction()) {
+                                data_factors.push_back(*v.second.As<Construction::Tensor::Fraction>());
+                            } else {
+                                data_factors.push_back(Construction::Tensor::Fraction::FromDouble(v.second.ToDouble()));
+                            }
                         }
 
                         data.push_back({ data_variables, data_factors });
@@ -113,7 +118,7 @@ namespace Construction {
                 }
 
                 // Write the elements into a matrix
-                Vector::Matrix<double> M(data.size(), variables.size());
+                Vector::Matrix<Construction::Tensor::Fraction> M(data.size(), variables.size());
 
                 // Insert the data from above
                 for (int i=0; i<data.size(); ++i) {
@@ -148,11 +153,11 @@ namespace Construction {
 
                     // Iterate over all the components
                     for (int j=0; j<vec.GetDimension(); j++) {
-                        if (vec[j] == 0 && isZero) continue;
-                        if (vec[j] == 1 && isZero) {
+                        if (vec[j] == Construction::Tensor::Fraction(0) && isZero) continue;
+                        if (vec[j] == Construction::Tensor::Fraction(1) && isZero) {
                             lhs = variables[j];
                             isZero = false;
-                        } else if (vec[j] != 0) {
+                        } else if (vec[j] != Construction::Tensor::Fraction(0)) {
                             rhs += (-variables[j] * Scalar::Fraction(vec[j]));
                         }
                     }
