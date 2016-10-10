@@ -2903,7 +2903,9 @@ namespace Construction {
 							if (pair.second.IsZeroTensor()) continue;
 
 							//combined.push_back(pair.first * pair.second);
-                            auto it = std::find(map_keys.begin(), map_keys.end(), pair.second);
+                            auto it = std::find_if(map_keys.begin(), map_keys.end(), [&](const Tensor& _tensor) {
+                                return _tensor.ToString() == pair.second.ToString();
+                            });
 
                             if (it == map_keys.end()) {
                                 map_keys.push_back(pair.second);

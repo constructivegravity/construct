@@ -19,6 +19,7 @@ namespace Construction {
                    into the coefficients.
 
             Class that manages the substitution of results from equations
+            Class that manages the substitution of results from equations
             into the coefficients. This works by a ticket system, i.e. any
             equation that can be calculated asks the manager for a ticket.
             If there are no tickets available for now, the equation thread
@@ -57,8 +58,8 @@ namespace Construction {
             };
 
             void Fulfill(std::shared_ptr<Ticket> ticket, const Substitution& substition) {
-                // Lock the mutex
                 {
+                    // Lock the mutex
                     std::unique_lock<std::mutex> lock(mutex);
 
                     // Check if the ticket was already served
@@ -76,8 +77,7 @@ namespace Construction {
                     // from giving further tickets
                     state = LOCKED;
 
-                    Construction::Logger logger;
-                    logger << Construction::Logger::DEBUG << "Fulfilled ticket " << ticket << Construction::Logger::endl;
+                    Construction::Logger::Debug("Fulfilled ticket ", ticket);
                 }
 
                 // If no ticket left, apply the substitutions
@@ -136,6 +136,8 @@ namespace Construction {
 
                     if (ref->IsFinished()) {
                         ref->SetTensor(merged(*ref->GetAsync()).Simplify());
+
+                        Construction::Logger::Debug("Coefficient now reads ", ref->GetAsync()->ToString());
 
                         // Overwrite the tensor in the session
                         Session::Instance()->Set(ref->GetName(), *ref->GetAsync());
