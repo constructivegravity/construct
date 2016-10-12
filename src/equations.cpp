@@ -37,8 +37,22 @@ int main(int argc, char** argv) {
     }
 
     // Add options for debugging
+    Construction::Equations::SubstitutionManager::Instance()->SetMaxTickets(1);
+
     if (argc > 2) {
         std::string option = argv[2];
+
+        if (option == "-d" || option == "--debug") {
+            logger.SetDebugLevel("screen", Construction::Common::DebugLevel::DEBUG);
+        }
+
+        // Set the number of cores
+        int maxTickets = std::atoi(argv[2]);
+        Construction::Equations::SubstitutionManager::Instance()->SetMaxTickets(maxTickets);
+    }
+
+    if (argc > 3) {
+        std::string option = argv[3];
 
         if (option == "-d" || option == "--debug") {
             logger.SetDebugLevel("screen", Construction::Common::DebugLevel::DEBUG);
@@ -105,6 +119,14 @@ int main(int argc, char** argv) {
     // Wait for all equations to be solved
     for (auto& eq : equations) {
         eq->Wait();
+    }
+
+    // Simplify all coefficients
+    for (auto& pair : *Construction::Equations::Coefficients::Instance()) {
+        auto ref = pair.second;
+
+        // Update
+        ref->SetTensor(ref->GetAsync()->Simplify());
     }
 
     // Print the result

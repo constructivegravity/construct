@@ -103,7 +103,7 @@ namespace Construction {
 
                 // If the number of tickets is equal to a threshold
                 // set the state to LOCKED
-                if (tickets.size() == 1) {
+                if (tickets.size() == maxTickets) {
                     state = LOCKED;
                 }
 
@@ -111,6 +111,10 @@ namespace Construction {
                 logger << Construction::Logger::DEBUG << "Issued ticket " << ticket << Construction::Logger::endl;
 
                 return std::move(ticket);
+            }
+        public:
+            void SetMaxTickets(int tickets=4) {
+                maxTickets = tickets;
             }
         private:
             void Apply() {
@@ -135,9 +139,9 @@ namespace Construction {
                     auto ref = pair.second;
 
                     if (ref->IsFinished()) {
-                        ref->SetTensor(merged(*ref->GetAsync()).Simplify());
+                        ref->SetTensor(merged(*ref->GetAsync()));
 
-                        Construction::Logger::Debug("Coefficient now reads ", ref->GetAsync()->ToString());
+                        Construction::Logger::Debug("Updated coefficient: ", ref->ToString());
 
                         // Overwrite the tensor in the session
                         Session::Instance()->Set(ref->GetName(), *ref->GetAsync());
@@ -152,6 +156,8 @@ namespace Construction {
             }
         private:
             State state;
+
+            int maxTickets = 4;
 
             std::vector<Tensor::Substitution> substitutions;
             std::vector<std::shared_ptr<Ticket>> tickets;

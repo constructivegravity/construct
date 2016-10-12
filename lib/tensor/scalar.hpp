@@ -442,6 +442,43 @@ namespace Construction {
             }
 
             /**
+                \brief Expand scalar expressions
+             */
+            Scalar Expand() const {
+                if (pointer->IsAdded()) {
+                    auto summands = GetSummands();
+                    Scalar result;
+
+                    for (auto& scalar : summands) {
+                        auto expanded = scalar.Expand().GetSummands();
+
+                        for (auto& s : expanded) {
+                            result += s;
+                        }
+                    }
+
+                    return result;
+                }
+
+                if (pointer->IsMultiplied()) {
+                    auto expandedLeft = Scalar(static_cast<MultipliedScalar*>(pointer.get())->GetFirst()->Clone()).Expand().GetSummands();
+                    auto expandedRight = Scalar(static_cast<MultipliedScalar*>(pointer.get())->GetSecond()->Clone()).Expand().GetSummands();
+
+                    Scalar result;
+
+                    for (auto& s : expandedLeft) {
+                        for (auto& t : expandedRight) {
+                            result += s*t;
+                        }
+                    }
+
+                    return result;
+                }
+
+                return *this;
+            }
+
+            /**
                 \brief Substitute variables in a scalar expression
 
                 Substitutes a variable with an arbitrary scalar expression. Since
