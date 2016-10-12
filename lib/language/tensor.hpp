@@ -514,5 +514,21 @@ namespace Construction {
         REGISTER_COMMAND(Expand);
         REGISTER_ARGUMENT(Expand, 0, ArgumentType::TENSOR);
 
+        CLI_COMMAND(GetAllCombinations)
+            std::string Help() const {
+                return "GetAllCombinations(<Tensor>, <Indices>)";
+            }
+
+            Expression Execute() const {
+
+
+                return Expression::Void();
+            }
+        };
+
+        REGISTER_COMMAND(GetAllCombinations);
+        REGISTER_ARGUMENT(GetAllCombinations, 0, ArgumentType::TENSOR);
+        REGISTER_ARGUMENT(GetAllCombinations, 1, ArgumentType::INDEX);
+
     }
 }

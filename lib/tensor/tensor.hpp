@@ -2238,7 +2238,7 @@ namespace Construction {
 
 					// Get the tensor that is scaled and expand it
 					auto tensor_summands = Tensor(std::move(static_cast<ScaledTensor*>(pointer.get())->GetTensor()->Clone())).Expand().GetSummands();
-					auto scalar_summands = static_cast<ScaledTensor*>(pointer.get())->GetScale().GetSummands();
+					auto scalar_summands = static_cast<ScaledTensor*>(pointer.get())->GetScale().Expand().GetSummands();
 
 					for (auto& c : scalar_summands) {
 						for (auto& tensor : tensor_summands) {
@@ -2369,6 +2369,25 @@ namespace Construction {
 
 					pool.Wait();
 				}
+
+                // Remove double lines
+                {
+                    std::vector<Construction::Vector::Vector<Construction::Tensor::Fraction>> vector;
+                    for (int i = 0; i < M.GetNumberOfRows(); ++i) {
+                        auto v = M.GetRowVector(i);
+
+                        auto it = std::find(vector.begin(), vector.end(), v);
+                        if (it == vector.end()) {
+                            vector.push_back(v);
+                            continue;
+                        }
+
+                        // Set all entries in the row to zero
+                        for (int j = 0; j < M.GetNumberOfColumns(); ++j) {
+                            M(i, j) = 0;
+                        }
+                    }
+                }
 
                 // Reduce to reduced matrix echelon form
                 M.ToRowEchelonForm();
@@ -3382,7 +3401,10 @@ namespace Construction {
                             // Ignore zeroes
                             if (pair.second.IsZeroTensor()) continue;
 
-                            auto it = std::find(map_keys.begin(), map_keys.end(), pair.second);
+                            auto it = std::find_if(map_keys.begin(), map_keys.end(), [&](const Tensor& _tensor) {
+                                return _tensor.ToString() == pair.second.ToString();
+                            });
+
                             if (it == map_keys.end()) {
                                 map_keys.push_back(pair.second);
                                 map_values.push_back(pair.first);
