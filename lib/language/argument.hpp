@@ -192,7 +192,13 @@ namespace Construction {
 
         class NumericArgument : public BaseArgument {
         public:
-            NumericArgument(const std::string& text) : BaseArgument(ArgumentType::NUMERIC), value(std::atof(text.c_str())) { }
+            NumericArgument(const std::string& text) : BaseArgument(ArgumentType::NUMERIC) {
+                if (text.find(".") == std::string::npos) {
+                    value = Tensor::Scalar::Fraction(std::atoi(text.c_str()), 1);
+                } else {
+                    value = Tensor::Scalar::Fraction(std::atof(text.c_str()));
+                }
+            }
             NumericArgument(const Tensor::Scalar& value) : BaseArgument(ArgumentType::NUMERIC), value(value) { }
         public:
             inline void SetValue(const Tensor::Scalar& v) {
