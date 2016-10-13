@@ -139,7 +139,14 @@ namespace Construction {
                 }
                 // Numerics
                 else if (document->IsNumeric()) {
-                    lastResult = Scalar(std::atof(std::dynamic_pointer_cast<NumericNode>(document)->GetText().c_str()));
+                    auto str = std::dynamic_pointer_cast<NumericNode>(document)->GetText();
+
+                    if (str.find(".") == std::string::npos) {
+                        lastResult = Scalar::Fraction(std::atoi(str.c_str()), 1);
+                    } else {
+                        lastResult = Scalar::Fraction(std::atof(str.c_str()));
+                    }
+
                     Session::Instance()->SetCurrent("", lastResult);
 
                     return lastResult;
