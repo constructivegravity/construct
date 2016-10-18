@@ -55,7 +55,7 @@ namespace Construction {
 
             virtual ~Coefficient() {
                 // Join the thread
-                //thread.join();
+                thread.join();
             }
         public:
             // Is the coefficient calculation deferred, i.e. not started yet?

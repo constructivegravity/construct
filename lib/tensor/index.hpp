@@ -868,11 +868,10 @@ namespace Construction {
 
                 for (auto& index : indices) {
                     if (transformation.find(index) == transformation.end()) {
-                        // TODO: throw exception
-                        return *this;
-                    }
-
-                    result.Insert(transformation[index]);
+                        result.Insert(index);
+                    } else {
+						result.Insert(transformation[index]);
+					}
                 }
 
                 return result;
