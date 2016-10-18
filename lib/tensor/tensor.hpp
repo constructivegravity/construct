@@ -676,6 +676,7 @@ namespace Construction {
                 }
 
                 indices = newIndices;
+
                 A->SetIndices(A->GetIndices().Shuffle(mapping));
                 B->SetIndices(B->GetIndices().Shuffle(mapping));
 			}
@@ -2997,7 +2998,7 @@ namespace Construction {
 							// If the tensor is the same after canonicalization modulo scale,
 							// change the scale of the original tensor and remove the new one
 							// from the stack.
-							if (newTerm.GetType() == current.GetType() && newTerm.GetIndices() == current.GetIndices()) {
+                            if (newTerm.ToString() == current.ToString()) {
 								scale += newScale;
 								stack.erase(stack.begin() + i);
 								i--;
