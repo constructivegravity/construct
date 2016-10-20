@@ -12,20 +12,22 @@
 #include <functional>
 #include <stdexcept>
 
-#include <iostream>
+#include <common/singleton.hpp>
 
 namespace Construction {
     namespace Common {
 
         class TaskPool {
         public:
-            TaskPool(int threads = std::thread::hardware_concurrency()) : terminate(false), stopped(false), remainingTasks(0) {
+            TaskPool(int threads = std::thread::hardware_concurrency()) : terminate(false), stopped(false) {
                 threadPool.reserve(threads);
 
                 for (size_t i = 0; i < threads; ++i) {
                     threadPool.emplace_back([this] {
                         while (true) {
                             std::function<void()> task;
+
+                            std::thread::id id;
 
                             // Scope based locking
                             {
@@ -38,8 +40,10 @@ namespace Construction {
 
                                 if (this->terminate && this->tasks.empty()) return;
 
+                                id = this->tasks.front().first;
+
                                 // Move the top task to our reference and remove it from the queue
-                                task = std::move(this->tasks.front());
+                                task = std::move(this->tasks.front().second);
                                 this->tasks.pop();
                             }
 
@@ -50,7 +54,7 @@ namespace Construction {
                                 std::unique_lock<std::mutex> lock(tasksMutex);
 
                                 // Decrease the number of remaining tasks
-                                std::atomic_fetch_sub_explicit(&this->remainingTasks, static_cast<unsigned>(1), std::memory_order_relaxed);
+                                std::atomic_fetch_sub_explicit(&this->remainingTasks[id], static_cast<unsigned>(1), std::memory_order_relaxed);
                             }
 
                             // Notify that a task was finished
@@ -107,10 +111,19 @@ namespace Construction {
                         throw std::runtime_error("enqueue on stopped TaskPool");
 
                     // Put task in the queue
-                    tasks.emplace([task]() { (*task)(); });
+                    std::pair< std::thread::id, std::function<void()> > obj = { std::this_thread::get_id() , [task]() {
+                        (*task)();
+                    } };
+
+                    tasks.emplace(obj);
+
+                    // If the thread has no tasks so far, add to the list
+                    if (this->remainingTasks.find(std::this_thread::get_id()) == this->remainingTasks.end()) {
+                        this->remainingTasks[std::this_thread::get_id()] = 0;
+                    }
 
                     // Increase the number of active tasks;
-                    std::atomic_fetch_add_explicit(&this->remainingTasks, static_cast<unsigned>(1), std::memory_order_relaxed);
+                    std::atomic_fetch_add_explicit(&this->remainingTasks[std::this_thread::get_id()], static_cast<unsigned>(1), std::memory_order_relaxed);
                 }
 
                 // Wake up one thread and return the future
@@ -186,7 +199,7 @@ namespace Construction {
                 std::unique_lock<std::mutex> lock(tasksMutex);
 
                 this->condition_finished.wait(lock, [this]() { 
-                    return this->tasks.empty() && this->remainingTasks == 0; 
+                    return this->remainingTasks[std::this_thread::get_id()] == 0;
                 });
             }
 
@@ -216,8 +229,8 @@ namespace Construction {
             }
         private:
             std::vector<std::thread> threadPool;
-            std::queue<std::function<void()>> tasks;
-            std::atomic<unsigned> remainingTasks;
+            std::queue< std::pair<std::thread::id, std::function<void()>> > tasks;
+            std::map<std::thread::id, std::atomic<unsigned>> remainingTasks;
 
             mutable std::mutex tasksMutex;
             std::condition_variable condition;
@@ -231,10 +244,42 @@ namespace Construction {
 
     namespace Parallel {
 
+        class GlobalTaskPool : public Singleton<GlobalTaskPool> {
+        public:
+            // Initialize the global task pool
+            GlobalTaskPool() : pool(std::thread::hardware_concurrency()) { }
+        public:
+            template<class F, class... Args>
+            auto Enqueue(F &&f, Args &&... args)
+            -> std::future<typename std::result_of<F(Args...)>::type> {
+                return pool.Enqueue(f, args...);
+            }
+
+            template<typename S, typename T>
+            std::vector<S> Map(std::vector<T> elements, std::function<S(const T&)> fn) {
+                return pool.Map(elements, fn);
+            }
+
+            template<typename S, typename T>
+            std::vector<S> MapEmit(std::vector<T> elements, std::function<void(const T&, std::function<void(S&&)>)> fn) {
+                return pool.MapEmit(elements, fn);
+            }
+
+            void Wait() {
+                pool.Wait();
+            }
+        private:
+            Common::TaskPool pool;
+        };
+
         template<typename S, typename T>
         inline std::vector<S> Map(std::vector<T> elements, std::function<S(const T&)> fn) {
-            Common::TaskPool pool;
-            return pool.Map(elements, fn);
+            return GlobalTaskPool::Instance()->Map(elements, fn);
+        }
+
+        template<typename S, typename T>
+        inline std::vector<S> MapEmit(std::vector<T> elements, std::function<void(const T&, std::function<void(S&&)>)> fn) {
+            return GlobalTaskPool::Instance()->MapEmit(elements, fn);
         }
 
     }
