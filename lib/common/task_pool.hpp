@@ -58,8 +58,9 @@ namespace Construction {
                                 std::unique_lock<std::mutex> lock(tasksMutex);
 
                                 // Decrease the number of remaining tasks
-                                std::atomic_fetch_sub_explicit(&this->remainingTasks[id], static_cast<unsigned>(1), std::memory_order_relaxed);
-                            }
+                                //std::atomic_fetch_sub_explicit(&this->remainingTasks[id], static_cast<unsigned>(1), std::memory_order_relaxed);
+                                this->remainingTasks[id]--;
+			    }
 
                             Construction::Logger::Debug("Finished task for thread ", id, " (remaining: ", remainingTasks[id], ")");
 
@@ -175,7 +176,8 @@ namespace Construction {
                     }
 
                     // Increase the number of active tasks;
-                    std::atomic_fetch_add_explicit(&this->remainingTasks[std::this_thread::get_id()], static_cast<unsigned>(1), std::memory_order_relaxed);
+                    //std::atomic_fetch_add_explicit(&this->remainingTasks[std::this_thread::get_id()], static_cast<unsigned>(1), std::memory_order_relaxed);
+		    this->remainingTasks[std::this_thread::get_id()]++;
 
                     Construction::Logger::Debug("Added task for thread ", std::this_thread::get_id(), " (remaining: ", remainingTasks[std::this_thread::get_id()], ")");
                 }
@@ -376,7 +378,8 @@ namespace Construction {
                             std::unique_lock<std::mutex> lock (tasksMutex);
 
                             // Decrease the number of remaining tasks
-                            std::atomic_fetch_sub_explicit(&this->remainingTasks[id], static_cast<unsigned>(1), std::memory_order_relaxed);
+                            this->remainingTasks[id]--;
+			    //std::atomic_fetch_sub_explicit(&this->remainingTasks[id], static_cast<unsigned>(1), std::memory_order_relaxed);
 
                             if (fromWorker) {
                                 worker_ids[id]--;
@@ -395,7 +398,7 @@ namespace Construction {
             std::vector<std::thread> threadPool;
             std::vector<std::thread> helpers;
             std::vector< std::pair<std::thread::id, std::function<void()>> > tasks;
-            std::map<std::thread::id, std::atomic<unsigned>> remainingTasks;
+            std::map<std::thread::id, unsigned> remainingTasks;
             std::map<std::thread::id, unsigned> worker_ids;
             std::map<std::thread::id, unsigned> helper_ids;
             std::thread observer;
