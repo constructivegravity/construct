@@ -29,7 +29,7 @@ int main(int argc, char** argv) {
     Construction::Logger::File("file", "apple.log");
 
     Construction::Logger logger;
-    logger.SetDebugLevel("screen", Construction::Common::DebugLevel::ERROR);
+    logger.SetDebugLevel("screen", Construction::Common::DebugLevel::WARNING);
 
     if (argc < 2) {
         logger << Construction::Logger::ERROR << "You need to specify the file that needs to be solved" << Construction::Logger::endl;
@@ -71,7 +71,7 @@ int main(int argc, char** argv) {
     std::ifstream file (argv[1]);
     if (!file.is_open()) return -1;
 
-    std::vector<std::unique_ptr<Construction::Equations::Equation>> equations;
+    std::vector<std::shared_ptr<Construction::Equations::Equation>> equations;
 
     // Read line per line and add them as equations
     std::string line;
@@ -80,7 +80,7 @@ int main(int argc, char** argv) {
         if (line == "") continue;
 
         // Add the equation
-        auto eq = std::unique_ptr<Construction::Equations::Equation>(new Construction::Equations::Equation(line));
+        auto eq = std::make_shared<Construction::Equations::Equation>(line);
 
         // If the equation isn't empty, add it
         if (!eq->IsEmpty()) {
