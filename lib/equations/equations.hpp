@@ -204,7 +204,7 @@ namespace Construction {
             };
         public:
             // Constructor
-            Equation(const std::string& code) : state(WAITING) {
+            Equation(const std::string& code) : state(WAITING), code(code) {
                 // Parse the code
                 Parse(code);
             }
@@ -221,6 +221,8 @@ namespace Construction {
             bool IsSolved() const { return state == SOLVED; }
 
             bool IsEmpty() const { return isEmpty; }
+        public:
+            std::string GetCode() const { return code; }
         public:
             /**
                 \brief Parses the expression
@@ -418,6 +420,9 @@ namespace Construction {
                     // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
                     auto subst = Session::Instance()->Get(substName).As<Tensor::Substitution>();
 
+                    // Store the substitution in the
+                    this->substitution = subst;
+
                     Construction::Logger::Debug("Found substitution ", subst, " from equation ", eq);
 
                     //  IV. Give the substitution to the ticket
@@ -458,6 +463,11 @@ namespace Construction {
                 }
             }
         public:
+            Tensor::Substitution GetSubstition() {
+                if (state != SOLVED) Wait();
+                return substitution;
+            }
+        public:
             void Wait() {
                 std::unique_lock<std::mutex> lock(mutex);
 
@@ -473,9 +483,12 @@ namespace Construction {
 
             bool isEmpty;
 
+            std::string code;
             std::string eq;
             std::string substName;
             std::vector<CoefficientReference> coefficients;
+
+            Tensor::Substitution substitution;
 
             std::vector<ObserverFunction> observers;
 

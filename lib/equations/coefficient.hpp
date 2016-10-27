@@ -123,6 +123,11 @@ namespace Construction {
             }
         public:
             std::string GetName() const { return name; }
+
+            unsigned GetNumberOfLeftIndices() const { return l; }
+            unsigned GetNumberOfLeftDerivativeIndices() const { return ld; }
+            unsigned GetNumberOfRightIndices() const { return r; }
+            unsigned GetNumberOfRightDerivativeIndices() const { return rd; }
         public:
             /**
                 Returns the tensor if it was calculated, otherwise it blocks
