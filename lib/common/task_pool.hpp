@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <chrono>
 #include <thread>
 #include <mutex>
@@ -49,7 +50,6 @@ namespace Construction {
                                 this->tasks.erase(this->tasks.begin());
                             }
 
-                            Construction::Logger::Debug("Started working on task of thread ", id);
 
                             // Execute task
                             task();
@@ -58,10 +58,8 @@ namespace Construction {
                                 std::unique_lock<std::mutex> lock(tasksMutex);
 
                                 // Decrease the number of remaining tasks
-                                std::atomic_fetch_sub_explicit(&this->remainingTasks[id], static_cast<unsigned>(1), std::memory_order_relaxed);
-                            }
-
-                            Construction::Logger::Debug("Finished task for thread ", id, " (remaining: ", remainingTasks[id], ")");
+                                std::atomic_fetch_sub_explicit(this->remainingTasks[id].get(), static_cast<unsigned>(1), std::memory_order_relaxed);
+			    }
 
                             // Notify that a task was finished
                             this->condition_finished.notify_all();
@@ -70,7 +68,7 @@ namespace Construction {
                 }
 
                 // Start the observer
-                observer = std::thread([&]() {
+                /*observer = std::thread([&]() {
                     while (true) {
                         // First check if there is recursion in the helpers
                         std::thread::id current_helper;
@@ -82,9 +80,7 @@ namespace Construction {
                             }
 
                             // spawn a helper for the top helper
-                            SpawnHelper(current_helper, false);
-
-                            Construction::Logger::Debug("Spawned a helper for helper thread ", current_helper);
+                            SpawnHelper(current_helper, false); 
 
                             // Add the ID to the list
                             helper_ids[current_helper] += 1;
@@ -101,9 +97,7 @@ namespace Construction {
                             }
 
                             // Spawn a helper for this
-                            SpawnHelper(current, true);
-
-                            Construction::Logger::Debug("Spawned a helper for worker thread ", current);
+                            SpawnHelper(current, true); 
 
                             // Add the ID to the list
                             worker_ids[current] += 1;
@@ -113,7 +107,7 @@ namespace Construction {
                         // Check if the shut down signal was sent
                         if (this->terminate && this->tasks.empty()) return;
                     }
-                });
+                });*/
             }
 
             TaskPool(const TaskPool&) = delete;
@@ -171,13 +165,12 @@ namespace Construction {
 
                     // If the thread has no tasks so far, add to the list
                     if (this->remainingTasks.find(std::this_thread::get_id()) == this->remainingTasks.end()) {
-                        this->remainingTasks[std::this_thread::get_id()] = 0;
+			this->remainingTasks.insert({ std::this_thread::get_id(), std::make_shared<std::atomic<unsigned>>(0) });
                     }
 
                     // Increase the number of active tasks;
-                    std::atomic_fetch_add_explicit(&this->remainingTasks[std::this_thread::get_id()], static_cast<unsigned>(1), std::memory_order_relaxed);
-
-                    Construction::Logger::Debug("Added task for thread ", std::this_thread::get_id(), " (remaining: ", remainingTasks[std::this_thread::get_id()], ")");
+                    std::atomic_fetch_add_explicit(this->remainingTasks[std::this_thread::get_id()].get(), static_cast<unsigned>(1), std::memory_order_relaxed);
+ 
                 }
 
                 // Wake up one thread and return the future
@@ -253,7 +246,9 @@ namespace Construction {
                 std::unique_lock<std::mutex> lock(tasksMutex);
 
                 this->condition_finished.wait(lock, [this]() { 
-                    return this->remainingTasks[std::this_thread::get_id()] == 0;
+		    auto it = this->remainingTasks.find(std::this_thread::get_id());
+		    if (it == this->remainingTasks.end()) return;
+                    return *(it->second) == 0;
                 });
             }
 
@@ -376,7 +371,7 @@ namespace Construction {
                             std::unique_lock<std::mutex> lock (tasksMutex);
 
                             // Decrease the number of remaining tasks
-                            std::atomic_fetch_sub_explicit(&this->remainingTasks[id], static_cast<unsigned>(1), std::memory_order_relaxed);
+			    std::atomic_fetch_sub_explicit(this->remainingTasks[id].get(), static_cast<unsigned>(1), std::memory_order_relaxed);
 
                             if (fromWorker) {
                                 worker_ids[id]--;
@@ -395,7 +390,7 @@ namespace Construction {
             std::vector<std::thread> threadPool;
             std::vector<std::thread> helpers;
             std::vector< std::pair<std::thread::id, std::function<void()>> > tasks;
-            std::map<std::thread::id, std::atomic<unsigned>> remainingTasks;
+            std::map<std::thread::id, std::shared_ptr<std::atomic<unsigned>>> remainingTasks;
             std::map<std::thread::id, unsigned> worker_ids;
             std::map<std::thread::id, unsigned> helper_ids;
             std::thread observer;
