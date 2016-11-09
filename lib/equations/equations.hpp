@@ -240,7 +240,10 @@ namespace Construction {
                 int coeffStart = -1;
                 std::string current;
                 std::string temp;
+                std::string tmp2;
                 unsigned l, ld, r, rd;
+                bool foundOptional=false;
+                bool exchangeSymmetry = true;
                 std::string id;
                 unsigned mode=0;
 
@@ -276,6 +279,9 @@ namespace Construction {
                             r = std::stoi(temp);
                         } else if (mode == 4) {
                             rd = std::stoi(temp);
+                        } else if (mode == 5) {
+                            foundOptional = true;
+                            tmp2 = temp;
                         }
 
                         temp = "";
@@ -286,6 +292,14 @@ namespace Construction {
                     if (c == '>') {
                         inCoeff = false;
                         mode = 0;
+
+                        if (foundOptional) {
+                            if (std::tolower(temp) == "no") {
+                                exchangeSymmetry = false;
+                            }
+
+                            temp = tmp2;
+                        }
 
                         // Bring the coefficients into canonical order.
                         // Since we have the exchange symmetry, this is of course
@@ -311,7 +325,7 @@ namespace Construction {
                         }
 
                         // Get the coefficient reference
-                        auto ref = Coefficients::Instance()->Get(l, ld, r, rd, id);
+                        auto ref = Coefficients::Instance()->Get(l, ld, r, rd, id, exchangeSymmetry);
 
                         // Replace the coefficient with a dummy name
                         {
