@@ -24,8 +24,8 @@ namespace Construction {
         public:
             long gcd(long num1, long num2) {
                 long tmp;
-                num1 = abs(num1);
-                num2 = abs(num2);
+                num1 = std::abs(num1);
+                num2 = std::abs(num2);
                 while (num1 > 0) {
                     tmp = num1;
                     num1 = num2 % num1;
@@ -99,8 +99,8 @@ namespace Construction {
 
             Fraction& operator/=(const Fraction& other) {
                 long factor = ((numerator < 0 && other.numerator > 0) || (numerator > 0 && other.numerator < 0)) ? -1 : 1;
-                long newNumerator = factor * abs(numerator) * other.denominator;
-                long newDenominator = denominator * abs(other.numerator);
+                long newNumerator = factor * std::abs(numerator) * other.denominator;
+                long newDenominator = denominator * std::abs(other.numerator);
 
                 numerator   = newNumerator;
                 denominator = newDenominator;
@@ -141,8 +141,8 @@ namespace Construction {
 
             Fraction operator/(const Fraction& other) const {
                 long factor = ((numerator < 0 && other.numerator > 0) || (numerator > 0 && other.numerator < 0)) ? -1 : 1;
-                long newNumerator = factor * abs(numerator) * other.denominator;
-                long newDenominator = denominator * abs(other.numerator);
+                long newNumerator = factor * std::abs(numerator) * other.denominator;
+                long newDenominator = denominator * std::abs(other.numerator);
 
                 Fraction result (newNumerator, newDenominator);
                 result.Reduce();

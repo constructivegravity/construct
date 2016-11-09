@@ -245,9 +245,9 @@ namespace Construction {
             void Wait() {
                 std::unique_lock<std::mutex> lock(tasksMutex);
 
-                this->condition_finished.wait(lock, [this]() { 
-		    auto it = this->remainingTasks.find(std::this_thread::get_id());
-		    if (it == this->remainingTasks.end()) return;
+                this->condition_finished.wait(lock, [this]() -> bool {
+		            auto it = this->remainingTasks.find(std::this_thread::get_id());
+		            if (it == this->remainingTasks.end()) return true;
                     return *(it->second) == 0;
                 });
             }
