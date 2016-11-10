@@ -535,6 +535,9 @@ namespace Construction {
                     case DEBUG:
                         logger.DoDebug(msg);
                         break;
+
+                    case endl:
+                        break;
                 };
 
                 // Clean the line
