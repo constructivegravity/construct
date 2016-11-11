@@ -493,7 +493,7 @@ namespace Construction {
             class DefinitionHasher {
             public:
                 size_t operator()(const Definition& d) const {
-                    return std::hash<unsigned>()(d.l) ^ std::hash<unsigned>()(d.ld) ^ std::hash<unsigned>()(d.r) ^ std::hash<unsigned>()(d.rd) ^ std::hash<std::string>()(d.id) ^ std::hash<std::string>()(d.exchangeSymmetry);
+                    return std::hash<unsigned>()(d.l) ^ std::hash<unsigned>()(d.ld) ^ std::hash<unsigned>()(d.r) ^ std::hash<unsigned>()(d.rd) ^ std::hash<std::string>()(d.id) ^ std::hash<bool>()(d.exchangeSymmetry);
                 }
             };
         public:

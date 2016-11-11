@@ -294,7 +294,7 @@ namespace Construction {
                         mode = 0;
 
                         if (foundOptional) {
-                            if (std::tolower(temp) == "no") {
+                            if (temp == "no") {
                                 exchangeSymmetry = false;
                             }
 
@@ -326,6 +326,10 @@ namespace Construction {
 
                         // Get the coefficient reference
                         auto ref = Coefficients::Instance()->Get(l, ld, r, rd, id, exchangeSymmetry);
+
+                        tmp2 = "";
+                        exchangeSymmetry = true;
+                        foundOptional = false;
 
                         // Replace the coefficient with a dummy name
                         {
