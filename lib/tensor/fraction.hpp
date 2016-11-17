@@ -13,14 +13,19 @@ namespace Construction {
         public:
             Fraction() : numerator(0), denominator(1), AbstractScalar(AbstractScalar::FRACTION) { }
             Fraction(int number) :  AbstractScalar(AbstractScalar::FRACTION), numerator(number), denominator(1) { }
-            Fraction(int numerator, unsigned int denominator) :  AbstractScalar(AbstractScalar::FRACTION), numerator(numerator), denominator(denominator) { }
+            Fraction(long numerator, long denominator) :  AbstractScalar(AbstractScalar::FRACTION), numerator(numerator), denominator(denominator) {
+                if (this->denominator < 0) {
+                    this->numerator = -this->numerator;
+                    this->denominator = -this->denominator;
+                }
+            }
 
             virtual ~Fraction() = default;
         public:
-            int gcd(int num1, int num2) {
-                int tmp;
-                num1 = abs(num1);
-                num2 = abs(num2);
+            long gcd(long num1, long num2) {
+                long tmp;
+                num1 = std::abs(num1);
+                num2 = std::abs(num2);
                 while (num1 > 0) {
                     tmp = num1;
                     num1 = num2 % num1;
@@ -32,7 +37,7 @@ namespace Construction {
             void Reduce() {
                 if (numerator == 0) return;
 
-                int g = gcd(numerator, denominator);
+                long g = gcd(numerator, denominator);
                 numerator /= g;
                 denominator /= g;
             }
@@ -70,8 +75,8 @@ namespace Construction {
             }
 
             Fraction& operator+=(const Fraction& other) {
-                unsigned int d = denominator * other.denominator;
-                int n = numerator * other.denominator + other.numerator * denominator;
+                long d = denominator * other.denominator;
+                long n = numerator * other.denominator + other.numerator * denominator;
                 denominator = d;
                 numerator = n;
                 Reduce();
@@ -79,8 +84,8 @@ namespace Construction {
             }
 
             Fraction& operator-=(const Fraction& other) {
-                unsigned int d = denominator * other.denominator;
-                int n = numerator * other.denominator - other.numerator * denominator;
+                long d = denominator * other.denominator;
+                long n = numerator * other.denominator - other.numerator * denominator;
                 denominator = d;
                 numerator = n;
                 return *this;
@@ -93,9 +98,9 @@ namespace Construction {
             }
 
             Fraction& operator/=(const Fraction& other) {
-                int factor = ((numerator < 0 && other.numerator > 0) || (numerator > 0 && other.numerator < 0)) ? -1 : 1;
-                int newNumerator = factor * abs(numerator) * other.denominator;
-                int newDenominator = denominator * abs(other.numerator);
+                long factor = ((numerator < 0 && other.numerator > 0) || (numerator > 0 && other.numerator < 0)) ? -1 : 1;
+                long newNumerator = factor * std::abs(numerator) * other.denominator;
+                long newDenominator = denominator * std::abs(other.numerator);
 
                 numerator   = newNumerator;
                 denominator = newDenominator;
@@ -107,8 +112,8 @@ namespace Construction {
             }
 
             Fraction operator+(const Fraction& other) const {
-                unsigned int d = denominator * other.denominator;
-                int n = numerator * other.denominator + other.numerator * denominator;
+                long d = denominator * other.denominator;
+                long n = numerator * other.denominator + other.numerator * denominator;
                 Fraction result (n,d);
                 result.Reduce();
                 return result;
@@ -117,8 +122,8 @@ namespace Construction {
             inline Fraction operator+(int i) const { return *this + Fraction(i); }
 
             Fraction operator-(const Fraction& other) const {
-                unsigned int d = denominator * other.denominator;
-                int n = numerator * other.denominator - other.numerator * denominator;
+                long d = denominator * other.denominator;
+                long n = numerator * other.denominator - other.numerator * denominator;
                 Fraction result (n,d);
                 result.Reduce();
                 return result;
@@ -135,9 +140,9 @@ namespace Construction {
             inline Fraction operator*(int i) const { return Fraction(numerator * i, denominator); }
 
             Fraction operator/(const Fraction& other) const {
-                int factor = ((numerator < 0 && other.numerator > 0) || (numerator > 0 && other.numerator < 0)) ? -1 : 1;
-                int newNumerator = factor * abs(numerator) * other.denominator;
-                int newDenominator = denominator * abs(other.numerator);
+                long factor = ((numerator < 0 && other.numerator > 0) || (numerator > 0 && other.numerator < 0)) ? -1 : 1;
+                long newNumerator = factor * std::abs(numerator) * other.denominator;
+                long newDenominator = denominator * std::abs(other.numerator);
 
                 Fraction result (newNumerator, newDenominator);
                 result.Reduce();
@@ -145,9 +150,9 @@ namespace Construction {
             }
 
             inline Fraction operator/(int i) const {
-                int factor = (i < 0) ? -1 : 1;
-                int newNumerator = factor * numerator;
-                int newDenominator = denominator * i;
+                long factor = (i < 0) ? -1 : 1;
+                long newNumerator = factor * numerator;
+                long newDenominator = denominator * i;
 
                 Fraction result(newNumerator, newDenominator);
                 result.Reduce();
@@ -189,16 +194,16 @@ namespace Construction {
                 // Call parent
                 AbstractScalar::Serialize(os);
 
-                WriteBinary<int>(os, numerator);
-                WriteBinary<unsigned>(os, denominator);
+                WriteBinary<long>(os, numerator);
+                WriteBinary<long>(os, denominator);
             }
 
             static std::unique_ptr<AbstractScalar> Deserialize(std::istream& is) {
                 // Call parent
                 AbstractScalar::Deserialize(is);
 
-                int numerator = ReadBinary<int>(is);
-                unsigned denominator = ReadBinary<unsigned>(is);
+                long numerator = ReadBinary<long>(is);
+                long denominator = ReadBinary<long>(is);
 
                 return std::move(std::unique_ptr<AbstractScalar>(new Fraction(numerator, denominator)));
             }
@@ -240,8 +245,8 @@ namespace Construction {
                 return result;
             }
         private:
-            int numerator;
-            unsigned int denominator;
+            long numerator;
+            long denominator;
         };
 
     }

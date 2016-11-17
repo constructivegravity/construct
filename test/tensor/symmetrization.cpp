@@ -3,17 +3,5 @@
 //#include <generator/symmetrized_tensor.hpp>
 #include <language/api.hpp>
 
-SCENARIO("Symmetrization", "[symmetrization]") {
-
-    GIVEN(" some arbitrary tensor with symmetries") {
-        auto tensor = Construction::Language::API::Coefficient(2,0,2,0);
-
-        WHEN(" Simplify is called again") {
-            THEN(" nothing should happen") {
-                REQUIRE(tensor.Simplify().ToString()==tensor.ToString());
-            }
-        }
-    }
-}
 
 //TODO: Test ExchangeSymmetrize

@@ -8,6 +8,7 @@
 
 #include <common/datetime.hpp>
 #include <common/singleton.hpp>
+#include <memory>
 
 namespace Construction {
     namespace Common {
@@ -533,6 +534,9 @@ namespace Construction {
 
                     case DEBUG:
                         logger.DoDebug(msg);
+                        break;
+
+                    case endl:
                         break;
                 };
 

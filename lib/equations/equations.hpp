@@ -204,7 +204,7 @@ namespace Construction {
             };
         public:
             // Constructor
-            Equation(const std::string& code) : state(WAITING) {
+            Equation(const std::string& code) : state(WAITING), code(code) {
                 // Parse the code
                 Parse(code);
             }
@@ -222,6 +222,8 @@ namespace Construction {
 
             bool IsEmpty() const { return isEmpty; }
         public:
+            std::string GetCode() const { return code; }
+        public:
             /**
                 \brief Parses the expression
 
@@ -238,7 +240,10 @@ namespace Construction {
                 int coeffStart = -1;
                 std::string current;
                 std::string temp;
+                std::string tmp2;
                 unsigned l, ld, r, rd;
+                bool foundOptional=false;
+                bool exchangeSymmetry = true;
                 std::string id;
                 unsigned mode=0;
 
@@ -274,6 +279,9 @@ namespace Construction {
                             r = std::stoi(temp);
                         } else if (mode == 4) {
                             rd = std::stoi(temp);
+                        } else if (mode == 5) {
+                            foundOptional = true;
+                            tmp2 = temp;
                         }
 
                         temp = "";
@@ -284,6 +292,14 @@ namespace Construction {
                     if (c == '>') {
                         inCoeff = false;
                         mode = 0;
+
+                        if (foundOptional) {
+                            if (temp == "no") {
+                                exchangeSymmetry = false;
+                            }
+
+                            temp = tmp2;
+                        }
 
                         // Bring the coefficients into canonical order.
                         // Since we have the exchange symmetry, this is of course
@@ -309,7 +325,11 @@ namespace Construction {
                         }
 
                         // Get the coefficient reference
-                        auto ref = Coefficients::Instance()->Get(l, ld, r, rd, id);
+                        auto ref = Coefficients::Instance()->Get(l, ld, r, rd, id, exchangeSymmetry);
+
+                        tmp2 = "";
+                        exchangeSymmetry = true;
+                        foundOptional = false;
 
                         // Replace the coefficient with a dummy name
                         {
@@ -418,6 +438,9 @@ namespace Construction {
                     // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
                     auto subst = Session::Instance()->Get(substName).As<Tensor::Substitution>();
 
+                    // Store the substitution in the
+                    this->substitution = subst;
+
                     Construction::Logger::Debug("Found substitution ", subst, " from equation ", eq);
 
                     //  IV. Give the substitution to the ticket
@@ -458,6 +481,11 @@ namespace Construction {
                 }
             }
         public:
+            Tensor::Substitution GetSubstition() {
+                if (state != SOLVED) Wait();
+                return substitution;
+            }
+        public:
             void Wait() {
                 std::unique_lock<std::mutex> lock(mutex);
 
@@ -473,9 +501,12 @@ namespace Construction {
 
             bool isEmpty;
 
+            std::string code;
             std::string eq;
             std::string substName;
             std::vector<CoefficientReference> coefficients;
+
+            Tensor::Substitution substitution;
 
             std::vector<ObserverFunction> observers;
 
