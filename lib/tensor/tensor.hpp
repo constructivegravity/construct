@@ -2295,6 +2295,58 @@ namespace Construction {
 				return *this;
 			}
 
+            /**
+                \brief Fast simplification of tensorial expressions
+
+                Fast simplification of tensorial expressions. It is based on
+                `Canonicalize` and assumes that its result is unique.
+             */
+            Tensor FastSimplify() const {
+                if (IsScaled()) {
+                    auto pair = SeparateScalefactor();
+                    return pair.first * pair.second.FastSimplify();
+                }
+
+                if (IsMultiplied()) {
+                    return Tensor(static_cast<MultipliedTensor*>(pointer.get())->GetFirst()->Clone()).FastSimplify() * Tensor(static_cast<MultipliedTensor*>(pointer.get())->GetSecond()->Clone()).FastSimplify();
+                }
+
+                if (!IsAdded()) {
+                    return Canonicalize();
+                }
+
+                // Get the summands
+                auto summands = GetSummands();
+
+                std::vector<Tensor> map_keys;
+                std::vector<Scalar> map_values;
+
+                for (auto& tensor : summands) {
+                    auto simplified = tensor.FastSimplify().SeparateScalefactor();
+
+                    auto it = std::find_if(map_keys.begin(), map_keys.end(), [&](const Tensor& _tensor) {
+                        return _tensor.ToString() == simplified.second.ToString();
+                    });
+
+                    if (it == map_keys.end()) {
+                        map_keys.push_back(simplified.second);
+                        map_values.push_back(simplified.first);
+                        continue;
+                    }
+
+                    map_values[std::distance(map_keys.begin(), it)] += simplified.first;
+                }
+
+                std::vector<Tensor> tensors;
+                for (int i=0; i<map_keys.size(); ++i) {
+                    auto tensor_ = map_keys[i] * map_values[i];
+                    if (tensor_.IsZeroTensor()) continue;
+                    tensors.push_back(tensor_);
+                }
+
+                return Add(tensors);
+            }
+
 			/**
 				\brief Simplify the expression
 
@@ -2535,7 +2587,7 @@ namespace Construction {
                 Tensor result = Tensor::Zero();
 
                 for (int i=0; i<variables.size(); ++i) {
-                    result += variables[i] * tensors[i].FactorizeOveralScale();
+                    result += variables[i] * tensors[i].FastSimplify().FactorizeOveralScale();
                 }
 
                 return result;
