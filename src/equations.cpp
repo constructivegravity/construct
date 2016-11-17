@@ -121,14 +121,6 @@ int main(int argc, char** argv) {
         eq->Wait();
     }
 
-    // Simplify all coefficients
-    for (auto& pair : *Construction::Equations::Coefficients::Instance()) {
-        auto ref = pair.second;
-
-        // Update
-        ref->SetTensor(ref->GetAsync()->Simplify());
-    }
-
     // Print the result
     int offset = 0;
 
@@ -159,7 +151,7 @@ int main(int argc, char** argv) {
     // Print the results
     for (auto it = Construction::Equations::Coefficients::Instance()->begin(); it != Construction::Equations::Coefficients::Instance()->end(); ++it) {
         //auto tensor = it->second->Get()->RedefineVariables("e", offset);
-        auto tensor = substitution(*it->second->Get());
+        auto tensor = substitution(*it->second->GetAsync()).Simplify();
 
         auto summands = tensor.GetSummands();
 
@@ -174,7 +166,15 @@ int main(int argc, char** argv) {
 
             if (t.IsScaled()) {
                 auto s = t.SeparateScalefactor();
-                std::cout << "     \033[32m" << s.first << "\033[0m * \033[33m";
+                std::cout << "     \033[32m";
+
+                if (s.first.IsAdded()) {
+                    std::cout << "(" << s.first << ")";
+                } else {
+                    std::cout << s.first;
+                }
+
+                std::cout << "\033[0m * \033[33m";
 
                 if (s.second.IsAdded()) {
                     std::cout << "(" << s.second << ")";
