@@ -139,7 +139,7 @@ namespace Construction {
                     auto ref = pair.second;
 
                     if (ref->IsFinished()) {
-                        ref->SetTensor(merged(*ref->GetAsync()));
+                        ref->SetTensor(merged(*ref->GetAsync()).FastSimplify());
 
                         Construction::Logger::Debug("Updated coefficient: ", ref->ToString());
 
