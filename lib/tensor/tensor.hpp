@@ -1034,6 +1034,15 @@ namespace Construction {
 			return ss.str();
 		}
 
+        /*class SymmetrizedTensor : public AbstractTensor {
+        public:
+            SymmetrizedTensor(const Indices& indices) : AbstractTensor("", "", indices) {
+                type = TensorType::SYMMETRIZED;
+            }
+        private:
+
+        };*/
+
 		/**
 		 	\class SubstituteTensor
 
@@ -3564,6 +3573,7 @@ namespace Construction {
 			 */
 		    static Tensor Add(const std::vector<Tensor>& factors) {
 				if (factors.size() == 0) return Tensor::Zero();
+                if (factors.size() == 1) return factors[0];
 
 				std::vector<TensorPointer> pointers;
 				for (auto& tensor : factors) {
