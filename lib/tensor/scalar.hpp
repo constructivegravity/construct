@@ -521,7 +521,7 @@ namespace Construction {
                 Scalar rest = 0;
 
                 // Get the summands
-                auto summands = GetSummands();
+                auto summands = Expand().GetSummands();
 
                 std::vector<Scalar> keys;
                 std::vector<Scalar> values;
