@@ -8,6 +8,7 @@
 
 #include <common/datetime.hpp>
 #include <common/singleton.hpp>
+#include <memory>
 
 namespace Construction {
     namespace Common {

@@ -2565,7 +2565,7 @@ namespace Construction {
 					result = std::move(result.SubstituteVariable(substitution.first, substitution.second));
 				}
 
-                Construction::Logger::Debug("Finished substitution into ", result.ToString(), ". Collect by variables ...");
+                Construction::Logger::Debug("Finished substitution. Result is: ", result.ToString(), ". Collect by variables ...");
 
 				return result.CollectByVariables();
 			}
