@@ -2602,7 +2602,7 @@ namespace Construction {
 
 				for (auto& _tensor : summands) {
 					auto tmp = _tensor.SeparateScalefactor();
-					result += tmp.first.Substitute(variable, expression) * tmp.second;
+					result += tmp.first.Substitute(variable, expression).Expand() * tmp.second;
 				}
 
 				return result;

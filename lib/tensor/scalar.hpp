@@ -223,12 +223,20 @@ namespace Construction {
 
                 // If one is minus one, just return the negated expression
                 if (A->IsNumeric() && A->ToDouble() == -1) {
-                    ss << "-" << B->ToString();
+                    if (B->IsAdded()) {
+                        ss << "-(" << B->ToString() << ")";
+                    } else {
+                        ss << "-" << B->ToString();
+                    }
                     return ss.str();
                 }
 
                 if (B->IsNumeric() && B->ToDouble() == -1) {
-                    ss << "-" << A->ToString();
+                    if (A->IsAdded()) {
+                        ss << "-(" << A->ToString() << ")";
+                    } else {
+                        ss << "-" << A->ToString();
+                    }
                     return ss.str();
                 }
 
@@ -507,7 +515,7 @@ namespace Construction {
                     if (s.IsVariable()) result += (s == variable) ? other : s;
                     if (s.IsNumeric()) result += s;
 
-                    // If it is a multiplication, substite in each factor recursively
+                    // If it is a multiplication, substitute in each factor recursively
                     if (s.IsMultiplied()) {
                         result += Scalar(static_cast<MultipliedScalar*>(s.pointer.get())->GetFirst()->Clone()).Substitute(variable, other) *
                                   Scalar(static_cast<MultipliedScalar*>(s.pointer.get())->GetSecond()->Clone()).Substitute(variable, other);
