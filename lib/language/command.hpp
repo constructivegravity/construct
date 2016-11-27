@@ -142,6 +142,10 @@ namespace Construction {
                 return GetArgument<NumericArgument>(pos)->GetValue();
             }
         public:
+            virtual std::string ToLaTeX(const std::vector<std::string>& args) const {
+                return "";
+            }
+        public:
             /**
                 \brief Validates the arguments
 

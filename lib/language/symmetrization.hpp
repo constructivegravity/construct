@@ -25,6 +25,16 @@ namespace Construction {
                 return false;
             }
 
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                std::string output = "Symmetrize(";
+
+                for (int i=0; i<args.size()-1; ++i) {
+                    output = output + args[i] + ", ";
+                }
+
+                return output + args[args.size()-1] + ")";
+            }
+
             Expression Execute() const {
                 auto result = GetTensors(0);
 
@@ -49,6 +59,16 @@ namespace Construction {
 
             static bool Cachable() {
                 return false;
+            }
+
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                std::string output = "AntiSymmetrize(";
+
+                for (int i=0; i<args.size()-1; ++i) {
+                    output = output + args[i] + ", ";
+                }
+
+                return output + args[args.size()-1] + ")";
             }
 
             Expression Execute() const {
@@ -77,6 +97,16 @@ namespace Construction {
                 return true;
             }
 
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                std::string output = "ExchangeSymmetrize(";
+
+                for (int i=0; i<args.size()-1; ++i) {
+                    output = output + args[i] + ", ";
+                }
+
+                return output + args[args.size()-1] + ")";
+            }
+
             Expression Execute() const {
                 return API::ExchangeSymmetrize(GetTensors(0), GetIndices(1), GetIndices(2));
             }
@@ -96,6 +126,16 @@ namespace Construction {
 
             static bool Cachable() {
                 return true;
+            }
+
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                std::string output = "BlockSymmetrize(";
+
+                for (int i=0; i<args.size()-1; ++i) {
+                    output = output + args[i] + ", ";
+                }
+
+                return output + args[args.size()-1] + ")";
             }
 
             Expression Execute() const {

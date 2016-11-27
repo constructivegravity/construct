@@ -440,7 +440,7 @@ namespace Construction {
                         continue;
                     }
 
-                    if (IsNumeric(c)) {
+                    if (IsNumeric(c) || (c == "-" && IsNumeric(std::string(1, code[i+1])))) {
                         inNumeric = true;
                         current.append(c);
                         continue;
