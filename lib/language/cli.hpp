@@ -118,6 +118,56 @@ namespace Construction {
                 }
             }
 
+            std::string ToLaTeX(const std::shared_ptr<Node>& document) const {
+                if (document->IsPrevious()) return "%";
+                else if (document->IsLiteral()) {
+                    return std::dynamic_pointer_cast<LiteralNode>(document)->GetText();
+                } else if (document->IsNumeric()) {
+                    return std::dynamic_pointer_cast<NumericNode>(document)->GetText();
+                } else if (document->IsIndices()) {
+                    IndexArgument arg(std::dynamic_pointer_cast<IndicesNode>(document)->GetText());
+                    return arg.GetIndices().ToCommand();
+                } else if (document->IsString()) {
+                    return std::dynamic_pointer_cast<StringNode>(document)->GetText();
+                } else if (document->IsBinary()) {
+                    auto lhs = ToLaTeX(std::dynamic_pointer_cast<BinaryNode>(document)->GetLeft());
+                    auto rhs = ToLaTeX(std::dynamic_pointer_cast<BinaryNode>(document)->GetRight());
+
+                    return lhs + std::string(1, std::dynamic_pointer_cast<BinaryNode>(document)->GetOperator()) + rhs;
+                } else if (document->IsCommand()) {
+                    auto commandName = std::dynamic_pointer_cast<CommandNode>(document)->GetIdentifier()->GetText();
+
+                    CommandPointer command;
+                    std::vector<std::string> texedArgs;
+
+                    // Create a instance of the command
+                    try {
+                        command = CommandManagement::Instance()->CreateCommand(commandName);
+                    } catch (UnknownCommandException& err) {
+                        Error("I do not know this command");
+                        return Expression::Void();
+                    }
+
+                    // Turn the arguments into LaTeX code
+                    auto args = std::dynamic_pointer_cast<CommandNode>(document)->GetArguments();
+
+                    for (auto& arg : *args) {
+                        texedArgs.push_back(ToLaTeX(arg));
+                    }
+
+                    // Return the output
+                    std::string result = command->ToLaTeX(texedArgs);
+                    return result;
+                } else if (document->IsAssignment()) {
+                    auto id = std::dynamic_pointer_cast<AssignmentNode>(document)->GetIdentifier()->GetText();
+                    auto expression = ToLaTeX(std::dynamic_pointer_cast<AssignmentNode>(document)->GetExpression());
+
+                    return id + " = " + expression;
+                }
+
+                return "";
+            }
+
             Expression Execute(const std::shared_ptr<Node>& document, bool silent=false) {
                 // Copy the most recent expression;
                 Expression lastResult = Session::Instance()->GetCurrent();
@@ -408,6 +458,36 @@ namespace Construction {
                 }
             }
         public:
+            std::string ToLaTeX(const std::string& code) {
+                std::string text = code;
+
+                bool silent = false;
+
+                if (code.size() > 0 && code[code.size() - 1] == ':') {
+                    silent = true;
+                    text = code.substr(0, code.size() - 1);
+                }
+
+                // Parse and get the AST
+                auto document = parser.Parse(text);
+
+                if (document == nullptr) {
+                    Error("Something went wrong :/");
+                    return "";
+                }
+
+#if RECOVER_FROM_EXCEPTIONS == 1
+                try {
+#endif
+                    return ToLaTeX(document);
+#if RECOVER_FROM_EXCEPTIONS == 1
+                } catch(...) {
+
+                }
+#endif
+                return "";
+            }
+
             void operator()(const std::string& code) {
                 std::string text = code;
 

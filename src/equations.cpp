@@ -88,6 +88,11 @@ int main(int argc, char** argv) {
         }
     }
 
+    // Print the code
+    for (auto& eq : equations) {
+        std::cerr<< " \033[36m" << "> " << eq->ToLaTeX() << "\033[0m" << std::endl;
+    }
+
     // Calculate number of coefficients and equations
     int numberOfSteps = equations.size() + 8 * Construction::Equations::Coefficients::Instance()->Size();
 

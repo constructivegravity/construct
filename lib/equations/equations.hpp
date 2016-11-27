@@ -493,6 +493,72 @@ namespace Construction {
                     return state == SOLVED;
                 });
             }
+
+            std::string ToLaTeX() const {
+                CLI cli;
+                std::string output = cli.ToLaTeX(eq);
+
+                // Crawl for all indices
+                std::vector<std::pair<std::string, std::string>> crawledCoefficients;
+                {
+                    size_t pos = 0;
+                    while (true) {
+                        pos = eq.find("RenameIndices(", pos);
+                        if (pos == std::string::npos) break;
+                        pos += 14;
+
+                        std::string name, indices;
+
+                        while (eq[pos] != ',') {
+                            name += std::string(1, eq[pos]);
+                            ++pos;
+                        }
+
+                        // Ignore the first indices block { }
+                        pos = eq.find("}, ", pos);
+                        pos += 3;
+
+                        // Get the indices
+                        while (eq[pos] != ')') {
+                            indices += std::string(1, eq[pos]);
+                            ++pos;
+                        }
+
+                        crawledCoefficients.push_back({ name, indices });
+                    }
+                }
+
+                // Replace all the coefficients
+                size_t pos = 0;
+                for (auto& pair : crawledCoefficients) {
+                    // Jump to the position in the output
+                    pos = output.find(pair.first, pos);
+                    if (pos == std::string::npos) return "Error building LaTeX code";
+
+                    // Find the coefficient
+                    CoefficientReference ref;
+                    for (auto& coef : coefficients) {
+                        if (coef->GetName() == pair.first) {
+                            ref = coef;
+                            break;
+                        }
+                    }
+
+                    auto text = ref->ToString() + "_" + pair.second;
+
+                    // Replace in the output
+                    output.erase(pos, pair.first.size());
+                    output.insert(pos, text);
+
+                    pos += text.size();
+                }
+
+                // Replace the substitution by a zero
+                output.erase(0, substName.size());
+                output.insert(0, "0");
+
+                return output;
+            }
         private:
             std::thread thread;
             std::mutex mutex;
