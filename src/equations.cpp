@@ -201,6 +201,26 @@ int main(int argc, char** argv) {
         std::cout << std::endl;
     }
 
+    // Finally check all the coefficients
+    /*
+    {
+        Construction::Logger::Debug("Run a final test ...");
+        int violations = 0;
+        for (auto &eq : equations) {
+            Construction::Tensor::Tensor result;
+
+            // Check the equation
+            auto correct = eq->Test(&result);
+
+            if (!correct) {
+                Construction::Logger::Error("Equation `", eq->ToLaTeX(), "` is violated.\nFound ", result);
+                ++violations;
+            }
+        }
+        Construction::Logger::Debug("Found ", violations, " violation(s)");
+    }
+     */
+
     time.Stop();
     std::cerr << time << std::endl;
 

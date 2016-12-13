@@ -383,13 +383,13 @@ namespace Construction {
                 return output;
             }
         public:
-            std::string ToString() const {
+            std::string ToString(bool includeResult=true) const {
                 std::stringstream ss;
                 ss << "#<" << id << ":" << l << ":" << ld << ":" << r << ":" << rd;
                 if (!exchangeSymmetry) ss << ":no";
                 ss << ">";
 
-                if (state == FINISHED) {
+                if (state == FINISHED && includeResult) {
                     ss << " = " << tensor->ToString();
                 }
 

@@ -383,7 +383,10 @@ namespace Construction {
                 }
 
                 substName = "subst" + Coefficient::GetRandomString(3);
+                testName = "test" + Coefficient::GetRandomString(3);
+
                 eq = substName + " = HomogeneousSystem(" + current + "):";
+                test = testName + " = " + current + ":";
             }
         public:
             /**
@@ -481,6 +484,43 @@ namespace Construction {
                 }
             }
         public:
+            bool Test(Tensor::Tensor* output=nullptr) {
+                // Wait to be finished
+                Wait();
+
+                // Execute the test
+                CLI cli;
+                cli(test);
+
+                // Get the result
+                auto testResult = Session::Instance()->Get(testName).As<Tensor::Tensor>().CollectByVariables();
+
+                // Improve the expression
+                {
+                    auto summands = testResult.GetSummands();
+                    std::vector<Tensor::Tensor> simplified;
+
+                    for (auto& tensor : summands) {
+                        auto pair = tensor.SeparateScalefactor();
+                        auto s = pair.second.Simplify();
+
+                        if (!s.IsZeroTensor()) {
+                            simplified.push_back(pair.first * s);
+                        }
+                    }
+
+                    testResult = Tensor::Tensor::Add(simplified);
+                }
+
+                // Set the output
+                if (output) {
+                    *output = testResult;
+                }
+
+                // Check if the tensor is zero
+                return testResult.IsZeroTensor();
+            }
+        public:
             Tensor::Substitution GetSubstition() {
                 if (state != SOLVED) Wait();
                 return substitution;
@@ -544,7 +584,7 @@ namespace Construction {
                         }
                     }
 
-                    auto text = ref->ToString() + "_" + pair.second;
+                    auto text = ref->ToString(false) + "_" + pair.second;
 
                     // Replace in the output
                     output.erase(pos, pair.first.size());
@@ -569,7 +609,9 @@ namespace Construction {
 
             std::string code;
             std::string eq;
+            std::string test;
             std::string substName;
+            std::string testName;
             std::vector<CoefficientReference> coefficients;
 
             Tensor::Substitution substitution;

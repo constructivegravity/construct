@@ -8,8 +8,6 @@ Add(#<lambda:0:0:2:2:{a b c d}>,Scale(#<theta:2:0:2:0:{c d a b}>,-4))
 #<lambda:0:0:2:1:{a b c}>
 #<lambda:2:0:2:1:{a b c d e}>
 Add(#<lambda:2:1:2:1:{a b e c d f}>,Scale(#<lambda:2:0:2:2:{c d a b e f}>,-2),Scale(Symmetrize(Multiply(Gamma({e c}),#<theta:2:0:2:0:{d f a b}>),{c d}),-4),Scale(Multiply(Gamma({e f}),#<theta:2:0:2:0:{c d a b}>),2))
-Add(#<lambda:2:1:2:2:{a b e c d f g}>,Scale(Symmetrize(#<lambda:2:1:2:2:{c d f a b g e}>,{f g}),-2))
-Symmetrize(#<lambda:2:2:2:2:{a b e f c d g h}>,{f g h})
 
 // C10
 Add(Multiply(Gamma({a b}),#<lambda:0:0:0:0:{}>),Scale(#<lambda:0:0:2:0:{a b}>,-2))
@@ -21,8 +19,5 @@ Add(Multiply(Gamma({e f}),#<lambda:0:0:2:2:{a b c d}>),Scale(Symmetrize(Multiply
 Symmetrize(#<lambda:0:0:2:1:{a b c}>,{b c})
 Add(Symmetrize(Multiply(Gamma({e a}),#<lambda:0:0:2:1:{b c d}>),{e d},{a b}),Scale(Symmetrize(#<lambda:2:0:2:1:{a b c d e}>,{d e}),-1))
 Add(Multiply(Gamma({c d}),#<lambda:0:0:2:2:{a b e f}>),Scale(Symmetrize(Multiply(Gamma({e a}),#<lambda:0:0:2:2:{b c f d}>),{e f},{a b}),-4),Scale(Symmetrize(#<lambda:2:1:2:1:{a b d c e f}>,{e f}),2))
-Symmetrize(#<lambda:2:1:2:2:{c f g a b d e}>,{f g})
 Symmetrize(#<lambda:0:0:2:2:{a b c d}>,{b c d})
 Add(Symmetrize(#<lambda:2:0:2:2:{a b c d e f}>,{d e f}),Scale(Symmetrize(Multiply(Gamma({d a}),#<lambda:0:0:2:2:{b c e f}>),{d e f},{a b}),-1))
-Symmetrize(#<lambda:2:1:2:2:{a b d c e f g}>,{e f g})
-Symmetrize(#<lambda:2:2:2:2:{a b d e c f g h}>,{f g h})
