@@ -272,7 +272,7 @@ bool AbstractScalar::HasVariables() const {
 void Scalar::Serialize(std::ostream& os) const {
     switch (pointer->GetType()) {
         case AbstractScalar::FRACTION:
-            static_cast<class Fraction*>(pointer.get())->Serialize(os);
+            static_cast<::Fraction*>(pointer.get())->Serialize(os);
             break;
 
         case AbstractScalar::FLOATING_POINT:

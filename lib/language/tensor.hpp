@@ -261,7 +261,7 @@ namespace Construction {
 
                 for (auto i=1; i<args.size(); ++i) {
                     output = output + " - ";
-                    if (GetTensors(i).IsAdded()) {
+                    if (args[i].find("+") != std::string::npos || args[i].find("-") != std::string::npos) {
                         output = output + "(" + args[i] + ")";
                     } else output = output + args[i];
                 }
@@ -300,7 +300,7 @@ namespace Construction {
 
             std::string ToLaTeX(const std::vector<std::string>& args) const {
                 std::string output = "-";
-                if (GetTensors(0).IsAdded()) {
+                if (args[0].find("+") != std::string::npos || args[0].find("-") != std::string::npos) {
                     output = output + "(" +args[0] + ")";
                 } else output = output + args[0];
 
@@ -326,6 +326,9 @@ namespace Construction {
             }
 
             std::string ToLaTeX(const std::vector<std::string>& args) const {
+                if (args[0].find("+") != std::string::npos || args[0].find("-") != std::string::npos) {
+                    return args[1] + " * (" + args[0] + ")";
+                }
                 return args[1] + " * " + args[0];
             }
 
@@ -351,7 +354,11 @@ namespace Construction {
                 std::string output = args[0];
 
                 for (auto i=1; i<args.size(); ++i) {
-                    output = output + " * " + args[i];
+                    if (args[i].find("+") != std::string::npos || args[i].find("-") != std::string::npos) {
+                        output = output + " * (" + args[i] + ")";
+                    } else {
+                        output = output + " * " + args[i];
+                    }
                 }
 
                 return output;
@@ -389,7 +396,11 @@ namespace Construction {
                 std::string output = args[0];
 
                 for (auto i=1; i<args.size(); ++i) {
-                    output = output + " * " + args[i];
+                    if (args[i].find("+") != std::string::npos || args[i].find("-") != std::string::npos) {
+                        output = output + " * (" + args[i] + ")";
+                    } else {
+                        output = output + " * " + args[i];
+                    }
                 }
 
                 return output;
