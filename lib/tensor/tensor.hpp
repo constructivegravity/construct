@@ -1503,14 +1503,22 @@ namespace Construction {
 				This is easier to calculate since no permutation have to
 				be generated.
 			 */
-			static double GetEpsilonComponents(const std::vector<unsigned>& args) {
-				double result = 1.0;
+			static Scalar GetEpsilonComponents(const std::vector<unsigned>& args) {
+				Scalar result = Scalar::Fraction(1,1);
 				for (unsigned p=0; p < args.size(); p++) {
 					for (unsigned q=p+1; q < args.size(); q++ ) {
-						result *= static_cast<double>(static_cast<int>(args[q])-static_cast<int>(args[p]))/(q-p);
+						int n = args[q] - args[p];
+						int d = q - p;
+
+						if (d < 0) {
+							n = -n;
+							d = -d;
+						}
+
+						result *= Scalar::Fraction(n,d);
 					}
 				}
-				return result != 0 ? result : 0;
+				return result != Scalar::Fraction(0,1) ? result : Scalar::Fraction(0,1);
 			}
 
 
@@ -1635,10 +1643,10 @@ namespace Construction {
 				}
 
 				if (vec[0] == vec[1]) {
-					if (vec[0]-indices[0].GetRange().GetFrom() < signature.first) return -1;
-					else return 1;
+					if (vec[0]-indices[0].GetRange().GetFrom() < signature.first) return Scalar::Fraction(-1,1);
+					else return Scalar::Fraction(1,1);
 				}
-				return 0;
+				return Scalar::Fraction(0,1);
 			}
 
 			virtual TensorPointer Canonicalize() const override {
@@ -1797,7 +1805,7 @@ namespace Construction {
 			}
 
 			virtual Scalar Evaluate(const std::vector<unsigned>& args) const override {
-				Scalar result = 1;
+				Scalar result = Scalar::Fraction(1,1);
 				unsigned pos = 0;
 
 				// Calculate the epsilon contribution
@@ -1807,7 +1815,7 @@ namespace Construction {
 
 					result *= EpsilonTensor::GetEpsilonComponents(partialArgs);
 
-					if (result == 0.0) return result;
+					if (result.ToDouble() == 0.0) return result;
 
 					pos += 3;
 				}
@@ -1818,7 +1826,7 @@ namespace Construction {
 					auto partialArgs = Partial(args, {pos, pos+1});
 					result *= GammaTensor(indices, 0,3).Evaluate(partialArgs);// GammaTensor::Evaluate(partialArgs, GammaTensor(indices, 0,3));
 
-					if (result == 0.0) return result;
+					if (result.ToDouble() == 0.0) return result;
 
 					pos += 2;
 				}

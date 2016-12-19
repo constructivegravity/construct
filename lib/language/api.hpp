@@ -327,7 +327,7 @@ namespace Construction {
 
                         // Set all entries in the row to zero
                         for (int j = 0; j < system.first.GetNumberOfColumns(); ++j) {
-                            system.first(i, j) = 0;
+                            system.first(i, j) = Tensor::Fraction(0,1);
                         }
                     }
                 }
@@ -353,18 +353,18 @@ namespace Construction {
                     if (vec.IsZero()) break;
 
                     bool isZero = true;
-                    Scalar lhs = 0;
-                    Scalar rhs = 0;
+                    Scalar lhs = Scalar::Fraction(0,1);
+                    Scalar rhs = Scalar::Fraction(0,1);
 
                     // Iterate over all the components
                     for (int j=0; j<vec.GetDimension(); j++) {
                         //Construction::Logger::Debug("j = ", j, ", vec[j] = ", vec[j], ", isZero = ", (isZero) ? "yes" : "no");
 
-                        if (vec[j] == Construction::Tensor::Fraction(0) && isZero) continue;
-                        if (vec[j] == Construction::Tensor::Fraction(1) && isZero) {
+                        if (vec[j] == Construction::Tensor::Fraction(0,1) && isZero) continue;
+                        if (vec[j] == Construction::Tensor::Fraction(1,1) && isZero) {
                             lhs = system.second[j];
                             isZero = false;
-                        } else if (vec[j] != Construction::Tensor::Fraction(0)) {
+                        } else if (vec[j] != Construction::Tensor::Fraction(0,1)) {
                             rhs += (-system.second[j] * Tensor::Scalar::Fraction(vec[j]));
                         }
                     }
