@@ -2459,7 +2459,7 @@ namespace Construction {
 
                         // Set all entries in the row to zero
                         for (int j = 0; j < M.GetNumberOfColumns(); ++j) {
-                            M(i, j) = 0;
+                            M(i, j) = Common::BigNumber(0);
                         }
                     }
                 }
@@ -2631,8 +2631,11 @@ namespace Construction {
 			}
 
 			Tensor RedefineVariables(const std::string& name, int offset=0) const {
+                // Factorize overal scale first
+                auto factorized = FactorizeOveralScale().SeparateScalefactor();
+
 				// Separate the summands, if available
-				auto summands = GetSummands();
+				auto summands = factorized.second.GetSummands();
 
 				Tensor result = Tensor::Zero();
 				unsigned variableCount = 1 + offset;
@@ -2640,7 +2643,13 @@ namespace Construction {
 				for (auto& tensor : summands) {
 					// If the tensor is scaled, redefine the free variable in front (if present)
 					if (tensor.IsScaled() && tensor.As<ScaledTensor>()->GetScale().HasVariables()) {
-						result += scalar_type(name, variableCount++) * Tensor(tensor.As<ScaledTensor>()->GetTensor()->Clone());
+                        auto scale = tensor.As<ScaledTensor>()->GetScale().FactorizeOveralScale();
+
+                        if (scale.IsMultiplied()) {
+                            result += scalar_type(scale.As<MultipliedScalar>()->GetFirst()->Clone()) * scalar_type(name, variableCount++) * Tensor(tensor.As<ScaledTensor>()->GetTensor()->Clone());
+                        } else {
+                            result += scalar_type(name, variableCount++) * Tensor(tensor.As<ScaledTensor>()->GetTensor()->Clone());
+                        }
 					} else if (tensor.IsMultiplied()) {
 						MultipliedTensor* _tensor = static_cast<MultipliedTensor*>(tensor.pointer.get());
 						auto first = Tensor(_tensor->GetFirst()->Clone()).SeparateScalefactor();
@@ -2653,7 +2662,7 @@ namespace Construction {
 					}
 				}
 
-				return result;
+				return factorized.first * result;
 			}
 
 			std::vector<std::pair<scalar_type, Tensor>> ExtractVariables(Tensor* inhomogeneousPart = nullptr) const {
@@ -2776,7 +2785,7 @@ namespace Construction {
 			}
         public:
             Tensor FactorizeOveralScale() const {
-                scalar_type overalScale = 1;
+                scalar_type overalScale = Scalar::Fraction(1,1);
                 std::vector<Tensor> tensors;
 
                 auto summands = GetSummands();

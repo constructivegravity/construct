@@ -365,7 +365,7 @@ namespace Construction {
                             lhs = system.second[j];
                             isZero = false;
                         } else if (vec[j] != Construction::Tensor::Fraction(0,1)) {
-                            rhs += (-system.second[j] * Tensor::Scalar::Fraction(vec[j]));
+                            rhs += (-system.second[j] * Tensor::Scalar::Fraction(vec[j].GetNumerator(), vec[j].GetDenominator()));
                         }
                     }
 
