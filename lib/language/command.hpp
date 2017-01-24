@@ -136,10 +136,14 @@ namespace Construction {
                 return GetArgument<SubstitutionArgument>(pos)->GetSubstitution();
             }
 
-            double GetNumeric(unsigned pos) const {
+            Tensor::Scalar GetNumeric(unsigned pos) const {
                 assert(pos < arguments.size());
                 assert(arguments[pos]->IsNumericArgument());
                 return GetArgument<NumericArgument>(pos)->GetValue();
+            }
+        public:
+            virtual std::string ToLaTeX(const std::vector<std::string>& args) const {
+                return "";
             }
         public:
             /**
@@ -167,7 +171,10 @@ namespace Construction {
 
                 for (int i=0; i<arguments.size(); i++) {
                     if (!ArgumentDictionary::Instance()->IsA(name, i, arguments[i]->GetType())) {
-                        throw WrongArgumentTypeException(name, ArgumentDictionary::Instance()->TypeToString(arguments[i]->GetType()));
+                        throw WrongArgumentTypeException(
+                                ArgumentDictionary::Instance()->TypeToString(ArgumentDictionary::Instance()->Type(name, i)),
+                                ArgumentDictionary::Instance()->TypeToString(arguments[i]->GetType())
+                        );
                     }
                 }
             }

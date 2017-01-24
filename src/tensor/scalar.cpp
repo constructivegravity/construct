@@ -7,16 +7,20 @@
 
 using namespace Construction::Tensor;
 
-Scalar::Scalar() : AbstractExpression(SCALAR), pointer(ScalarPointer(new Tensor::Fraction(0))) { }
-Scalar::Scalar(double v) : AbstractExpression(SCALAR), pointer(ScalarPointer(new FloatingPointScalar(v))) { }
-Scalar::Scalar(int v) : AbstractExpression(SCALAR), pointer(ScalarPointer(new Tensor::Fraction(v))) { }
-Scalar::Scalar(int numerator, unsigned denominator) : AbstractExpression(SCALAR), pointer(ScalarPointer(new Tensor::Fraction(numerator, denominator))) { }
-Scalar::Scalar(const std::string& name) : AbstractExpression(SCALAR), pointer(ScalarPointer(new Tensor::Variable(name))) { }
-Scalar::Scalar(const std::string& name, const std::string& printed_text) : AbstractExpression(SCALAR), pointer(ScalarPointer(new Tensor::Variable(name, printed_text))) { }
-Scalar::Scalar(const std::string& name, unsigned id) : AbstractExpression(SCALAR) {
+Scalar::Scalar() : pointer(ScalarPointer(new Tensor::Fraction(0))) { }
+Scalar::Scalar(double v) : pointer(ScalarPointer(new FloatingPointScalar(v))) { }
+Scalar::Scalar(int v) : pointer(ScalarPointer(new Tensor::Fraction(v))) { }
+Scalar::Scalar(int numerator, unsigned denominator) : pointer(ScalarPointer(new Tensor::Fraction(numerator, denominator))) { }
+Scalar::Scalar(const std::string& name) : pointer(ScalarPointer(new Tensor::Variable(name))) { }
+Scalar::Scalar(const std::string& name, const std::string& printed_text) : pointer(ScalarPointer(new Tensor::Variable(name, printed_text))) { }
+Scalar::Scalar(const std::string& name, unsigned id) {
     std::stringstream ss;
     ss << name << "_" << id;
-    pointer = ScalarPointer(new Tensor::Variable(ss.str()));   
+    pointer = ScalarPointer(new Tensor::Variable(ss.str()));
+}
+
+Scalar Scalar::Fraction(double f) {
+    return Scalar(ScalarPointer(new Tensor::Fraction(std::move(Tensor::Fraction::FromDouble(f)))));
 }
 
 Scalar& Scalar::operator=(double d) {
@@ -71,7 +75,7 @@ ScalarPointer AbstractScalar::Add(const AbstractScalar& one, const AbstractScala
         if (other.IsMultiplied() && static_cast<MultipliedScalar*>(second.get())->B->IsVariable() && static_cast<MultipliedScalar*>(second.get())->B->ToString() == v->ToString()) {
             return std::move(Multiply(
                 *Add(
-                    *static_cast<MultipliedScalar*>(first.get())->A->Clone(), 
+                    *static_cast<MultipliedScalar*>(first.get())->A->Clone(),
                     *static_cast<MultipliedScalar*>(second.get())->A->Clone(),
                 ),
 
@@ -197,9 +201,9 @@ bool Scalar::operator==(const Scalar& other) const {
         Scalar firstB = Scalar(static_cast<AddedScalar*>(pointer.get())->GetSecond()->Clone());
 
         Scalar secondA = Scalar(static_cast<AddedScalar*>(other.pointer.get())->GetFirst()->Clone());
-        Scalar secondB = Scalar(static_cast<AddedScalar*>(other.pointer.get())->GetSecond()->Clone()); 
+        Scalar secondB = Scalar(static_cast<AddedScalar*>(other.pointer.get())->GetSecond()->Clone());
 
-        return ((firstA == secondA && firstB == secondB) || (firstA == secondB && firstB == secondA));                   
+        return ((firstA == secondA && firstB == secondB) || (firstA == secondB && firstB == secondA));
     }
 
     if (IsMultiplied() && other.IsMultiplied()) {
@@ -207,10 +211,10 @@ bool Scalar::operator==(const Scalar& other) const {
         Scalar firstB = Scalar(static_cast<MultipliedScalar*>(pointer.get())->GetSecond()->Clone());
 
         Scalar secondA = Scalar(static_cast<MultipliedScalar*>(other.pointer.get())->GetFirst()->Clone());
-        Scalar secondB = Scalar(static_cast<MultipliedScalar*>(other.pointer.get())->GetSecond()->Clone()); 
+        Scalar secondB = Scalar(static_cast<MultipliedScalar*>(other.pointer.get())->GetSecond()->Clone());
 
-        return ((firstA == secondA && firstB == secondB) || (firstA == secondB && firstB == secondA));                   
-    }            
+        return ((firstA == secondA && firstB == secondB) || (firstA == secondB && firstB == secondA));
+    }
 
     return false;
 }
@@ -263,12 +267,12 @@ bool AbstractScalar::HasVariables() const {
 
     fn(this);
     return hasVariables;
-}   
+}
 
 void Scalar::Serialize(std::ostream& os) const {
     switch (pointer->GetType()) {
         case AbstractScalar::FRACTION:
-            static_cast<class Fraction*>(pointer.get())->Serialize(os);
+            static_cast<Construction::Tensor::Fraction*>(pointer.get())->Serialize(os);
             break;
 
         case AbstractScalar::FLOATING_POINT:
@@ -285,8 +289,8 @@ void Scalar::Serialize(std::ostream& os) const {
 
         case AbstractScalar::MULTIPLIED:
             static_cast<MultipliedScalar*>(pointer.get())->Serialize(os);
-            break;  
-    } 
+            break;
+    }
 }
 
 std::unique_ptr<AbstractExpression> Scalar::Deserialize(std::istream& is) {
@@ -341,4 +345,24 @@ std::unique_ptr<AbstractExpression> Scalar::Deserialize(std::istream& is) {
     }
 
     return std::unique_ptr<AbstractExpression>(new Scalar(std::move(result)));
+}
+
+bool Scalar::IsProportionalTo(const Scalar& other, Scalar* factor) {
+    // If not both scalars are numerics, return false
+    // TODO: also handle multiples of a scalar and sums
+    if (!IsNumeric() || !other.IsNumeric()) return false;
+
+    // Handle fractions
+    if (IsFraction() && other.IsFraction()) {
+        Scalar result = Scalar(*static_cast<Construction::Tensor::Fraction*>(pointer.get()) / *static_cast<Construction::Tensor::Fraction*>(other.pointer.get()));
+        if (factor) *factor = std::move(result);
+        return true;
+    }
+
+    double f = ToDouble() / other.ToDouble();
+    Scalar result = Scalar(f);
+
+    if (factor) *factor = std::move(result);
+
+    return true;
 }

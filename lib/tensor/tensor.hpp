@@ -8,6 +8,7 @@
 #include <memory>
 
 #include <common/task_pool.hpp>
+#include <common/logger.hpp>
 #include <tensor/permutation.hpp>
 #include <tensor/fraction.hpp>
 #include <tensor/symmetry.hpp>
@@ -70,7 +71,7 @@ namespace Construction {
 		 	we do not implement the Einstein sum convention here. This may
 		 	follow in the future.
 		 */
-		class AbstractTensor : public Printable, Serializable<AbstractTensor> {
+		class AbstractTensor : public Printable, public Serializable<AbstractTensor> {
 		public:
 			enum class TensorType {
 				ADDITION = 1,
@@ -153,7 +154,7 @@ namespace Construction {
 				Check if two tensors are unequal
 			 */
 			virtual bool operator!=(const AbstractTensor& other) const {
-				return name != other.name || printed_text != other.printed_text || indices != other.indices;
+                return !(*this == other);
 			}
 		public:
 			/**
@@ -177,7 +178,7 @@ namespace Construction {
 				return true;
 			}
 		public:
-			Indices GetIndices() const { return indices; }
+			virtual Indices GetIndices() const { return indices; }
 			std::string GetName() const { return name; }
 
 			void SetName(const std::string& name) { this->name = name; }
@@ -282,6 +283,21 @@ namespace Construction {
                 If nothing can be done, it returns nullptr.
              */
             virtual std::unique_ptr<AbstractTensor> ContractionHeuristics(const AbstractTensor& other) const {
+                return nullptr;
+            }
+
+            /**
+                \brief Method that allows to simplify expressions on multiplications
+
+                Method that allows to simplify expressions on regular multiplication.
+                For example, multipliying an EpsilonGamma tensor by a Gamma just adds the
+                indies to the tensor and increases numGamma by one.
+
+                If nothing can be done, it returns nullptr.
+
+                PRECONDITION: there are no equal indices in both indices
+             */
+            virtual std::unique_ptr<AbstractTensor> MultiplicationHeuristics(const AbstractTensor& other) const {
                 return nullptr;
             }
         public:
@@ -476,7 +492,8 @@ namespace Construction {
 				std::vector<TensorPointer> newSummands;
 
 				for (auto& tensor : summands) {
-					newSummands.push_back(std::move(tensor->Clone()));
+                    auto t = std::move(tensor->Clone());
+					newSummands.emplace_back(std::move(t));
 				}
 
 				return std::move(TensorPointer(new AddedTensor(std::move(newSummands), indices)));
@@ -489,6 +506,18 @@ namespace Construction {
 		public:
 			const TensorPointer& At(unsigned id) const { return summands[id]; }
 			size_t Size() const { return summands.size(); }
+        public:
+            virtual Indices GetIndices() const override {
+                // No summands => empty indices
+                if (summands.size() == 0) return Indices();
+
+                // If indices is empty, return the indices of the first summand
+                if (indices.Size() != summands[0]->GetIndices().Size()) {
+                    return summands[0]->GetIndices();
+                }
+
+                return indices;
+            }
 		public:
 			static void DoSerialize(std::ostream& os, const AddedTensor& tensor) {
 				// Write size of
@@ -577,15 +606,34 @@ namespace Construction {
 			/**
 				Canonicalize a sum of two tensors
 			 */
-			TensorPointer Canonicalize() const override {
+			virtual TensorPointer Canonicalize() const override {
 				std::vector<TensorPointer> newSummands;
 
 				for (auto& tensor : summands) {
 					newSummands.push_back(std::move(tensor->Canonicalize()));
 				}
 
+				// Sort the summands by their indices
+				std::sort(newSummands.begin(), newSummands.end(), [](const TensorPointer& a, const TensorPointer& b) {
+					return a->GetIndices() < b->GetIndices();
+				});
+
 				return std::move(TensorPointer(new AddedTensor(std::move(newSummands), indices)));
 			}
+        public:
+            virtual std::unique_ptr<AbstractTensor> MultiplicationHeuristics(const AbstractTensor& other) const override {
+                // Create new list
+                std::vector<TensorPointer> newSummands;
+
+                for (auto& tensor : summands) {
+                    auto newTensor = tensor->MultiplicationHeuristics(other);
+                    if (!newTensor) return nullptr;
+
+                    newSummands.push_back(std::move(newTensor));
+                }
+
+                return std::move(TensorPointer(new AddedTensor(std::move(newSummands), indices)));
+            }
 		private:
 			std::vector<TensorPointer> summands;
 		};
@@ -628,13 +676,30 @@ namespace Construction {
                 }
 
                 indices = newIndices;
+
                 A->SetIndices(A->GetIndices().Shuffle(mapping));
                 B->SetIndices(B->GetIndices().Shuffle(mapping));
 			}
 		public:
 			virtual std::string ToString() const override {
 				std::stringstream ss;
-				ss << A->ToString() << B->ToString();
+
+				if (A->IsAddedTensor()) {
+					ss << "(";
+				}
+				ss << A->ToString();
+				if (A->IsAddedTensor()) {
+					ss << ")";
+				}
+
+				if (B->IsAddedTensor()) {
+					ss << "(";
+				}
+				ss << B->ToString();
+				if (B->IsAddedTensor()) {
+					ss << ")";
+				}
+
 				return ss.str();
 			}
 
@@ -730,6 +795,33 @@ namespace Construction {
 				auto B = AbstractTensor::Deserialize(is)->Clone();
 				return TensorPointer(new MultipliedTensor(std::move(A), std::move(B)));
 			}
+        public:
+            virtual TensorPointer Canonicalize() const override {
+                return TensorPointer(new MultipliedTensor(std::move(A->Canonicalize()), std::move(B->Canonicalize())));
+            }
+
+            virtual std::unique_ptr<AbstractTensor> MultiplicationHeuristics(const AbstractTensor& other) const override {
+                // Try to apply heuristics to first one
+                auto heuristics = A->MultiplicationHeuristics(other);
+                if (heuristics) {
+                    return TensorPointer(new MultipliedTensor(std::move(heuristics), std::move(B->Clone())));
+                }
+
+                // Try to apply heuristics to the second one
+                heuristics = B->MultiplicationHeuristics(other);
+                if (heuristics) {
+                    return TensorPointer(new MultipliedTensor(std::move(A->Clone()), std::move(heuristics)));
+                }
+
+                return nullptr;
+            }
+        public:
+            virtual bool operator==(const AbstractTensor& other) const override {
+                if (!other.IsMultipliedTensor()) return false;
+                bool a = *static_cast<const MultipliedTensor&>(other).A == *A && *static_cast<const MultipliedTensor&>(other).B == *B;
+                bool b = *static_cast<const MultipliedTensor&>(other).A == *B && *static_cast<const MultipliedTensor&>(other).B == *A;
+                return a || b;
+            }
 		private:
 			TensorPointer A;
 			TensorPointer B;
@@ -772,10 +864,10 @@ namespace Construction {
 				\throws IncompleteIndexAssignmentException
 			 */
 			virtual Scalar Evaluate(const std::vector<unsigned>& args) const override {
-				return A->Evaluate(args) * c;
+                return A->Evaluate(args) * c;
 			}
 
-			TensorPointer Canonicalize() const override {
+			virtual TensorPointer Canonicalize() const override {
 				auto newA = A->Canonicalize();
 				if (newA->IsScaledTensor()) {
 					ScaledTensor* scaled = static_cast<ScaledTensor*>(newA.get());
@@ -785,6 +877,16 @@ namespace Construction {
 				}
 				return std::move(newA);
 			}
+
+            virtual std::unique_ptr<AbstractTensor> MultiplicationHeuristics(const AbstractTensor& other) const override {
+                // Try to apply heuristics to the tensor one
+                auto heuristics = A->MultiplicationHeuristics(other);
+                if (heuristics) {
+                    return TensorPointer(new ScaledTensor(std::move(heuristics), c));
+                }
+
+                return nullptr;
+            }
 
 			virtual std::string ToString() const override {
 				std::stringstream ss;
@@ -808,7 +910,12 @@ namespace Construction {
 
 				return ss.str();
 			}
-		public:
+        public:
+            virtual bool operator==(const AbstractTensor& other) const override {
+                if (!other.IsScaledTensor()) return false;
+                return *static_cast<const ScaledTensor&>(other).A == *A && static_cast<const ScaledTensor&>(other).c == c;
+            }
+        public:
 			virtual void SetIndices(const Indices& newIndices) override {
 				indices = newIndices;
 
@@ -860,6 +967,10 @@ namespace Construction {
 			virtual std::string ToString() const override {
 				return "0";
 			}
+        public:
+            virtual bool operator==(const AbstractTensor& other) const override {
+                return other.IsZeroTensor();
+            }
 		public:
 			static void DoSerialize(std::ostream& os, const ZeroTensor& tensor) {
 				// do nothing
@@ -868,6 +979,14 @@ namespace Construction {
 			static TensorPointer DoDeserialize(std::istream& is, const Indices& indices) {
 				return TensorPointer(new ZeroTensor());
 			}
+        public:
+            virtual TensorPointer Clone() const override {
+                return TensorPointer(new ZeroTensor());
+            }
+
+            virtual TensorPointer Canonicalize() const override {
+                return TensorPointer(new ZeroTensor());
+            }
 		};
 
 		/*MultipliedTensor AbstractTensor::operator*(const AbstractTensor &other) const {
@@ -903,13 +1022,26 @@ namespace Construction {
 			ss << summands[0]->ToString();
 
 			for (int i=1; i<summands.size(); i++) {
-				if (summands[i]->IsScaledTensor() && static_cast<const ScaledTensor*>(summands[i].get())->GetScale() == Scalar(-1)) {
-					ss << " - " << static_cast<const ScaledTensor*>(summands[i].get())->GetTensor()->ToString();
-				} else ss << " + " << summands[i]->ToString();
+                auto str = summands[i]->ToString();
+
+                if (str[0] == '-') {
+                    ss << " - " << str.substr(1);
+                } else {
+                    ss << " + " << str;
+                }
 			}
 
 			return ss.str();
 		}
+
+        /*class SymmetrizedTensor : public AbstractTensor {
+        public:
+            SymmetrizedTensor(const Indices& indices) : AbstractTensor("", "", indices) {
+                type = TensorType::SYMMETRIZED;
+            }
+        private:
+
+        };*/
 
 		/**
 		 	\class SubstituteTensor
@@ -936,6 +1068,17 @@ namespace Construction {
 			bool IsAddedTensor() const {
 				return A->IsAddedTensor();
 			}
+        public:
+            virtual bool operator==(const AbstractTensor& other) const override {
+                if (other.IsSubstitute()) {
+                    return static_cast<const SubstituteTensor&>(other).indices == indices && *static_cast<const SubstituteTensor&>(other).A == *A;
+                }
+
+                auto one = A->Clone();
+                one->SetIndices(indices);
+
+                return *one == other;
+            }
 		public:
 			virtual std::string ToString() const override {
 				return A->ToString();
@@ -955,6 +1098,10 @@ namespace Construction {
 
 				return (*A)(assignment);
 			}
+
+            virtual TensorPointer Canonicalize() const override {
+                return TensorPointer(new SubstituteTensor(std::move(A->Canonicalize()), indices));
+            }
 		public:
 			const TensorPointer& GetTensor() const {
 				return A;
@@ -995,7 +1142,7 @@ namespace Construction {
 		 */
 		class ScalarTensor : public AbstractTensor {
 		public:
-			ScalarTensor(Scalar value) : value(value) { }
+			ScalarTensor(const Scalar& value) : value(value) { type = TensorType::SCALAR; }
 
 			ScalarTensor(const std::string& name, const std::string& printed_text, Scalar value)
 				: AbstractTensor(name, printed_text, Indices()), value(value) {
@@ -1003,15 +1150,32 @@ namespace Construction {
 				type = TensorType::SCALAR;
 			}
 
+            ScalarTensor(const ScalarTensor& other) : value(other.value) {
+                type = TensorType::SCALAR;
+            }
+
+            ScalarTensor(ScalarTensor&& other) : value(std::move(other.value)) {
+                type = TensorType::SCALAR;
+            }
+
 			virtual ~ScalarTensor() = default;
 		public:
 			virtual TensorPointer Clone() const override {
-				return TensorPointer(new ScalarTensor(*this));
+				return TensorPointer(new ScalarTensor(value));
 			}
+        public:
+            virtual TensorPointer Canonicalize() const override {
+                return TensorPointer(new ScalarTensor(value));
+            }
 		public:
 			virtual std::string ToString() const override {
-				return printed_text;
+				return value.ToString();
 			}
+        public:
+            virtual bool operator==(const AbstractTensor& other) const override {
+                if (!other.IsScalar()) return false;
+                return static_cast<const ScalarTensor&>(other).value == value;
+            }
         public:
 			virtual Scalar Evaluate(const std::vector<unsigned>& args) const override {
 				return value;
@@ -1034,6 +1198,8 @@ namespace Construction {
 
 				return TensorPointer(new ScalarTensor(value));
 			}
+        public:
+            Scalar GetValue() const { return value; }
 		private:
 			Scalar value;
 		};
@@ -1077,7 +1243,7 @@ namespace Construction {
 			}
 
 			// Else, return a new added tensor
-			return TensorPointer(new AddedTensor(std::move(first), std::move(second)));
+            return TensorPointer(new AddedTensor(std::move(first), std::move(second)));
 		}
 
 		std::unique_ptr<AbstractTensor> AbstractTensor::Multiply(const AbstractTensor& one, const AbstractTensor& second) {
@@ -1091,7 +1257,7 @@ namespace Construction {
             }
 
             // Try to apply heuristics
-            {
+            if (containsContractions) {
                 auto heuristics = one.ContractionHeuristics(second);
                 if (heuristics != nullptr) return std::move(heuristics);
 
@@ -1099,9 +1265,48 @@ namespace Construction {
                 if (heuristics != nullptr) return std::move(heuristics);
             }
 
+            // Try to apply multiplication heuristics
+            /*{
+                auto heuristics = one.MultiplicationHeuristics(second);
+                if (heuristics != nullptr) return std::move(heuristics);
+
+                heuristics = second.MultiplicationHeuristics(one);
+                if (heuristics != nullptr) return std::move(heuristics);
+            }*/
+
 			// If one of the tensors is zero, return zero
 			if (one.IsZeroTensor() || second.IsZeroTensor()) {
 				return TensorPointer(new ZeroTensor());
+			}
+
+            // If one of the tensors is scalar
+            if (one.IsScalar()) {
+                auto value = static_cast<ScalarTensor*>(one.Clone().get())->GetValue();
+                return std::move(Multiply(second, value));
+            }
+
+            if (second.IsScalar()) {
+                auto value = static_cast<ScalarTensor*>(second.Clone().get())->GetValue();
+                return std::move(Multiply(one, value));
+            }
+
+			// Do some magic if we multiply scaled tensors
+			if (one.IsScaledTensor() && !second.IsScaledTensor()) {
+				auto s = static_cast<const ScaledTensor*>(&one)->GetScale();
+				auto tensor = static_cast<const ScaledTensor*>(&one)->GetTensor()->Clone();
+
+				return std::move(Multiply(*Multiply(*tensor, second), s));
+			} else if (!one.IsScaledTensor() && second.IsScaledTensor()) {
+				auto s = static_cast<const ScaledTensor*>(&second)->GetScale();
+				auto tensor = static_cast<const ScaledTensor*>(&second)->GetTensor()->Clone();
+
+				return std::move(Multiply(*Multiply(one, *tensor), s));
+			} else if (one.IsScaledTensor() && second.IsScaledTensor()) {
+				auto s = static_cast<const ScaledTensor*>(&one)->GetScale() * static_cast<const ScaledTensor*>(&second)->GetScale();
+				auto tensorA = static_cast<const ScaledTensor*>(&one)->GetTensor()->Clone();
+				auto tensorB = static_cast<const ScaledTensor*>(&second)->GetTensor()->Clone();
+
+				return std::move(Multiply(*Multiply(*tensorA, *tensorB), s));
 			}
 
 			return TensorPointer(new MultipliedTensor(
@@ -1121,6 +1326,12 @@ namespace Construction {
 
 			// If the tensor is zero, return zero
 			if (one.IsZeroTensor()) return std::move(clone);
+
+            // Syntactic sugar for scaling of scalars
+            if (one.IsScalar()) {
+                auto s = c * static_cast<ScalarTensor*>(clone.get())->GetValue();
+                return TensorPointer(new ScalarTensor(s));
+            }
 
 			// Syntactic sugar for scaling a scaled tensor
 			if (one.IsScaledTensor()) {
@@ -1197,17 +1408,35 @@ namespace Construction {
              */
             virtual TensorPointer ContractionHeuristics(const AbstractTensor& other) const override {
                 try {
-                    auto contracted = indices.Contract(other.GetIndices());
+                    auto otherIndices = other.GetIndices();
+
+                    // Make mapping
+                    std::map<Index, Index> mapping;
+                    for (auto& index : otherIndices) {
+                        mapping[index] = index;
+                    }
+
+                    // Check if the tensor contains the index
+                    if (otherIndices.ContainsIndex(indices[0])) {
+                        mapping[indices[0]] = indices[1];
+                    } else if (otherIndices.ContainsIndex(indices[1])) {
+                        mapping[indices[1]] = indices[0];
+                    } else return nullptr;
 
                     // Clone the other tensor
                     auto clone = other.Clone();
 
                     // Set the indices
-                    clone->SetIndices(contracted);
+                    clone->SetIndices(otherIndices.Shuffle(mapping));
                     return std::move(clone);
                 } catch (...) {
                     return nullptr;
                 }
+            }
+        public:
+            virtual bool operator==(const AbstractTensor& other) const override {
+                if (!other.IsDeltaTensor()) return false;
+                return indices == other.GetIndices();
             }
 		public:
 			/**
@@ -1257,6 +1486,11 @@ namespace Construction {
 			virtual TensorPointer Clone() const override {
 				return TensorPointer(new EpsilonTensor(*this));
 			}
+        public:
+            bool operator==(const AbstractTensor& other) const override {
+                if (!other.IsEpsilonTensor()) return false;
+                return indices == other.GetIndices();
+            }
 		public:
 			/**
 			    \brief Evaluate the Levi-Civita symbol
@@ -1269,14 +1503,22 @@ namespace Construction {
 				This is easier to calculate since no permutation have to
 				be generated.
 			 */
-			static double GetEpsilonComponents(const std::vector<unsigned>& args) {
-				double result = 1.0;
+			static Scalar GetEpsilonComponents(const std::vector<unsigned>& args) {
+				Scalar result = Scalar::Fraction(1,1);
 				for (unsigned p=0; p < args.size(); p++) {
 					for (unsigned q=p+1; q < args.size(); q++ ) {
-						result *= static_cast<double>(static_cast<int>(args[q])-static_cast<int>(args[p]))/(q-p);
+						int n = args[q] - args[p];
+						int d = q - p;
+
+						if (d < 0) {
+							n = -n;
+							d = -d;
+						}
+
+						result *= Scalar::Fraction(n,d);
 					}
 				}
-				return result != 0 ? result : 0;
+				return result != Scalar::Fraction(0,1) ? result : Scalar::Fraction(0,1);
 			}
 
 
@@ -1361,6 +1603,11 @@ namespace Construction {
 			virtual TensorPointer Clone() const override {
 				return TensorPointer(new GammaTensor(*this));
 			}
+        public:
+            virtual bool operator==(const AbstractTensor& other) const override {
+                if (!other.IsGammaTensor()) return false;
+                return indices == other.GetIndices();
+            }
 		public:
 			std::pair<int, int> GetSignature() const { return signature; }
 			void SetSignature(int p, int q) { signature = {p,q}; }
@@ -1396,10 +1643,10 @@ namespace Construction {
 				}
 
 				if (vec[0] == vec[1]) {
-					if (vec[0]-indices[0].GetRange().GetFrom() < signature.first) return -1;
-					else return 1;
+					if (vec[0]-indices[0].GetRange().GetFrom() < signature.first) return Scalar::Fraction(-1,1);
+					else return Scalar::Fraction(1,1);
 				}
-				return 0;
+				return Scalar::Fraction(0,1);
 			}
 
 			virtual TensorPointer Canonicalize() const override {
@@ -1471,8 +1718,58 @@ namespace Construction {
 			}
 		public:
 			virtual TensorPointer Clone() const override {
-				return TensorPointer(new EpsilonGammaTensor(*this));
+				return TensorPointer(new EpsilonGammaTensor(numEpsilon, numGamma, indices));
 			}
+
+            virtual std::unique_ptr<AbstractTensor> MultiplicationHeuristics(const AbstractTensor& other) const override {
+                // Check if the other one is a gamma
+                if (!other.IsGammaTensor()) return nullptr;
+
+                // Increase number of gammas and append the indices of the other
+                Indices indices = this->indices;
+
+                indices.Append(other.GetIndices());
+
+                // Sort the indices
+                Indices newIndices;
+
+                unsigned pos = 0;
+
+                // Canonicalize the epsilon contribution
+                if (numEpsilon == 1) {
+                    // Sort and append the indices to the new list
+                    newIndices.Append(indices.Partial({0, 2}));
+
+                    pos += 3;
+                }
+
+                // Vector for the sorted indices of the gammas
+                std::vector<Indices> gammas;
+
+                // Canonicalize the gamma contribution
+                for (unsigned i=0; i<numGamma; i++) {
+                    auto gammaIndices = indices.Partial({pos, pos+1});
+
+                    // Sort and append the indices to the new list
+                    auto sortedIndices = gammaIndices.Ordered();
+                    gammas.push_back(sortedIndices);
+
+                    pos += 2;
+                }
+
+                // Sort the indices of the gammas to respect the
+                // commutivity of gammas
+                std::sort(gammas.begin(), gammas.end(), [](const Indices& a, const Indices& b) {
+                    return a[0] < b[0];
+                });
+
+                // Append the now sorted gammas to all indices
+                for (auto& gammaIndices : gammas) {
+                    newIndices.Append(gammaIndices);
+                }
+
+                return TensorPointer(new EpsilonGammaTensor(numEpsilon, numGamma+1, newIndices));
+            }
 		public:
 			virtual std::string ToString() const override {
 				std::stringstream ss;
@@ -1490,6 +1787,11 @@ namespace Construction {
 
 				return ss.str();
 			}
+        public:
+            virtual bool operator==(const AbstractTensor& other) const override {
+                if (!other.IsEpsilonGammaTensor()) return false;
+                return indices == other.GetIndices();
+            }
 		public:
 			unsigned GetNumEpsilons() const { return numEpsilon; }
 			unsigned GetNumGammas() const { return numGamma; }
@@ -1503,7 +1805,7 @@ namespace Construction {
 			}
 
 			virtual Scalar Evaluate(const std::vector<unsigned>& args) const override {
-				Scalar result = 1;
+				Scalar result = Scalar::Fraction(1,1);
 				unsigned pos = 0;
 
 				// Calculate the epsilon contribution
@@ -1513,7 +1815,7 @@ namespace Construction {
 
 					result *= EpsilonTensor::GetEpsilonComponents(partialArgs);
 
-					if (result == 0.0) return result;
+					if (result.ToDouble() == 0.0) return result;
 
 					pos += 3;
 				}
@@ -1524,7 +1826,7 @@ namespace Construction {
 					auto partialArgs = Partial(args, {pos, pos+1});
 					result *= GammaTensor(indices, 0,3).Evaluate(partialArgs);// GammaTensor::Evaluate(partialArgs, GammaTensor(indices, 0,3));
 
-					if (result == 0.0) return result;
+					if (result.ToDouble() == 0.0) return result;
 
 					pos += 2;
 				}
@@ -1532,7 +1834,7 @@ namespace Construction {
 				return result;
 			}
 
-			virtual void SetIndices(const Indices& indices) {
+			virtual void SetIndices(const Indices& indices) override {
 				this->indices = indices;
 			}
 
@@ -1670,7 +1972,7 @@ namespace Construction {
 			std::getline(is, printed_text, ';');
 
 			// Read indices
-			auto indices = *Indices::Deserialize(is);
+			auto indices = *static_cast<Indices*>(Indices::Deserialize(is).get());
 
 			// Read type
 			int typeC;
@@ -1729,15 +2031,15 @@ namespace Construction {
 
 		class Tensor : public AbstractExpression {
 		public:
-			Tensor() : AbstractExpression(TENSOR), pointer(TensorPointer(new ZeroTensor())) { }
-			Tensor(const std::string& name, const std::string& printable, const Indices& indices) : AbstractExpression(TENSOR), pointer(TensorPointer(new AbstractTensor(name, printable, indices))) { }
+			Tensor() : pointer(TensorPointer(new ZeroTensor())) { }
+			Tensor(const std::string& name, const std::string& printable, const Indices& indices) : pointer(TensorPointer(new AbstractTensor(name, printable, indices))) { }
 
-			Tensor(const Tensor& other) : AbstractExpression(TENSOR), pointer(std::move(other.pointer->Clone())) { }
-			Tensor(Tensor&& other) : AbstractExpression(TENSOR), pointer(std::move(other.pointer)) { }
+			Tensor(const Tensor& other) : pointer(std::move(other.pointer->Clone())) { }
+			Tensor(Tensor&& other) : pointer(std::move(other.pointer)) { }
 
 			virtual ~Tensor() = default;
 		private:
-			Tensor(TensorPointer pointer) : AbstractExpression(TENSOR), pointer(std::move(pointer)) { }
+			Tensor(TensorPointer pointer) : pointer(std::move(pointer)) { }
 		public:
 			Tensor& operator=(const Tensor& other) {
 				pointer = std::move(other.pointer->Clone());
@@ -1762,6 +2064,8 @@ namespace Construction {
 			}
 		private:
 			typedef Scalar scalar_type;
+		public:
+			virtual bool IsTensorExpression() const override { return true; }
 		public:
 			static Tensor Zero() { return Tensor(TensorPointer(new ZeroTensor())); }
 			static Tensor One() { return Tensor(TensorPointer(new ScalarTensor(1))); }
@@ -1828,6 +2132,7 @@ namespace Construction {
 			bool IsEpsilonGamma() const { return pointer->IsEpsilonGammaTensor(); }
 			bool IsDelta() const { return pointer->IsDeltaTensor(); }
 
+			AbstractTensor::TensorType GetType() const { return pointer->GetType(); }
 			std::string TypeToString() const { return pointer->TypeToString(); }
 		public:
 			inline bool IsEqual(const Tensor& other) const { return pointer->IsEqual(*other.pointer); }
@@ -1862,10 +2167,20 @@ namespace Construction {
 
 				// Else, iterate over all summands
 				std::stringstream ss;
+                bool first = true;
 				for (unsigned i=0; i<summands.size(); i++) {
-					ss << summands[i];
-					if (i < summands.size() - 1) ss << " + ";
-                    if (vars) ss << std::endl;
+                    auto str = summands[i].ToString();
+
+                    if (!first) {
+                        if (str[0] == '-') ss << " - " << ((vars) ? "\n" : "") << str.substr(1);
+                        else ss << " + " << ((vars) ? "\n" : "") << str;
+                    }
+
+                    if (first) {
+                        first = false;
+
+                        ss << str;
+                    }
 				}
 				return ss.str();
 			}
@@ -1890,7 +2205,8 @@ namespace Construction {
 					std::vector<Tensor> result;
 
 					for (int i=0; i<As<AddedTensor>()->Size(); ++i) {
-						result.push_back(Tensor(std::move(As<AddedTensor>()->At(i)->Clone())));
+						auto tensor = Tensor(std::move(As<AddedTensor>()->At(i)->Clone()));
+						result.emplace_back(std::move(tensor));
 					}
 
 					return result;
@@ -1914,48 +2230,130 @@ namespace Construction {
 				\returns {Tensor}	The expanded tensorial expression
 			 */
 			Tensor Expand() const {
-				// Get the summands in the expression
-				auto summands = GetSummands();
+				// Look at sums
+				if (IsAdded()) {
+					auto summands = GetSummands();
+					std::vector<Tensor> tensors;
 
-				// Start result
-				Tensor result = Tensor::Zero();
+					// Iterate over all summands
+					for (auto& tensor : summands) {
+						// Expand the summand
+						auto expanded = tensor.Expand().GetSummands();
 
-				// Iterate over all summands
-				for (auto& tensor : summands) {
-					// If the tensor is scaled
-					//
-					if (tensor.IsScaled()) {
-						ScaledTensor* _tensor = static_cast<ScaledTensor*>(tensor.pointer.get());
-						scalar_type c = _tensor->GetScale();
-						auto _summands = Tensor(std::move(_tensor->GetTensor()->Clone())).GetSummands();
-						for (auto& _tensor : _summands) result += c * _tensor;
-					} else if (tensor.IsMultiplied()) {
-						MultipliedTensor* _tensor = static_cast<MultipliedTensor*>(tensor.pointer.get());
-
-						if (!_tensor->GetFirst()->IsAddedTensor() && _tensor->GetSecond()->IsAddedTensor()) {
-							auto first = Tensor(_tensor->GetFirst()->Clone());
-							auto _summands = Tensor(std::move(_tensor->GetSecond()->Clone())).GetSummands();
-							for (auto& second : _summands) result += first * second;
-						} else if (_tensor->GetFirst()->IsAddedTensor() && !_tensor->GetSecond()->IsAddedTensor()) {
-							auto second = Tensor(_tensor->GetSecond()->Clone());
-							auto _summands = Tensor(std::move(_tensor->GetFirst()->Clone())).GetSummands();
-							for (auto& first : _summands) result += first * second;
-						} else if (_tensor->GetFirst()->IsAddedTensor() && _tensor->GetSecond()->IsAddedTensor()) {
-							auto _summands1 = Tensor(std::move(_tensor->GetFirst()->Clone())).GetSummands();
-							auto _summands2 = Tensor(std::move(_tensor->GetSecond()->Clone())).GetSummands();
-							for (auto& first : _summands1) {
-								for (auto& second : _summands2) {
-									result += first * second;
-								}
+						for (auto& t : expanded) {
+							if (!t.IsZeroTensor()) {
+								tensors.push_back(t);
 							}
 						}
-					} else {
-						result += tensor;
 					}
+
+					// Add them together
+					return Tensor::Add(std::move(tensors));
 				}
 
-				return result;
+				if (IsScaled()) {
+					std::vector<Tensor> tensors;
+
+					// Get the tensor that is scaled and expand it
+					auto tensor_summands = Tensor(std::move(static_cast<ScaledTensor*>(pointer.get())->GetTensor()->Clone())).Expand().GetSummands();
+					auto scalar_summands = static_cast<ScaledTensor*>(pointer.get())->GetScale().Expand().GetSummands();
+
+					for (auto& c : scalar_summands) {
+						for (auto& tensor : tensor_summands) {
+							auto combined = (c * tensor);
+
+							/*for (auto& t : combined) {
+								if (!t.IsZeroTensor()) tensors.push_back(t);
+							}*/
+
+							if (!combined.IsZeroTensor()) tensors.push_back(combined);
+						}
+					}
+
+					// Add them together
+					return Tensor::Add(std::move(tensors));
+				}
+
+				if (IsMultiplied()) {
+					std::vector<Tensor> tensors;
+
+					// Expand left and right
+					auto expandedLeft = Tensor(std::move(static_cast<MultipliedTensor*>(pointer.get())->GetFirst()->Clone())).Expand().GetSummands();
+					auto expandedRight = Tensor(std::move(static_cast<MultipliedTensor*>(pointer.get())->GetSecond()->Clone())).Expand().GetSummands();
+
+					// Glue them together
+					for (auto& left : expandedLeft) {
+						for (auto& right : expandedRight) {
+							// Combine it
+							auto combined = (left * right);//.Expand().GetSummands();
+
+							/*for (auto& t : combined) {
+								if (!t.IsZeroTensor()) tensors.push_back(t);
+							}*/
+
+							if (!combined.IsZeroTensor()) tensors.push_back(combined);
+						}
+					}
+
+					// Add them together
+					return Tensor::Add(std::move(tensors));
+				}
+
+				// Nothing to do, return this
+				return *this;
 			}
+
+            /**
+                \brief Fast simplification of tensorial expressions
+
+                Fast simplification of tensorial expressions. It is based on
+                `Canonicalize` and assumes that its result is unique.
+             */
+            Tensor FastSimplify() const {
+                if (IsScaled()) {
+                    auto pair = SeparateScalefactor();
+                    return pair.first * pair.second.FastSimplify();
+                }
+
+                if (IsMultiplied()) {
+                    return Tensor(static_cast<MultipliedTensor*>(pointer.get())->GetFirst()->Clone()).FastSimplify() * Tensor(static_cast<MultipliedTensor*>(pointer.get())->GetSecond()->Clone()).FastSimplify();
+                }
+
+                if (!IsAdded()) {
+                    return Canonicalize();
+                }
+
+                // Get the summands
+                auto summands = GetSummands();
+
+                std::vector<Tensor> map_keys;
+                std::vector<Scalar> map_values;
+
+                for (auto& tensor : summands) {
+                    auto simplified = tensor.FastSimplify().SeparateScalefactor();
+
+                    auto it = std::find_if(map_keys.begin(), map_keys.end(), [&](const Tensor& _tensor) {
+                        return _tensor.ToString() == simplified.second.ToString();
+                    });
+
+                    if (it == map_keys.end()) {
+                        map_keys.push_back(simplified.second);
+                        map_values.push_back(simplified.first);
+                        continue;
+                    }
+
+                    map_values[std::distance(map_keys.begin(), it)] += simplified.first;
+                }
+
+                std::vector<Tensor> tensors;
+                for (int i=0; i<map_keys.size(); ++i) {
+                    auto tensor_ = map_keys[i] * map_values[i];
+                    if (tensor_.IsZeroTensor()) continue;
+                    tensors.push_back(tensor_);
+                }
+
+                return Add(tensors);
+            }
 
 			/**
 				\brief Simplify the expression
@@ -1969,6 +2367,8 @@ namespace Construction {
 				\returns {Tensor}	The simplified tensorial expression
 			 */
 			Tensor Simplify() const {
+                Construction::Logger::Debug("Simplify a tensor");
+
 				// Scaling heuristics
 				if (IsScaled()) {
 					auto it = SeparateScalefactor();
@@ -1989,7 +2389,7 @@ namespace Construction {
 				auto summands = GetSummands();
 
 				// Initialize
-                std::map<unsigned,Vector::Vector> vectors;
+                std::map<unsigned,Vector::Vector<double>> vectors;
 
 				// Get the indices of the resulting tensor
 				auto indices = GetIndices();
@@ -1997,12 +2397,13 @@ namespace Construction {
 
 				unsigned dimension = combinations.size();
 
-				Vector::Matrix M (dimension, summands.size());
+				Vector::Matrix<Construction::Tensor::Fraction> M (dimension, summands.size());
 
 				// Insert the values into the matrix
 				{
-					Common::TaskPool pool;
 					std::mutex mutex;
+
+                    Common::TaskPool pool(4);
 
 					for (int i=0; i<summands.size(); i++) {
 						pool.Enqueue([&](unsigned id, const Tensor& tensor) {
@@ -2018,10 +2419,17 @@ namespace Construction {
                         		}
 
                         		// Calculate the value of the assignment
-                        		float value = tensor(assignment).ToDouble();
+                                Construction::Tensor::Fraction value;
+
+                                {
+                                    auto _value = tensor(assignment);
+                                    if (_value.IsFraction())
+                                        value = *_value.As<Fraction>();
+                                    else value = Construction::Tensor::Fraction::FromDouble(_value.ToDouble());
+                                }
 
                         		// only lock and insert if necessary
-                        		if (value != 0) {
+                        		if (value != Construction::Tensor::Fraction(0)) {
                         			std::unique_lock<std::mutex> lock(mutex);
 
                         			// Insert the value into the matrix
@@ -2030,10 +2438,31 @@ namespace Construction {
 							}
 
 						}, i, summands[i].SeparateScalefactor().second);
-					}
+                    }
 
 					pool.Wait();
 				}
+
+                Construction::Logger::Debug("Finished insert into matrix");
+
+                // Remove double lines
+                {
+                    std::vector<Construction::Vector::Vector<Construction::Tensor::Fraction>> vector;
+                    for (int i = 0; i < M.GetNumberOfRows(); ++i) {
+                        auto v = M.GetRowVector(i);
+
+                        auto it = std::find(vector.begin(), vector.end(), v);
+                        if (it == vector.end()) {
+                            vector.push_back(v);
+                            continue;
+                        }
+
+                        // Set all entries in the row to zero
+                        for (int j = 0; j < M.GetNumberOfColumns(); ++j) {
+                            M(i, j) = Common::BigNumber(0);
+                        }
+                    }
+                }
 
                 // Reduce to reduced matrix echelon form
                 M.ToRowEchelonForm();
@@ -2043,8 +2472,8 @@ namespace Construction {
 
                 int k=0;
 
-                std::vector<scalar_type> _map_scalars;
-                std::vector<Tensor> _map_tensors;
+                std::vector<scalar_type> map_scalar;
+				std::vector<Tensor> map_tensor;
 
                 // Iterate over the rows
                 unsigned max = std::min(static_cast<unsigned>(M.GetNumberOfRows()), static_cast<unsigned>(summands.size()));
@@ -2057,8 +2486,8 @@ namespace Construction {
                 	bool foundBase=false;
 
                     for (int i=k; i<summands.size(); i++) {
-                        if (M(currentRow,i) == 0) continue;
-                        else if (M(currentRow,i) == 1 && !foundBase) {
+                        if (M(currentRow,i) == Construction::Tensor::Fraction(0)) continue;
+                        else if (M(currentRow,i) == Construction::Tensor::Fraction(1) && !foundBase) {
                             // switch mode
                             foundBase = true;
                             k = i+1;
@@ -2067,11 +2496,7 @@ namespace Construction {
                             scalar = summands[i].SeparateScalefactor().first;
                             tensor = summands[i].SeparateScalefactor().second;//.Simplify();
                         } else if (foundBase) {
-                            if (std::fmod(M(currentRow,i),1) == 0) {
-                                scalar += summands[i].SeparateScalefactor().first * Scalar(M(currentRow,i),1);
-                            } else {
-                                scalar += summands[i].SeparateScalefactor().first * M(currentRow,i);
-                            }
+                            scalar += summands[i].SeparateScalefactor().first * Scalar::Fraction(M(currentRow,i));
                         } else if (i == summands.size()-1 && !foundBase) {
                             // If all the values were zero, no further information
                             // can be found in the matrix, thus break the loop
@@ -2084,20 +2509,19 @@ namespace Construction {
                     }
 
                 	// Add to the tensor map
-                	auto it = std::find(_map_scalars.begin(), _map_scalars.end(), scalar);
-                	if (it == _map_scalars.end()) {
-                		_map_scalars.push_back(scalar);
-                		_map_tensors.push_back(tensor);
+                	auto it = std::find(map_scalar.begin(), map_scalar.end(), scalar);
+                	if (it == map_scalar.end()) {
+                        map_scalar.push_back(scalar);
+						map_tensor.push_back(tensor);
                 	} else {
-                		auto id = it - _map_scalars.begin();
-                		_map_tensors[id] += tensor;
+						map_tensor[std::distance(map_scalar.begin(), it)] += tensor;
                 	}
                 }
 
                 // Add everything to the result
-                for (unsigned i=0; i<_map_scalars.size(); i++) {
-                	result += _map_scalars[i] * _map_tensors[i];
-                }
+				for (int i=0; i<map_scalar.size(); ++i) {
+					result += map_scalar[i] * map_tensor[i];
+				}
 
 				return result;
 			}
@@ -2108,12 +2532,33 @@ namespace Construction {
 				} else if (pointer->IsSubstitute()) {
 					auto res = Tensor(std::move(static_cast<SubstituteTensor*>(pointer.get())->GetTensor()->Clone())).SeparateScalefactor();
 					return { res.first, Tensor::Substitute(res.second, GetIndices()) };
-				} else {
+				} else if (pointer->IsScalar()) {
+                    auto scale = static_cast<ScalarTensor*>(pointer.get())->GetValue();
+                    return { scale, Tensor::One() };
+                } else if (pointer->IsMultipliedTensor()) {
+                    auto a1 = Tensor(TensorPointer(As<MultipliedTensor>()->GetFirst()->Clone())).SeparateScalefactor();
+                    auto a2 = Tensor(TensorPointer(As<MultipliedTensor>()->GetSecond()->Clone())).SeparateScalefactor();
+                    return { a1.first * a2.first , a1.second * a2.second };
+                } else if (pointer->IsAddedTensor()) {
+                    auto factorized = FactorizeOveralScale();
+
+                    // Do not just return factorized.SeparateScalefactor() since
+                    // this may return in a way too large cascade of function calls.
+                    // Separate this by hand
+
+                    // If the new tensor is not scaled, there was nothing to factor out
+                    if (!factorized.IsScaled()) return { 1, *this };
+
+                    // Return the scale and the rest
+                    return { factorized.As<ScaledTensor>()->GetScale(), Tensor(TensorPointer(factorized.As<ScaledTensor>()->GetTensor()->Clone())) };
+                } else {
 					return { 1, *this };
 				}
 			}
 
             Tensor CollectByVariables() const {
+                Construction::Logger::Debug("Collect by variables in tensor ", ToString());
+
                 // Expand first
                 auto expanded = Expand();
 
@@ -2150,38 +2595,47 @@ namespace Construction {
                 Tensor result = Tensor::Zero();
 
                 for (int i=0; i<variables.size(); ++i) {
-                    result += variables[i] * tensors[i];
+                    result += variables[i] * tensors[i].FastSimplify().FactorizeOveralScale();
                 }
 
                 return result;
             }
 
 			Tensor SubstituteVariable(const scalar_type& variable, const scalar_type& expression) const {
+                if (IsZeroTensor()) return *this;
+
 				auto summands = GetSummands();
 
 				Tensor result = Tensor::Zero();
 
 				for (auto& _tensor : summands) {
 					auto tmp = _tensor.SeparateScalefactor();
-					result += tmp.first.Substitute(variable, expression) * tmp.second;
+					result += tmp.first.Substitute(variable, expression).Expand() * tmp.second;
 				}
 
 				return result;
 			}
 
 			Tensor SubstituteVariables(const std::vector<std::pair<scalar_type, scalar_type>>& substitutions) const {
+                Construction::Logger::Debug("Substitute variables into ", ToString());
+
 				Tensor result = *this;
 
 				for (auto& substitution : substitutions) {
 					result = std::move(result.SubstituteVariable(substitution.first, substitution.second));
 				}
 
-				return result.CollectByVariables();
+                Construction::Logger::Debug("Finished substitution. Result is: ", result.ToString(), ". Collect by variables ...");
+
+				return result;//.CollectByVariables();
 			}
 
 			Tensor RedefineVariables(const std::string& name, int offset=0) const {
+                // Factorize overal scale first
+                auto factorized = FactorizeOveralScale().SeparateScalefactor();
+
 				// Separate the summands, if available
-				auto summands = GetSummands();
+				auto summands = factorized.second.GetSummands();
 
 				Tensor result = Tensor::Zero();
 				unsigned variableCount = 1 + offset;
@@ -2189,7 +2643,13 @@ namespace Construction {
 				for (auto& tensor : summands) {
 					// If the tensor is scaled, redefine the free variable in front (if present)
 					if (tensor.IsScaled() && tensor.As<ScaledTensor>()->GetScale().HasVariables()) {
-						result += scalar_type(name, variableCount++) * Tensor(tensor.As<ScaledTensor>()->GetTensor()->Clone());
+                        auto scale = tensor.As<ScaledTensor>()->GetScale().FactorizeOveralScale();
+
+                        if (scale.IsMultiplied()) {
+                            result += scalar_type(scale.As<MultipliedScalar>()->GetFirst()->Clone()) * scalar_type(name, variableCount++) * Tensor(tensor.As<ScaledTensor>()->GetTensor()->Clone());
+                        } else {
+                            result += scalar_type(name, variableCount++) * Tensor(tensor.As<ScaledTensor>()->GetTensor()->Clone());
+                        }
 					} else if (tensor.IsMultiplied()) {
 						MultipliedTensor* _tensor = static_cast<MultipliedTensor*>(tensor.pointer.get());
 						auto first = Tensor(_tensor->GetFirst()->Clone()).SeparateScalefactor();
@@ -2202,16 +2662,24 @@ namespace Construction {
 					}
 				}
 
-				return result;
+				return factorized.first * result;
 			}
 
 			std::vector<std::pair<scalar_type, Tensor>> ExtractVariables(Tensor* inhomogeneousPart = nullptr) const {
 				// First expand and get summands
-				auto summands = GetSummands();
+				auto expanded = Expand();
+
+				if (expanded.IsZeroTensor()) {
+					Construction::Logger::Warning("Expanding ", ToString(), " yields zero");
+				} else {
+					Construction::Logger::Debug("Expanded the equation into ", expanded);
+				}
+
+				auto summands = Expand().GetSummands();
 
 				// Start result
-				std::vector<scalar_type> result_scalars;
-				std::vector<Tensor> result_tensors;
+				std::vector<scalar_type> map_scalar_;
+				std::vector<Tensor> map_tensor_;
 
 				// Iterate over all the summands
 				for (auto& _tensor : summands) {
@@ -2220,70 +2688,39 @@ namespace Construction {
 					auto scalar = tmp.first;
 					auto tensor = tmp.second;
 
-					// Expand scalar part
-					auto scalarSummands = scalar.GetSummands();
-					for (auto& v : scalarSummands) {
-						// If the scalar is a variable
-						if (v.IsVariable()) {
-							auto it = std::find(result_scalars.begin(), result_scalars.end(), v);
-							if (it == result_scalars.end()) {
-								result_scalars.push_back(v);
-								result_tensors.push_back(tensor);
-							} else {
-								result_tensors[it - result_scalars.begin()] += tensor;
-							}
-						}
-						// if the scalar is a number, just add the tensor to the inhomogeneous part
-						else if (v.IsNumeric()) {
-							if (inhomogeneousPart != nullptr) (*inhomogeneousPart) += _tensor;
-						}
-						// if the scalar is a multiplication, we knwo that at least one of both
-						// factors is a variable
-						else if (v.IsMultiplied()) {
-							auto first = v.As<MultipliedScalar>()->GetFirst()->Clone();
-							auto second = v.As<MultipliedScalar>()->GetSecond()->Clone();
+                    auto s = scalar.SeparateVariablesFromRest();
 
-							bool a1 = v.As<MultipliedScalar>()->GetFirst()->IsVariable();
-							bool a2 = v.As<MultipliedScalar>()->GetFirst()->IsNumeric();
+                    // Add inhomogeneous part
+                    if (!(s.second.IsNumeric() && s.second.ToDouble() == 0) && inhomogeneousPart != nullptr) {
+                        (*inhomogeneousPart) += _tensor;
+                    }
 
-							bool b1 = v.As<MultipliedScalar>()->GetSecond()->IsVariable();
-							bool b2 = v.As<MultipliedScalar>()->GetSecond()->IsNumeric();
+                    for (auto& ss : s.first) {
+                        auto variable = ss.first;
+                        auto factor = ss.second;
 
-							if (a1 && b2) {
-								scalar_type s = scalar_type(std::move(first));
-								Tensor newTensor = scalar_type(std::move(second)) * tensor;
+                        // Throw exception, do not support quadratic terms
+                        if (factor.HasVariables()) {
+                            assert(false);
+                        }
 
-								auto it = std::find(result_scalars.begin(), result_scalars.end(), s);
-								if (it == result_scalars.end()) {
-									result_scalars.push_back(s);
-									result_tensors.push_back(newTensor);
-								} else {
-									result_tensors[it - result_scalars.begin()] += newTensor;
-								}
-							} else if (a2 && b1) {
-								scalar_type s = scalar_type(std::move(second));
-								Tensor newTensor = scalar_type(std::move(first)) * tensor;
+                        auto it = std::find(map_scalar_.begin(), map_scalar_.end(), variable);
 
-								auto it = std::find(result_scalars.begin(), result_scalars.end(), s);
-								if (it == result_scalars.end()) {
-									result_scalars.push_back(s);
-									result_tensors.push_back(newTensor);
-								} else {
-									result_tensors[it - result_scalars.begin()] += newTensor;
-								}
-							} else {
-								// Throw exception, do not support quadratic terms
-								assert(false);
-							}
-						}
-					}
+                        if (it == map_scalar_.end()) {
+							map_scalar_.push_back(variable);
+							map_tensor_.push_back(factor*tensor);
+                        } else {
+							map_tensor_[std::distance(map_scalar_.begin(), it)] += factor * tensor;
+                        }
+                    }
 				}
 
 				// Turn this into the result
 				std::vector< std::pair<scalar_type, Tensor> > result;
-				for (unsigned i=0; i<result_scalars.size(); i++) {
-					result.push_back({ result_scalars[i], result_tensors[i] });
-				}
+                for (int i=0; i<map_scalar_.size(); ++i) {
+                    Construction::Logger::Debug("Found variable ", map_scalar_[i], " in front of tensor ", map_tensor_[i]);
+                    result.push_back({ map_scalar_[i], map_tensor_[i] });
+                }
 
 				return result;
 			}
@@ -2293,7 +2730,12 @@ namespace Construction {
 
 
 			 */
-			std::pair< Vector::Matrix, std::vector<scalar_type> > ToHomogeneousLinearSystem() const {
+			std::pair< Vector::Matrix<Construction::Tensor::Fraction>, std::vector<scalar_type> > ToHomogeneousLinearSystem() const {
+                // Ignore zero tensors
+                if (IsZeroTensor()) {
+                    return { Vector::Matrix<Construction::Tensor::Fraction>(0,0), { } };
+                }
+
 				// First expand and get summands
 				auto variables = ExtractVariables();
 
@@ -2306,7 +2748,7 @@ namespace Construction {
 				unsigned m = variables.size();
 
 				// Create matrix
-				Vector::Matrix M(n, m);
+				Vector::Matrix<Construction::Tensor::Fraction> M(n, m);
 				std::vector<scalar_type> _variables;
 
 				// Iterate over all variables
@@ -2326,14 +2768,45 @@ namespace Construction {
                         }
 
                         // Plug the value of the assignment into the matrix
-                        M(j,i) = (pair.second)(assignment).ToDouble();
+                        auto s = (pair.second)(assignment);
+                        if (s.IsFraction()) {
+                            M(j,i) = *s.As<Fraction>();
+                        } else if (s.IsFloatingPoint()) {
+                            M(j, i) = Fraction::FromDouble(s.ToDouble());
+                        }
 					}
 
 					i++;
 				}
 
+                Construction::Logger::Debug("Finished matrix for equation");
+
 				return { M, _variables };
 			}
+        public:
+            Tensor FactorizeOveralScale() const {
+                scalar_type overalScale = Scalar::Fraction(1,1);
+                std::vector<Tensor> tensors;
+
+                auto summands = GetSummands();
+                bool first=true;
+
+                for (auto& summand : summands) {
+                    auto pair = summand.SeparateScalefactor();
+
+                    if (first) {
+                        overalScale = pair.first;
+                        first = false;
+                    }
+
+                    // If this is a different factor, return the original tensor
+                    if (pair.first != overalScale) return *this;
+
+                    tensors.push_back(pair.second);
+                }
+
+                return overalScale * Tensor::Add(tensors);
+            }
 		public:
 			std::vector<Indices> PermuteIndices(const Indices& indices) const {
 				auto tensorIndices = GetIndices();
@@ -2395,6 +2868,8 @@ namespace Construction {
                 \returns    Tensor          The symmetrized tensor
              */
 			Tensor Symmetrize(const Indices& indices) const {
+                Construction::Logger::Debug("Start symmetrization of ", ToString());
+
 				// Handle sums differently
 				if (IsAdded()) {
 					auto summands = GetSummands();
@@ -2405,9 +2880,10 @@ namespace Construction {
 
 					// Symmetrize all the summands in parallel
 					{
-						Common::TaskPool pool (8);
 						bool firstEntry = true;
 						std::mutex mutex;
+
+                        Common::TaskPool pool(4);
 
 						symmetrizedSummands = pool.Map<std::pair<scalar_type,Tensor>, Tensor>(summands, [&](const Tensor& tensor) {
 							auto result = tensor.Symmetrize(indices).SeparateScalefactor();
@@ -2426,6 +2902,11 @@ namespace Construction {
 
 							return result;
 						});
+
+                        // Sort by indices
+                        std::sort(symmetrizedSummands.begin(), symmetrizedSummands.end(), [&](const std::pair<scalar_type, Tensor>& a, const std::pair<scalar_type, Tensor>& b) {
+                            return a.second.GetIndices() < b.second.GetIndices();
+                        });
 					}
 
 					Tensor result = Tensor::Zero();
@@ -2488,22 +2969,63 @@ namespace Construction {
 							}
 						}
 
-						for (auto& pair : reduced) {
-							if (allTheSameScale) result += pair.second;
-							else result += pair.first * pair.second;
+						// Add them together
+						{
+							std::vector<Tensor> combined;
+
+							for (auto& pair : reduced) {
+								// Ignore zeroes
+								if (pair.second.IsZeroTensor()) continue;
+
+								if (allTheSameScale) combined.push_back(pair.second);
+								else combined.push_back(pair.first * pair.second);
+							}
+
+                            // Sort all the tensors in the sum
+                            if (allTheSameScale) {
+                                std::sort(combined.begin(), combined.end(), [](const Tensor& a, const Tensor& b) {
+                                    return a.GetIndices() < b.GetIndices();
+                                });
+                            }
+
+							result = Tensor::Add(std::move(combined));
 						}
 
-						if (allTheSameScale) result *= lastScale;
+						if (allTheSameScale) {
+							result *= lastScale;
+						}
 
 						return overalScale * result;
 
 					} else {
+						std::vector<Tensor> combined;
+
+                        std::vector<Tensor> map_keys;
+                        std::vector<scalar_type> map_values;
+
 						// Iterate over all symmetrized pairs
 						for (auto& pair : symmetrizedSummands) {
-							result += pair.first * pair.second;
+							// Ignore zeroes
+							if (pair.second.IsZeroTensor()) continue;
+
+							//combined.push_back(pair.first * pair.second);
+                            auto it = std::find_if(map_keys.begin(), map_keys.end(), [&](const Tensor& _tensor) {
+                                return _tensor.ToString() == pair.second.ToString();
+                            });
+
+                            if (it == map_keys.end()) {
+                                map_keys.push_back(pair.second);
+                                map_values.push_back(pair.first);
+                            } else {
+                                map_values[std::distance(map_keys.begin(), it)] += pair.first;
+                            }
 						}
 
-						return result;
+                        for (int i=0; i<map_keys.size(); ++i) {
+                            combined.push_back(map_keys[i] * map_values[i]);
+                        }
+
+						return std::move(Tensor::Add(std::move(combined)));
 					}
 				}
 
@@ -2533,13 +3055,16 @@ namespace Construction {
 
 					// Move the tensors on the stack
 					{
-						Common::TaskPool pool (8);
+                        Common::TaskPool pool(4);
+
 						stack = pool.Map<Tensor,Indices>(permutations, [this](const Indices& indices) {
 							Tensor clone = *this;
 							clone.SetIndices(indices);
 							return clone.Canonicalize();
 						});
 					}
+
+					std::vector<Tensor> combined;
 
 					// Iterate over all
 					while (stack.size() > 0) {
@@ -2560,7 +3085,7 @@ namespace Construction {
 							// If the tensor is the same after canonicalization modulo scale,
 							// change the scale of the original tensor and remove the new one
 							// from the stack.
-							if (newTerm.GetType() == current.GetType() && newTerm.GetIndices() == current.GetIndices()) {
+                            if (newTerm.ToString() == current.ToString()) {
 								scale += newScale;
 								stack.erase(stack.begin() + i);
 								i--;
@@ -2568,9 +3093,22 @@ namespace Construction {
 						}
 
 						if (!scale.IsNumeric() || scale.ToDouble() != 0) {
-							result += scale * current;
+							if (!current.IsZeroTensor()) combined.push_back(scale * current);
 						}
 					}
+
+                    // Sort
+                    std::sort(combined.begin(), combined.end(), [&](const Tensor& a, const Tensor& b) {
+                        return a.GetIndices() < b.GetIndices();
+                    });
+
+                    if (combined.size() == 1) {
+                        result = std::move(combined[0]);
+                    } else {
+                        result = Tensor::Add(std::move(combined));
+                    }
+
+                    result = result.FactorizeOveralScale();
 				}
 
 				// Scale
@@ -2602,9 +3140,10 @@ namespace Construction {
 
 					// Symmetrize all the summands in parallel
 					{
-						Common::TaskPool pool (8);
 						bool firstEntry = true;
 						std::mutex mutex;
+
+                        Common::TaskPool pool(4);
 
 						symmetrizedSummands = pool.Map<std::pair<scalar_type,Tensor>, Tensor>(summands, [&](const Tensor& tensor) {
 							auto result = tensor.AntiSymmetrize(indices).SeparateScalefactor();
@@ -2738,8 +3277,9 @@ namespace Construction {
 
 					// Move the tensors on the stack
 					{
-						Common::TaskPool pool (8);
                         auto originalIndices = GetIndices();
+
+                        Common::TaskPool pool(4);
 
 						stack = pool.Map<Tensor,Indices>(permutations, [this, &originalIndices](const Indices& indices) {
 							Tensor clone = *this;
@@ -2802,16 +3342,18 @@ namespace Construction {
                 Exchange symmetrizes the tensor
              */
             Tensor ExchangeSymmetrize(const Indices& from, const Indices& indices) const {
+                Construction::Logger::Debug("Start exchange symmetrization of ", ToString());
+
                 if (IsAdded()) {
                     auto summands = GetSummands();
 
                     std::vector<std::pair<scalar_type,Tensor>> symmetrizedSummands;
 					bool hasSameScale=true;
+                    bool hasVariables=false;
 					scalar_type overalScale = 0;
 
 					// Symmetrize all the summands in parallel
 					{
-						Common::TaskPool pool (1);
 						bool firstEntry = true;
 						std::mutex mutex;
                         auto originalIndices = GetIndices();
@@ -2821,6 +3363,8 @@ namespace Construction {
                         for (int i=0; i<indices.Size(); ++i) {
                             mapping[from[i]] = indices[i];
                         }
+
+                        Common::TaskPool pool(4);
 
 						symmetrizedSummands = pool.Map<std::pair<scalar_type,Tensor>, Tensor>(summands, [&](const Tensor& tensor) {
                             // Call exchange symmetrization on the summand
@@ -2838,9 +3382,31 @@ namespace Construction {
 
 							// If this has a different scale, remember this
                             if (overalScale != result.first && overalScale != -result.first) hasSameScale = false;
+                            if (!hasVariables) {
+                                if (result.first.HasVariables()) hasVariables = true;
+                            }
 
-							return result;
-						});
+                            return result;
+                        });
+
+                        // If all have the same scale, expand the sum and sort by indices
+                        if (!hasVariables) {
+                            auto symmetrizedSummandsClone = symmetrizedSummands;
+                            symmetrizedSummands.clear();
+
+                            for (auto& pair : symmetrizedSummandsClone) {
+                                auto summands_ = pair.second.GetSummands();
+
+                                for (auto& s : summands_) {
+                                    symmetrizedSummands.push_back({ pair.first, s });
+                                }
+                            }
+
+                            // Canonicalize
+                            std::sort(symmetrizedSummands.begin(), symmetrizedSummands.end(), [&](const std::pair<scalar_type,Tensor>& a, const std::pair<scalar_type,Tensor>& b) {
+                                return a.second.GetIndices() < b.second.GetIndices();
+                            });
+                        }
 					}
 
 					Tensor result = Tensor::Zero();
@@ -2920,12 +3486,33 @@ namespace Construction {
 						return overalScale * result;
 
                     } else {
+                        std::vector<Tensor> map_keys;
+                        std::vector<scalar_type> map_values;
+
                         // Iterate over all symmetrized pairs
 						for (auto& pair : symmetrizedSummands) {
-							result += pair.first * pair.second;
+                            // Ignore zeroes
+                            if (pair.second.IsZeroTensor()) continue;
+
+                            auto it = std::find_if(map_keys.begin(), map_keys.end(), [&](const Tensor& _tensor) {
+                                return _tensor.ToString() == pair.second.ToString();
+                            });
+
+                            if (it == map_keys.end()) {
+                                map_keys.push_back(pair.second);
+                                map_values.push_back(pair.first);
+                            } else {
+                                map_values[std::distance(map_keys.begin(), it)] += pair.first;
+                            }
 						}
 
-						return result;
+                        // Combine
+                        std::vector<Tensor> combined;
+                        for (int i=0; i<map_keys.size(); ++i) {
+                            combined.push_back(map_keys[i] * map_values[i]);
+                        }
+
+						return Tensor::Add(combined);
                     }
                 }
 
@@ -2955,7 +3542,7 @@ namespace Construction {
                     // Return the exchange symmetrized tensor
                     return newScale * s_.second;
                 } else {
-                    return Scalar(1,2) * ( *this + clone );
+                    return Scalar(1,2) * ( *this + clone ).Canonicalize();
                 }
             }
         public:
@@ -3044,6 +3631,47 @@ namespace Construction {
 
 			Tensor operator*(const Tensor& other) const {
 				return Tensor(std::move(AbstractTensor::Multiply(*pointer, *other.pointer)));
+			}
+		public:
+			/**
+			 	This adds multiple tensors efficiently into one.
+
+			 	NOTE: DO NOT USE THIS WHEN YOU ARE NOT ABSOLUTELY SURE
+			 		  THAT YOU KNOW WHAT YOU ARE DOING, THIS WILL
+			 		  NOT USE ANY OF THE SIMPLIFICATION HEURISTICS
+			 */
+		    static Tensor Add(const std::vector<Tensor>& factors) {
+				if (factors.size() == 0) return Tensor::Zero();
+                if (factors.size() == 1) return factors[0];
+
+				std::vector<TensorPointer> pointers;
+				for (auto& tensor : factors) {
+                    // Ignore zeroes
+                    if (tensor.IsZeroTensor()) continue;
+
+					pointers.push_back(std::move(tensor.pointer->Clone()));
+				}
+
+                // If there was no non-zero tensor, return zero
+                if (pointers.size() == 0) return Tensor::Zero();
+
+				return Tensor(TensorPointer(new AddedTensor(std::move(pointers), factors[0].GetIndices())));
+			}
+
+			Tensor ForEachOnSummands(std::function<Tensor(const Tensor&)> fn) const {
+				// Split into the summands
+				auto summands = GetSummands();
+
+                Common::TaskPool pool;
+
+				// Map in parallel
+                std::vector<Tensor> result = pool.MapEmit<Tensor, Tensor>(summands,  [&](const Tensor& tensor, std::function<void(Tensor&&)> emit) -> void {
+                    auto transformed = fn(std::move(tensor));
+
+                    if (!transformed.IsZeroTensor()) emit(std::move(transformed));
+                });
+
+				return Tensor::Add(std::move(result));
 			}
 		public:
 			size_t Size() const {

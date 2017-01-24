@@ -1,5 +1,7 @@
 #pragma once
 
+#include <common/logger.hpp>
+
 #include <tensor/index.hpp>
 #include <tensor/tensor.hpp>
 #include <tensor/substitution.hpp>
@@ -48,6 +50,7 @@ namespace Construction {
             Tensor::Tensor Expand(const Tensor::Tensor& tensor);
             Tensor::Tensor Simplify(const Tensor::Tensor& tensor);
             Tensor::Tensor RedefineVariables(const Tensor::Tensor& tensor);
+            Tensor::Tensor RenameIndices(const Tensor::Tensor& tensor, const Indices& from, const Indices& to);
 
             Tensor::Tensor Add(const Tensor::Tensor& first, const Tensor::Tensor& second);
             Tensor::Tensor Scale(const Tensor::Tensor& first, const Scalar& scalar);
@@ -134,6 +137,12 @@ namespace Construction {
                 indices.Append(block3);
                 indices.Append(block4);
 
+                // Build indices for block symmetries
+                auto block = block3;
+                block.Append(block4);
+                block.Append(block1);
+                block.Append(block2);
+
                 // Generate the tensor
                 auto tensor = API::Arbitrary(indices);
 
@@ -154,17 +163,13 @@ namespace Construction {
                     tensor = std::move(tensor.Symmetrize(block4));
                 }
 
-                // Build indices for block symmetries
-                auto block = block3;
-                block.Append(block4);
-                block.Append(block1);
-                block.Append(block2);
-
-                // Exchange symmetrize
-                tensor = tensor.ExchangeSymmetrize(indices, block);
+                // Exchange symmetrize if necessary
+                if (l == r && ld == rd) {
+                    tensor = std::move(tensor.ExchangeSymmetrize(indices, block));
+                }
 
                 // Collect terms
-                tensor = tensor.Simplify().RedefineVariables("e");
+                tensor = std::move(tensor.Simplify().RedefineVariables("e"));
 
                 return tensor;
             }
@@ -215,6 +220,25 @@ namespace Construction {
 
             Tensor::Tensor RedefineVariables(const Tensor::Tensor& tensor) {
                 return tensor.RedefineVariables("e");
+            }
+
+            Tensor::Tensor RenameIndices(const Tensor::Tensor& tensor, const Indices& from, const Indices& to) {
+                auto clone = tensor;
+
+                if (from.Size() != to.Size()) return clone;
+
+                // If the tensor is zero, return
+                if (clone.IsZeroTensor()) return clone;
+                if (clone.IsScalar()) return clone;
+
+                std::map<Tensor::Index, Tensor::Index> mapping;
+                for (unsigned i=0; i<from.Size(); ++i) {
+                    mapping[from[i]] = to[i];
+                }
+
+                clone.SetIndices(clone.GetIndices().Shuffle(mapping));
+
+                return clone.Canonicalize();
             }
 
             bool IsSymmetric(const Tensor::Tensor& tensor, const Indices& indices) {
@@ -287,8 +311,35 @@ namespace Construction {
             Substitution HomogeneousSystem(const Tensor::Tensor& tensor) {
                 auto system = tensor.ToHomogeneousLinearSystem();
 
+                Construction::Logger::Debug("Start reducing the equation ...");
+
+                // Remove double lines
+                {
+                    std::vector<Construction::Vector::Vector<Construction::Tensor::Fraction>> vector;
+                    for (int i = 0; i < system.first.GetNumberOfRows(); ++i) {
+                        auto v = system.first.GetRowVector(i);
+
+                        auto it = std::find(vector.begin(), vector.end(), v);
+                        if (it == vector.end()) {
+                            vector.push_back(v);
+                            continue;
+                        }
+
+                        // Set all entries in the row to zero
+                        for (int j = 0; j < system.first.GetNumberOfColumns(); ++j) {
+                            system.first(i, j) = Tensor::Fraction(0,1);
+                        }
+                    }
+                }
+
+                Construction::Logger::Debug("Matrix is ", system.first.ToString(false));
+
                 // Reduce
                 system.first.ToRowEchelonForm();
+
+                Construction::Logger::Debug("Matrix is ", system.first.ToString(false));
+
+                Construction::Logger::Debug("Finished Gaussian elimination.");
 
                 Substitution result;
 
@@ -296,27 +347,40 @@ namespace Construction {
                 for (int i=0; i<system.first.GetNumberOfRows(); i++) {
                     auto vec = system.first.GetRowVector(i);
 
+                    Construction::Logger::Debug("Row = ", vec);
+
                     // If the vector has zero norm, we get no further information => quit
-                    if (vec * vec == 0) break;
+                    if (vec.IsZero()) break;
 
                     bool isZero = true;
-                    Scalar lhs = 0;
-                    Scalar rhs = 0;
+                    Scalar lhs = Scalar::Fraction(0,1);
+                    Scalar rhs = Scalar::Fraction(0,1);
 
                     // Iterate over all the components
                     for (int j=0; j<vec.GetDimension(); j++) {
-                        if (vec[j] == 0 && isZero) continue;
-                        if (vec[j] == 1 && isZero) {
+                        //Construction::Logger::Debug("j = ", j, ", vec[j] = ", vec[j], ", isZero = ", (isZero) ? "yes" : "no");
+
+                        if (vec[j] == Construction::Tensor::Fraction(0,1) && isZero) continue;
+                        if (vec[j] == Construction::Tensor::Fraction(1,1) && isZero) {
                             lhs = system.second[j];
                             isZero = false;
-                        } else if (vec[j] != 0) {
-                            rhs += (-system.second[j] * vec[j]);
+                        } else if (vec[j] != Construction::Tensor::Fraction(0,1)) {
+                            rhs += (-system.second[j] * Tensor::Scalar::Fraction(vec[j].GetNumerator(), vec[j].GetDenominator()));
                         }
+                    }
+
+                    Construction::Logger::Debug("Found ", lhs, " = ", rhs);
+
+                    // If the left hand side is not a variable, throw exception
+                    if (lhs.IsNumeric() && lhs.ToDouble() == 0) {
+                        throw Tensor::InvalidSubstitutionException();
                     }
 
                     // Add to the result
                     result.Insert(lhs, rhs);
                 }
+
+                Construction::Logger::Debug("Created substitution");
 
                 return result;
             }

@@ -6,6 +6,8 @@
 #include <map>
 #include <algorithm>
 
+#include <tensor/expression.hpp>
+
 #include <common/error.hpp>
 #include <common/printable.hpp>
 #include <common/range.hpp>
@@ -395,9 +397,9 @@ namespace Construction {
 		/**
 			\class Indices
 		 */
-		class Indices : public Printable, Serializable<Indices> {
+		class Indices : public Serializable<Indices>, public AbstractExpression {
 		public:
-			Indices() = default;
+			Indices() { }
 
 			Indices(std::initializer_list<Index> indices) {
 				for (auto index : indices) {
@@ -527,8 +529,28 @@ namespace Construction {
 					if (indices[i] == index) return i;
 				return -1;
 			}
- 		public:
-			virtual std::string ToString() const {
+        public:
+            bool operator<(const Indices& other) const {
+                for (int i=0; i<std::min(Size(), other.Size()); ++i) {
+                    if (indices[i] < other[i]) return true;
+                    else if (indices[i] > other[i]) return false;
+                }
+
+                // The indices so far were equal
+                return Size() < other.Size();
+            }
+
+            bool operator>(const Indices& other) const {
+                for (int i = 0; i < std::min(Size(), other.Size()); ++i) {
+                    if (indices[i] > other[i]) return true;
+                    else if (indices[i] < other[i]) return false;
+                }
+
+                // The indices so far were equal
+                return Size() > other.Size();
+            }
+        public:
+			virtual std::string ToString() const override {
 				std::stringstream ss;
 
 				bool lastOneWasDown=true;
@@ -562,14 +584,14 @@ namespace Construction {
 
 			std::string ToCommand() const {
 				std::stringstream ss;
-				ss << "\"";
+				ss << "{";
 
 				for (int i=0; i< indices.size(); i++) {
 					ss << indices[i];
 					if (i != indices.size()-1) ss << " ";
 				}
 
-				ss << "\"";
+				ss << "}";
 
 				return ss.str();
 			}
@@ -658,25 +680,6 @@ namespace Construction {
 
 				// Start recursion
 				fn({}, {});
-
-				/*std::vector<unsigned> v1, v2;
-				//pool.Enqueue(fn, v1, v2);
-				threads.emplace_back(std::thread(fn, v1, v2));
-
-				// Wait for the recursion to finish
-				while (true) {
-					std::unique_lock<std::mutex> lock(mutex);
-					if (result.size() == size) {
-						std::unique_lock<std::mutex> lock(finishedMutex);
-						finished = true;
-						break;
-					}
-				}
-
-				// Join the remaining threads
-				/*for (auto& thread : threads) {
-					thread.detach();
-				}*/
 
 				return result;
 			}
@@ -849,22 +852,31 @@ namespace Construction {
 				}
 				return result;
 			}
+
+            static Indices GetNamed(const std::vector<std::string>& indices, const Range& range = {1,3}) {
+                Indices result;
+
+                for (auto& index : indices) {
+                    result.Insert(Index(index, range));
+                }
+
+                return result;
+            }
         public:
             Indices Shuffle(std::map<Index, Index> transformation) const {
                 Indices result;
 
                 for (auto& index : indices) {
                     if (transformation.find(index) == transformation.end()) {
-                        // TODO: throw exception
-                        return *this;
-                    }
-
-                    result.Insert(transformation[index]);
+                        result.Insert(index);
+                    } else {
+						result.Insert(transformation[index]);
+					}
                 }
 
                 return result;
             }
-		public:
+        public:
 			/**
 				\brief Returns if the given indices are a permutation of the given ones
 
@@ -930,6 +942,47 @@ namespace Construction {
 			bool ContainsIndex(const Index& index) const {
 				return std::find(indices.begin(), indices.end(), index) != indices.end();
 			}
+        public:
+            static Indices FromString(std::string code) {
+                Indices indices;
+
+                std::string current;
+
+                // Ignore brackets at the beginning and end if present
+                if (code[0] == '{') code = code.substr(1);
+                if (code[code.size()-1] == '}') code = code.substr(0, code.size()-1);
+
+                for (int pos=0; pos<code.length(); pos++) {
+                    char c = code[pos];
+
+                    if (c == ' ') {
+                        if (current.length() == 0) break;
+
+                        Tensor::Index index(current, current, {1,3});
+                        if (indices.ContainsIndex(index)) {
+                            // throw error
+                            return indices;
+                        }
+
+                        indices.Insert(index);
+                        current = "";
+                    } else {
+                        current.append(std::string(1,c));
+                    }
+                }
+
+                if (current.length() != 0) {
+                    Tensor::Index index(current, current, {1, 3});
+                    if (indices.ContainsIndex(index)) {
+                        // throw error
+                        return indices;
+                    }
+
+                    indices.Insert(index);
+                }
+
+                return indices;
+            }
 		public:
 			/**
 				\brief Check if the indices are in order
@@ -1065,7 +1118,10 @@ namespace Construction {
                 return result;
             }
 		public:
-			void Serialize(std::ostream& os) const {
+			virtual std::unique_ptr<AbstractExpression> Clone() const override { return std::move(ExpressionPointer(new Indices(*this))); }
+			virtual bool IsIndicesExpression() const override { return true; }
+		public:
+			void Serialize(std::ostream& os) const override {
 				// Write the size of the indices
 				unsigned size = indices.size();
 				os.write(reinterpret_cast<const char*>(&size), sizeof(size));
@@ -1076,7 +1132,7 @@ namespace Construction {
 				}
 			}
 
-			static std::unique_ptr<Indices> Deserialize(std::istream& is) {
+			static std::unique_ptr<AbstractExpression> Deserialize(std::istream& is) {
 				// Read size
 				unsigned size;
 				is.read(reinterpret_cast<char*>(&size), sizeof(unsigned));
@@ -1095,7 +1151,6 @@ namespace Construction {
 		private:
 			std::vector<Index> indices;
 		};
-
 
 		std::vector<unsigned> IndexAssignments::operator()(const Indices& indices) const {
 			std::vector<unsigned> result;

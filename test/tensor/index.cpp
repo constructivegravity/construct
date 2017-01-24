@@ -8,7 +8,7 @@ SCENARIO("Tensor indices", "[indices]") {
 
         WHEN(" printing the TeX code") {
             THEN(" we have {abc}") {
-                REQUIRE(indices.ToString() == "{abc}");
+                REQUIRE(indices.ToString() == "_{abc}");
             }
         }
 
@@ -16,7 +16,7 @@ SCENARIO("Tensor indices", "[indices]") {
             auto partial = indices.Partial({1,2});
 
             THEN(" the TeX code has no a anymore") {
-                REQUIRE(partial.ToString() == "{bc}");
+                REQUIRE(partial.ToString() == "_{bc}");
             }
         }
 
@@ -102,13 +102,6 @@ SCENARIO("Tensor indices", "[indices]") {
         WHEN(" looking at all partitions") {
             auto newIndices = Construction::Tensor::Indices::GetRomanSeries(6, {1,3});
             auto result = newIndices.GetAllPartitions({2,2,2}, true);
-
-            for (auto& partition : result) {
-                for (auto& indices : partition) {
-                    std::cout << indices << " ";
-                }
-                std::cout << std::endl;
-            }
 
             REQUIRE(result.size() == 15);
 

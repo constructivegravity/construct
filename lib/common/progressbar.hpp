@@ -34,6 +34,7 @@ namespace Construction {
         public:
             void Start() {
                 started = true;
+                time.Start();
             }
 
             void Increase() {
@@ -78,7 +79,7 @@ namespace Construction {
 
                 std::cerr << std::fixed << std::setprecision(1) << (static_cast<double>(pos)/max * 100) << " % ";
 
-                std::cerr << "(" << pos << " / " << max << ")";
+                std::cerr << "(" << pos << " / " << max << ")  " << time << "    ";
 
                 // Go back to the beginning
                 std::cerr << "\r";
@@ -89,6 +90,7 @@ namespace Construction {
             std::atomic<unsigned> width;
 
             std::thread thread;
+            TimeMeasurement time;
 
             bool started;
             bool running;

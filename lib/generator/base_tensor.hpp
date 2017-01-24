@@ -153,107 +153,18 @@ namespace Construction {
                     possibleIndices = GenerateEvenRank(indices);
                 }
 
+                std::vector<Tensor::Tensor> tensors;
+
                 for (auto& newIndices : possibleIndices) {
                     // Create variable
                     Tensor::Scalar variable ("e", ++variableCounter);
 
-                    result += variable * Tensor::Tensor::EpsilonGamma(numEpsilon, numGammas, newIndices);
+                    tensors.push_back(variable * Tensor::Tensor::EpsilonGamma(numEpsilon, numGammas, newIndices));
                 }
 
-                return result;
+                return Tensor::Tensor::Add(tensors);
             }
         };
-
-        /*
-        class BaseTensorGenerator {
-        public:
-            TensorContainer Generate(unsigned order) {
-                // Stuff
-                assert(order > 1);
-
-                // Generate indices
-                auto indices = Indices::GetRomanSeries(order, {1,3}, 0);
-
-                return Generate(indices);
-            }
-
-            TensorContainer Generate(const Indices& indices) {
-                unsigned order = indices.Size();
-                for (auto& index : indices) {
-                    if (index.GetRange() != Common::Range(1,3)) {
-                        // throw error
-                    }
-                }
-
-                TensorContainer result;
-
-                // Generate partitions
-                unsigned numEpsilons = 0;
-                unsigned numGammas   = 0;
-                std::vector<std::vector<Indices>> partitions;
-                {
-                    std::vector<unsigned> vec;
-                    if (order % 2 != 0) {
-                        vec.push_back(3);
-                        order -= 3;
-                        numEpsilons = 1;
-                    }
-                    while (order > 0) {
-                        vec.push_back(2);
-                        order -= 2;
-                        numGammas++;
-                    }
-
-                    // Get partitions
-                    partitions = indices.GetAllPartitions(vec, true);
-                }
-
-                // Generate all the tensors with the given partitions
-                for (auto& partition : partitions) {
-
-                    // Join all indices in the partition
-                    Tensor::Indices newIndices;
-
-                    for (auto& p : partition) {
-                        newIndices.Append(p);
-                    }
-
-                    if  (newIndices == indices)
-                        result.Insert(std::make_shared<Tensor::EpsilonGammaTensor>(numEpsilons, numGammas, newIndices));
-                    else {
-                        result.Insert(
-                                std::make_shared<Tensor::SubstituteTensor>(
-                                     std::make_shared<Tensor::EpsilonGammaTensor>(numEpsilons, numGammas, newIndices),
-                                     indices
-                                )
-                        );
-                    }
-
-                    /*Tensor::Tensor T;
-                    //TensorPointer T;
-                    if (numEpsilons == 1) {
-                        T = EpsilonTensor(partition[0]);
-                        //T = std::make_shared<EpsilonTensor>(EpsilonTensor(partition[0]));
-                    } else {
-                        T = GammaTensor(partition[0]);
-                        //T = std::make_shared<GammaTensor>(GammaTensor(partition[0]));
-                    }
-
-                    int max = (numEpsilons == 1) ? numGammas : numGammas - 1;
-                    for (int i = 1; i <= max; i++) {
-                        Tensor::Tensor S = T;
-                        T = MultipliedTensor(std::make_shared<Tensor::Tensor>(S), std::make_shared<GammaTensor>(GammaTensor(partition[i])));
-                        //T = std::make_shared<MultipliedTensor>(S, std::make_shared<GammaTensor>(GammaTensor(partition[i])));
-                    }
-
-                    result.Insert(std::move(T));*//*
-                }
-
-                return result;
-            }
-        private:
-
-        };*/
 
     }
 }

@@ -491,14 +491,13 @@ namespace Construction {
 
         private:
             // Padding helper
-            std::string PaddedString(int c, char s, int length) const {
+            static std::string PaddedString(int c, char s, int length) {
                 std::string result = std::to_string(c);
                 if (result.size() < length) {
                     result.insert(result.begin(), s);
                 }
                 return result;
             }
-
         public:
             std::string ToString(const std::string &format = "%F") const {
                 std::string result = format;
