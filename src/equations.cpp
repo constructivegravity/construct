@@ -156,6 +156,7 @@ int main(int argc, char** argv) {
     // Print the results
     for (auto it = Construction::Equations::Coefficients::Instance()->begin(); it != Construction::Equations::Coefficients::Instance()->end(); ++it) {
         //auto tensor = it->second->Get()->RedefineVariables("e", offset);
+        //auto tensor = substitution(*it->second->GetAsync()).CollectByVariables();
         auto tensor = substitution(*it->second->GetAsync()).Simplify();
 
         auto summands = tensor.GetSummands();

@@ -2627,7 +2627,7 @@ namespace Construction {
 
                 Construction::Logger::Debug("Finished substitution. Result is: ", result.ToString(), ". Collect by variables ...");
 
-				return result.CollectByVariables();
+				return result;//.CollectByVariables();
 			}
 
 			Tensor RedefineVariables(const std::string& name, int offset=0) const {
