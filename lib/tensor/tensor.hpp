@@ -2653,7 +2653,7 @@ namespace Construction {
 				auto expanded = Expand();
 
 				if (expanded.IsZeroTensor()) {
-					Construction::Logger::Warning("Expanding ", ToString(), " yields zero");
+					Construction::Logger::Debug("Expanding ", ToString(), " yields zero");
 				} else {
 					Construction::Logger::Debug("Expanded the equation into ", expanded);
 				}
