@@ -31,6 +31,9 @@ void Expression::Serialize(std::ostream& os) const {
 		case ExpressionType::VOID_TYPE:
 			static_cast<VoidExpression*>(pointer.get())->Serialize(os);
 			break;
+		case ExpressionType::STRING:
+			static_cast<StringExpression*>(pointer.get())->Serialize(os);
+			break;
 		case ExpressionType::UNKNOWN:
 			break;
 	}
@@ -65,6 +68,10 @@ std::unique_ptr<Expression> Expression::Deserialize(std::istream& is) {
 
 		case ExpressionType::VOID_TYPE:
 			result = std::unique_ptr<Expression>(new Expression(std::move(VoidExpression::Deserialize(is))));
+			break;
+
+		case ExpressionType::STRING:
+			result = std::unique_ptr<Expression>(new Expression(std::move(StringExpression::Deserialize(is))));
 			break;
 
 		case ExpressionType::UNKNOWN:

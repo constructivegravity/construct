@@ -139,7 +139,7 @@ namespace Construction {
                     auto ref = pair.second;
 
                     if (ref->IsFinished()) {
-                        ref->SetTensor(merged(*ref->GetAsync()));
+                        ref->SetTensor(merged(*ref->GetAsync()).FastSimplify());
 
                         Construction::Logger::Debug("Updated coefficient: ", ref->ToString());
 
@@ -204,7 +204,7 @@ namespace Construction {
             };
         public:
             // Constructor
-            Equation(const std::string& code) : state(WAITING) {
+            Equation(const std::string& code) : state(WAITING), code(code) {
                 // Parse the code
                 Parse(code);
             }
@@ -222,6 +222,8 @@ namespace Construction {
 
             bool IsEmpty() const { return isEmpty; }
         public:
+            std::string GetCode() const { return code; }
+        public:
             /**
                 \brief Parses the expression
 
@@ -238,7 +240,10 @@ namespace Construction {
                 int coeffStart = -1;
                 std::string current;
                 std::string temp;
+                std::string tmp2;
                 unsigned l, ld, r, rd;
+                bool foundOptional=false;
+                bool exchangeSymmetry = true;
                 std::string id;
                 unsigned mode=0;
 
@@ -274,6 +279,9 @@ namespace Construction {
                             r = std::stoi(temp);
                         } else if (mode == 4) {
                             rd = std::stoi(temp);
+                        } else if (mode == 5) {
+                            foundOptional = true;
+                            tmp2 = temp;
                         }
 
                         temp = "";
@@ -284,6 +292,14 @@ namespace Construction {
                     if (c == '>') {
                         inCoeff = false;
                         mode = 0;
+
+                        if (foundOptional) {
+                            if (temp == "no") {
+                                exchangeSymmetry = false;
+                            }
+
+                            temp = tmp2;
+                        }
 
                         // Bring the coefficients into canonical order.
                         // Since we have the exchange symmetry, this is of course
@@ -309,7 +325,11 @@ namespace Construction {
                         }
 
                         // Get the coefficient reference
-                        auto ref = Coefficients::Instance()->Get(l, ld, r, rd, id);
+                        auto ref = Coefficients::Instance()->Get(l, ld, r, rd, id, exchangeSymmetry);
+
+                        tmp2 = "";
+                        exchangeSymmetry = true;
+                        foundOptional = false;
 
                         // Replace the coefficient with a dummy name
                         {
@@ -363,7 +383,10 @@ namespace Construction {
                 }
 
                 substName = "subst" + Coefficient::GetRandomString(3);
+                testName = "test" + Coefficient::GetRandomString(3);
+
                 eq = substName + " = HomogeneousSystem(" + current + "):";
+                test = testName + " = " + current + ":";
             }
         public:
             /**
@@ -418,6 +441,9 @@ namespace Construction {
                     // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
                     auto subst = Session::Instance()->Get(substName).As<Tensor::Substitution>();
 
+                    // Store the substitution in the
+                    this->substitution = subst;
+
                     Construction::Logger::Debug("Found substitution ", subst, " from equation ", eq);
 
                     //  IV. Give the substitution to the ticket
@@ -458,12 +484,120 @@ namespace Construction {
                 }
             }
         public:
+            bool Test(Tensor::Tensor* output=nullptr) {
+                // Wait to be finished
+                Wait();
+
+                // Execute the test
+                CLI cli;
+                cli(test);
+
+                // Get the result
+                auto testResult = Session::Instance()->Get(testName).As<Tensor::Tensor>().CollectByVariables();
+
+                // Improve the expression
+                {
+                    auto summands = testResult.GetSummands();
+                    std::vector<Tensor::Tensor> simplified;
+
+                    for (auto& tensor : summands) {
+                        auto pair = tensor.SeparateScalefactor();
+                        auto s = pair.second.Simplify();
+
+                        if (!s.IsZeroTensor()) {
+                            simplified.push_back(pair.first * s);
+                        }
+                    }
+
+                    testResult = Tensor::Tensor::Add(simplified);
+                }
+
+                // Set the output
+                if (output) {
+                    *output = testResult;
+                }
+
+                // Check if the tensor is zero
+                return testResult.IsZeroTensor();
+            }
+        public:
+            Tensor::Substitution GetSubstition() {
+                if (state != SOLVED) Wait();
+                return substitution;
+            }
+        public:
             void Wait() {
                 std::unique_lock<std::mutex> lock(mutex);
 
                 variable.wait(lock, [&]() {
                     return state == SOLVED;
                 });
+            }
+
+            std::string ToLaTeX() const {
+                CLI cli;
+                std::string output = cli.ToLaTeX(eq);
+
+                // Crawl for all indices
+                std::vector<std::pair<std::string, std::string>> crawledCoefficients;
+                {
+                    size_t pos = 0;
+                    while (true) {
+                        pos = eq.find("RenameIndices(", pos);
+                        if (pos == std::string::npos) break;
+                        pos += 14;
+
+                        std::string name, indices;
+
+                        while (eq[pos] != ',') {
+                            name += std::string(1, eq[pos]);
+                            ++pos;
+                        }
+
+                        // Ignore the first indices block { }
+                        pos = eq.find("}, ", pos);
+                        pos += 3;
+
+                        // Get the indices
+                        while (eq[pos] != ')') {
+                            indices += std::string(1, eq[pos]);
+                            ++pos;
+                        }
+
+                        crawledCoefficients.push_back({ name, indices });
+                    }
+                }
+
+                // Replace all the coefficients
+                size_t pos = 0;
+                for (auto& pair : crawledCoefficients) {
+                    // Jump to the position in the output
+                    pos = output.find(pair.first, pos);
+                    if (pos == std::string::npos) return "Error building LaTeX code";
+
+                    // Find the coefficient
+                    CoefficientReference ref;
+                    for (auto& coef : coefficients) {
+                        if (coef->GetName() == pair.first) {
+                            ref = coef;
+                            break;
+                        }
+                    }
+
+                    auto text = ref->ToString(false) + "_" + pair.second;
+
+                    // Replace in the output
+                    output.erase(pos, pair.first.size());
+                    output.insert(pos, text);
+
+                    pos += text.size();
+                }
+
+                // Replace the substitution by a zero
+                output.erase(0, substName.size());
+                output.insert(0, "0");
+
+                return output;
             }
         private:
             std::thread thread;
@@ -473,9 +607,14 @@ namespace Construction {
 
             bool isEmpty;
 
+            std::string code;
             std::string eq;
+            std::string test;
             std::string substName;
+            std::string testName;
             std::vector<CoefficientReference> coefficients;
+
+            Tensor::Substitution substitution;
 
             std::vector<ObserverFunction> observers;
 

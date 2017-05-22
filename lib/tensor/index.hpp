@@ -550,7 +550,7 @@ namespace Construction {
                 return Size() > other.Size();
             }
         public:
-			virtual std::string ToString() const {
+			virtual std::string ToString() const override {
 				std::stringstream ss;
 
 				bool lastOneWasDown=true;
@@ -1121,7 +1121,7 @@ namespace Construction {
 			virtual std::unique_ptr<AbstractExpression> Clone() const override { return std::move(ExpressionPointer(new Indices(*this))); }
 			virtual bool IsIndicesExpression() const override { return true; }
 		public:
-			void Serialize(std::ostream& os) const {
+			void Serialize(std::ostream& os) const override {
 				// Write the size of the indices
 				unsigned size = indices.size();
 				os.write(reinterpret_cast<const char*>(&size), sizeof(size));

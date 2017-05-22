@@ -29,7 +29,7 @@ int main(int argc, char** argv) {
     Construction::Logger::File("file", "apple.log");
 
     Construction::Logger logger;
-    logger.SetDebugLevel("screen", Construction::Common::DebugLevel::ERROR);
+    logger.SetDebugLevel("screen", Construction::Common::DebugLevel::WARNING);
 
     if (argc < 2) {
         logger << Construction::Logger::ERROR << "You need to specify the file that needs to be solved" << Construction::Logger::endl;
@@ -71,7 +71,7 @@ int main(int argc, char** argv) {
     std::ifstream file (argv[1]);
     if (!file.is_open()) return -1;
 
-    std::vector<std::unique_ptr<Construction::Equations::Equation>> equations;
+    std::vector<std::shared_ptr<Construction::Equations::Equation>> equations;
 
     // Read line per line and add them as equations
     std::string line;
@@ -80,12 +80,17 @@ int main(int argc, char** argv) {
         if (line == "") continue;
 
         // Add the equation
-        auto eq = std::unique_ptr<Construction::Equations::Equation>(new Construction::Equations::Equation(line));
+        auto eq = std::make_shared<Construction::Equations::Equation>(line);
 
         // If the equation isn't empty, add it
         if (!eq->IsEmpty()) {
             equations.push_back(std::move(eq));
         }
+    }
+
+    // Print the code
+    for (auto& eq : equations) {
+        std::cerr<< " \033[36m" << "> " << eq->ToLaTeX() << "\033[0m" << std::endl;
     }
 
     // Calculate number of coefficients and equations
@@ -121,14 +126,6 @@ int main(int argc, char** argv) {
         eq->Wait();
     }
 
-    // Simplify all coefficients
-    for (auto& pair : *Construction::Equations::Coefficients::Instance()) {
-        auto ref = pair.second;
-
-        // Update
-        ref->SetTensor(ref->GetAsync()->Simplify());
-    }
-
     // Print the result
     int offset = 0;
 
@@ -159,7 +156,8 @@ int main(int argc, char** argv) {
     // Print the results
     for (auto it = Construction::Equations::Coefficients::Instance()->begin(); it != Construction::Equations::Coefficients::Instance()->end(); ++it) {
         //auto tensor = it->second->Get()->RedefineVariables("e", offset);
-        auto tensor = substitution(*it->second->Get());
+        //auto tensor = substitution(*it->second->GetAsync()).CollectByVariables();
+        auto tensor = substitution(*it->second->GetAsync()).Simplify();
 
         auto summands = tensor.GetSummands();
 
@@ -174,7 +172,15 @@ int main(int argc, char** argv) {
 
             if (t.IsScaled()) {
                 auto s = t.SeparateScalefactor();
-                std::cout << "     \033[32m" << s.first << "\033[0m * \033[33m";
+                std::cout << "     \033[32m";
+
+                if (s.first.IsAdded()) {
+                    std::cout << "(" << s.first << ")";
+                } else {
+                    std::cout << s.first;
+                }
+
+                std::cout << "\033[0m * \033[33m";
 
                 if (s.second.IsAdded()) {
                     std::cout << "(" << s.second << ")";
@@ -194,6 +200,26 @@ int main(int argc, char** argv) {
 
         std::cout << std::endl;
     }
+
+    // Finally check all the coefficients
+    /*
+    {
+        Construction::Logger::Debug("Run a final test ...");
+        int violations = 0;
+        for (auto &eq : equations) {
+            Construction::Tensor::Tensor result;
+
+            // Check the equation
+            auto correct = eq->Test(&result);
+
+            if (!correct) {
+                Construction::Logger::Error("Equation `", eq->ToLaTeX(), "` is violated.\nFound ", result);
+                ++violations;
+            }
+        }
+        Construction::Logger::Debug("Found ", violations, " violation(s)");
+    }
+     */
 
     time.Stop();
     std::cerr << time << std::endl;

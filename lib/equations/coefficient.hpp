@@ -46,8 +46,8 @@ namespace Construction {
             };
         public:
             // Constructor
-            Coefficient(unsigned l, unsigned ld, unsigned r, unsigned rd, const std::string& id)
-                : l(l), ld(ld), r(r), rd(rd), id(id), state(DEFERRED)
+            Coefficient(unsigned l, unsigned ld, unsigned r, unsigned rd, const std::string& id, bool exchangeSymmetry=true)
+                : l(l), ld(ld), r(r), rd(rd), id(id), exchangeSymmetry(exchangeSymmetry), state(DEFERRED)
             {
                 // Generate random name
                 name = id + GetRandomString(4);
@@ -123,6 +123,11 @@ namespace Construction {
             }
         public:
             std::string GetName() const { return name; }
+
+            unsigned GetNumberOfLeftIndices() const { return l; }
+            unsigned GetNumberOfLeftDerivativeIndices() const { return ld; }
+            unsigned GetNumberOfRightIndices() const { return r; }
+            unsigned GetNumberOfRightDerivativeIndices() const { return rd; }
         public:
             /**
                 Returns the tensor if it was calculated, otherwise it blocks
@@ -296,7 +301,7 @@ namespace Construction {
                         Notify();
 
                         // Do the block exchange if necessary
-                        if (l == r && ld == rd) {
+                        if (l == r && ld == rd && exchangeSymmetry) {
                             auto exchanged = block3;
                             exchanged.Append(block4);
                             exchanged.Append(block1);
@@ -378,11 +383,13 @@ namespace Construction {
                 return output;
             }
         public:
-            std::string ToString() const {
+            std::string ToString(bool includeResult=true) const {
                 std::stringstream ss;
-                ss << "#<" << id << ":" << l << ":" << ld << ":" << r << ":" << rd << ">";
+                ss << "#<" << id << ":" << l << ":" << ld << ":" << r << ":" << rd;
+                if (!exchangeSymmetry) ss << ":no";
+                ss << ">";
 
-                if (state == FINISHED) {
+                if (state == FINISHED && includeResult) {
                     ss << " = " << tensor->ToString();
                 }
 
@@ -403,6 +410,7 @@ namespace Construction {
             unsigned l, ld, r, rd;
             std::string id;
             std::string name;
+            bool exchangeSymmetry;
 
             std::shared_ptr<Tensor::Tensor> tensor;
         };
@@ -425,9 +433,14 @@ namespace Construction {
                 unsigned r;
                 unsigned rd;
                 std::string id;
+                bool exchangeSymmetry;
 
                 bool operator==(const Definition& other) const {
-                    return l == other.l && r == other.r && ld == other.ld && rd == other.rd && id == other.id;
+                    return l == other.l && r == other.r && ld == other.ld && rd == other.rd && id == other.id && exchangeSymmetry == other.exchangeSymmetry;
+                }
+
+                bool operator!=(const Definition& other) const {
+                    return !(*this == other);
                 }
 
                 bool operator<(const Definition& other) const {
@@ -442,6 +455,9 @@ namespace Construction {
 
                     if (rd > other.rd) return false;
                     else if (rd < other.rd) return true;
+
+                    if (!exchangeSymmetry && other.exchangeSymmetry) return false;
+                    else if (exchangeSymmetry && !other.exchangeSymmetry) return true;
 
                     return id < other.id;
                 }
@@ -459,6 +475,9 @@ namespace Construction {
                     if (rd > other.rd) return false;
                     else if (rd < other.rd) return true;
 
+                    if (!exchangeSymmetry && other.exchangeSymmetry) return false;
+                    else if (exchangeSymmetry && !other.exchangeSymmetry) return true;
+
                     return id <= other.id;
                 }
 
@@ -474,20 +493,20 @@ namespace Construction {
             class DefinitionHasher {
             public:
                 size_t operator()(const Definition& d) const {
-                    return std::hash<unsigned>()(d.l) ^ std::hash<unsigned>()(d.ld) ^ std::hash<unsigned>()(d.r) ^ std::hash<unsigned>()(d.rd) ^ std::hash<std::string>()(d.id);
+                    return std::hash<unsigned>()(d.l) ^ std::hash<unsigned>()(d.ld) ^ std::hash<unsigned>()(d.r) ^ std::hash<unsigned>()(d.rd) ^ std::hash<std::string>()(d.id) ^ std::hash<bool>()(d.exchangeSymmetry);
                 }
             };
         public:
-            CoefficientReference Get(unsigned l, unsigned ld, unsigned r, unsigned rd, const std::string& id) {
+            CoefficientReference Get(unsigned l, unsigned ld, unsigned r, unsigned rd, const std::string& id, bool exchangeSymmetry=true) {
                 Definition d;
-                d.l = l; d.ld = ld; d.r = r; d.rd = rd; d.id = id;
+                d.l = l; d.ld = ld; d.r = r; d.rd = rd; d.id = id; d.exchangeSymmetry = exchangeSymmetry;
 
                 auto it = map.find(d);
 
                 if (it != map.end()) {
                     return it->second;
                 } else {
-                    CoefficientReference ref = std::make_shared<Coefficient>(l, ld, r, rd, id);
+                    CoefficientReference ref = std::make_shared<Coefficient>(l, ld, r, rd, id, exchangeSymmetry);
                     map.insert({ d, ref });
                     return ref;
                 }
