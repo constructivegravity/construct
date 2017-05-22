@@ -590,6 +590,18 @@ namespace Construction {
 
                 return { result, rest };
             }
+
+            Scalar Simplify() const {
+                auto pair = SeparateVariablesFromRest();
+
+                Scalar result;
+                for (auto& vars : pair.first) {
+                    result += vars.first * vars.second;
+                }
+
+                result += pair.second;
+                return std::move(result);
+            }
         public:
             bool IsProportionalTo(const Scalar& other, Scalar* factor = nullptr);
         public:

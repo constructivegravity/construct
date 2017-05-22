@@ -124,6 +124,14 @@ namespace Construction {
                 Construction::Logger::Debug("Apply substitutions (from ", substitutions.size(), " tickets)");
 
                 // Merge
+                {
+                    int i=1;
+                    for (auto& subst : substitutions) {
+                        Construction::Logger::Debug("Substitution #", i, ": ", subst);
+                        ++i;
+                    }
+                }
+
                 auto merged = Tensor::Substitution::Merge(substitutions);
 
                 Construction::Logger::Debug("Merged substitutions into ", merged);
@@ -134,11 +142,19 @@ namespace Construction {
                 // Lock all the coefficients
                 CoefficientsLock coeffsLock;
 
+                // Print all coefficients before any update
+                Construction::Logger::Debug("==================== UPDATE ALL COEFFICIENTS ======================");
+                for (auto& pair : *Coefficients::Instance()) {
+                    Construction::Logger::Debug("Coefficient before update: ", pair.second->ToString());
+                }
+
                 // Iterate over all coefficients and apply the
                 for (auto& pair : *Coefficients::Instance()) {
                     auto ref = pair.second;
 
                     if (ref->IsFinished()) {
+                        Construction::Logger::Debug("Update coefficient ", ref->GetName());
+
                         ref->SetTensor(merged(*ref->GetAsync()).FastSimplify());
 
                         Construction::Logger::Debug("Updated coefficient: ", ref->ToString());
@@ -147,6 +163,8 @@ namespace Construction {
                         Session::Instance()->Set(ref->GetName(), *ref->GetAsync());
                     }
                 }
+
+                Construction::Logger::Debug("==================== FINISHED UPDATE ======================");
 
                 // Set the state back to serving
                 state = SERVING;

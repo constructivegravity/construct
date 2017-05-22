@@ -59,7 +59,7 @@ namespace Construction {
 
                                 // Decrease the number of remaining tasks
                                 std::atomic_fetch_sub_explicit(this->remainingTasks[id].get(), static_cast<unsigned>(1), std::memory_order_relaxed);
-                            }
+			    }
 
                             // Notify that a task was finished
                             this->condition_finished.notify_all();
@@ -80,7 +80,7 @@ namespace Construction {
                             }
 
                             // spawn a helper for the top helper
-                            SpawnHelper(current_helper, false);
+                            SpawnHelper(current_helper, false); 
 
                             // Add the ID to the list
                             helper_ids[current_helper] += 1;
@@ -97,7 +97,7 @@ namespace Construction {
                             }
 
                             // Spawn a helper for this
-                            SpawnHelper(current, true);
+                            SpawnHelper(current, true); 
 
                             // Add the ID to the list
                             worker_ids[current] += 1;
@@ -170,11 +170,12 @@ namespace Construction {
 
                     // Increase the number of active tasks;
                     std::atomic_fetch_add_explicit(this->remainingTasks[std::this_thread::get_id()].get(), static_cast<unsigned>(1), std::memory_order_relaxed);
+ 
                 }
 
                 // Wake up one thread and return the future
                 condition.notify_one();
-
+                
                 return res;
             }
 

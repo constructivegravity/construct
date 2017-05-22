@@ -2398,7 +2398,7 @@ namespace Construction {
                     Common::TaskPool pool(4);
 
 					for (int i=0; i<summands.size(); i++) {
-						Parallel::GlobalTaskPool::Instance()->Enqueue([&](unsigned id, const Tensor& tensor) {
+						pool.Enqueue([&](unsigned id, const Tensor& tensor) {
 
 							for (int j=0; j<dimension; j++) {
 								IndexAssignments assignment;
@@ -2432,7 +2432,7 @@ namespace Construction {
 						}, i, summands[i].SeparateScalefactor().second);
                     }
 
-					Parallel::GlobalTaskPool::Instance()->Wait();
+					pool.Wait();
 				}
 
                 Construction::Logger::Debug("Finished insert into matrix");
