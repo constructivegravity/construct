@@ -36,7 +36,7 @@ namespace Construction {
         REGISTER_ARGUMENT(Arbitrary, 0, ArgumentType::INDEX);
 
         /**
-            \class EpsilonCommand
+            \class Epsi nCommand
 
             Command that generates one tensor for given indices out of
             epsilons. It uses the API function.
@@ -44,6 +44,10 @@ namespace Construction {
         CLI_COMMAND(Epsilon)
             std::string Help() const {
                 return "Epsilon(<Indices>)";
+            }
+
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                return "\\epsilon_" + args[0];
             }
 
             Expression Execute() const {
@@ -65,6 +69,10 @@ namespace Construction {
                 return "InverseEpsilon(<Indices>)";
             }
 
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                return "\\epsilon^" + args[0];
+            }
+
             Expression Execute() const {
                 return API::InverseEpsilon(GetIndices(0));
             }
@@ -82,6 +90,10 @@ namespace Construction {
         CLI_COMMAND(Gamma)
             std::string Help() const {
                 return "Gamma(<Indices>)";
+            }
+
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                return "\\gamma_" + args[0];
             }
 
             Expression Execute() const {
@@ -103,6 +115,10 @@ namespace Construction {
                 return "InverseGamma(<Indices>)";
             }
 
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                return "\\gamma^" + args[0];
+            }
+
             Expression Execute() const {
                 return API::InverseGamma(GetIndices(0));
             }
@@ -120,6 +136,10 @@ namespace Construction {
         CLI_COMMAND(EpsilonGamma)
             std::string Help() const {
                 return "EpsilonGamma(<Indices>)";
+            }
+
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                return "\\epsilon_" + args[0];
             }
 
             Expression Execute() const {
@@ -141,6 +161,10 @@ namespace Construction {
                 return "Delta(<Indices>)";
             }
 
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                return "\\delta_" + args[0];
+            }
+
             Expression Execute() const {
                 return API::Delta(GetIndices(0));
             }
@@ -157,6 +181,10 @@ namespace Construction {
         CLI_COMMAND(Coefficient)
                 std::string Help() const {
                     return "Coefficient(<Numeric>, <Numeric>, <Numeric>, <Numeric>)";
+                }
+
+                std::string ToLaTeX(const std::vector<std::string>& args) const {
+                    return Execute().ToString();
                 }
 
                 Expression Execute() const {
@@ -182,6 +210,21 @@ namespace Construction {
 
             static bool Cachable() {
                 return false;
+            }
+
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                std::string output = args[0];
+
+                for (auto i=1; i<args.size(); ++i) {
+                    std::string p = args[i];
+                    if (p[0] == '-') {
+                        output = output + " - " + p.substr(1);
+                    } else {
+                        output = output + " + " + args[i];
+                    }
+                }
+
+                return output;
             }
 
             Expression Execute() const {
@@ -213,6 +256,19 @@ namespace Construction {
                 return false;
             }
 
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                std::string output = args[0];
+
+                for (auto i=1; i<args.size(); ++i) {
+                    output = output + " - ";
+                    if (args[i].find("+") != std::string::npos || args[i].find("-") != std::string::npos) {
+                        output = output + "(" + args[i] + ")";
+                    } else output = output + args[i];
+                }
+
+                return output;
+            }
+
             Expression Execute() const {
                 auto result = GetTensors(0);
 
@@ -242,6 +298,15 @@ namespace Construction {
                 return false;
             }
 
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                std::string output = "-";
+                if (args[0].find("+") != std::string::npos || args[0].find("-") != std::string::npos) {
+                    output = output + "(" +args[0] + ")";
+                } else output = output + args[0];
+
+                return output;
+            }
+
             Expression Execute() const {
                 return -GetTensors(0);
             }
@@ -260,6 +325,13 @@ namespace Construction {
                 return "Scale(<Tensor>, <Numeric>)";
             }
 
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                if (args[0].find("+") != std::string::npos || args[0].find("-") != std::string::npos) {
+                    return args[1] + " * (" + args[0] + ")";
+                }
+                return args[1] + " * " + args[0];
+            }
+
             static bool Cachable() {
                 return false;
             }
@@ -276,6 +348,20 @@ namespace Construction {
         CLI_COMMAND(Multiply)
             std::string Help() const {
                 return "Multiply(<Tensor>, <Tensor>...)";
+            }
+
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                std::string output = args[0];
+
+                for (auto i=1; i<args.size(); ++i) {
+                    if (args[i].find("+") != std::string::npos || args[i].find("-") != std::string::npos) {
+                        output = output + " * (" + args[i] + ")";
+                    } else {
+                        output = output + " * " + args[i];
+                    }
+                }
+
+                return output;
             }
 
             static bool Cachable() {
@@ -304,6 +390,20 @@ namespace Construction {
 
             static bool Cachable() {
                 return false;
+            }
+
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                std::string output = args[0];
+
+                for (auto i=1; i<args.size(); ++i) {
+                    if (args[i].find("+") != std::string::npos || args[i].find("-") != std::string::npos) {
+                        output = output + " * (" + args[i] + ")";
+                    } else {
+                        output = output + " * " + args[i];
+                    }
+                }
+
+                return output;
             }
 
             Expression Execute() const {
@@ -459,6 +559,10 @@ namespace Construction {
                 return "HomogeneousSystem(<Tensor>)";
             }
 
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                return args[0];
+            }
+
             Expression Execute() const {
                 return API::HomogeneousSystem(GetTensors(0));
             }
@@ -491,6 +595,10 @@ namespace Construction {
                 return "RenameIndices(<Tensor>, <Indices>, <Indices>)";
             }
 
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                return args[0];
+            }
+
             Expression Execute() const {
                 return Language::API::RenameIndices(GetTensors(0), GetIndices(1), GetIndices(2));
             }
@@ -504,6 +612,10 @@ namespace Construction {
         CLI_COMMAND(Expand)
             std::string Help() const {
                 return "Expand(<Tensor>)";
+            }
+
+            std::string ToLaTeX() const {
+                return Execute().ToString();
             }
 
             Expression Execute() const {

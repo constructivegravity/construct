@@ -10,7 +10,7 @@ SET(CMAKE_COLOR_MAKEFILE ON)
 SET(CMAKE_VERBOSE_MAKEFILE OFF)
 SET(CMAKE_BUILD_TYPE Debug)
 
-add_definitions(-std=c++14 -O3 -g -lpthread)
+add_definitions(-std=c++11 -O3 -g -lpthread)
 
 set(CONSTRUCTION_MAIN_DIRECTORY ${PROJECT_SOURCE_DIR})
 set(CONSTRUCTION_LIBRARY_DIRECTORY "${CONSTRUCTION_MAIN_DIRECTORY}/lib")
@@ -24,8 +24,10 @@ set(CMAKE_MODULE_PATH "${CONSTRUCTION_MAIN_DIRECTORY}/cmake")
 find_package(Boost COMPONENTS system filesystem serialization iostreams REQUIRED)
 find_package(Threads REQUIRED)
 find_package(Readline REQUIRED)
+find_package(Cobalt REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 include_directories(${Readline_INCLUDE_DIR})
+include_directories(${COBALT_INCLUDE_DIRS})
 
 # Documentation
 #find_package(Doxygen)
