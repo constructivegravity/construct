@@ -353,8 +353,8 @@ namespace Construction {
                     if (vec.IsZero()) break;
 
                     bool isZero = true;
-                    Scalar lhs = 0;
-                    Scalar rhs = 0;
+                    Scalar lhs = Scalar::Fraction(0,1);
+                    Scalar rhs = Scalar::Fraction(0,1);
 
                     // Iterate over all the components
                     for (int j=0; j<vec.GetDimension(); j++) {

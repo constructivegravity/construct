@@ -1503,14 +1503,22 @@ namespace Construction {
 				This is easier to calculate since no permutation have to
 				be generated.
 			 */
-			static double GetEpsilonComponents(const std::vector<unsigned>& args) {
-				double result = 1.0;
+			static Scalar GetEpsilonComponents(const std::vector<unsigned>& args) {
+				Scalar result = Scalar::Fraction(1,1);
 				for (unsigned p=0; p < args.size(); p++) {
 					for (unsigned q=p+1; q < args.size(); q++ ) {
-						result *= static_cast<double>(static_cast<int>(args[q])-static_cast<int>(args[p]))/(q-p);
+						int n = args[q] - args[p];
+						int d = q - p;
+
+						if (d < 0) {
+							n = -n;
+							d = -d;
+						}
+
+						result *= Scalar::Fraction(n,d);
 					}
 				}
-				return result != 0 ? result : 0;
+				return result != Scalar::Fraction(0,1) ? result : Scalar::Fraction(0,1);
 			}
 
 
@@ -1635,10 +1643,10 @@ namespace Construction {
 				}
 
 				if (vec[0] == vec[1]) {
-					if (vec[0]-indices[0].GetRange().GetFrom() < signature.first) return -1;
-					else return 1;
+					if (vec[0]-indices[0].GetRange().GetFrom() < signature.first) return Scalar::Fraction(-1,1);
+					else return Scalar::Fraction(1,1);
 				}
-				return 0;
+				return Scalar::Fraction(0,1);
 			}
 
 			virtual TensorPointer Canonicalize() const override {
@@ -1797,7 +1805,7 @@ namespace Construction {
 			}
 
 			virtual Scalar Evaluate(const std::vector<unsigned>& args) const override {
-				Scalar result = 1;
+				Scalar result = Scalar::Fraction(1,1);
 				unsigned pos = 0;
 
 				// Calculate the epsilon contribution
@@ -1807,7 +1815,7 @@ namespace Construction {
 
 					result *= EpsilonTensor::GetEpsilonComponents(partialArgs);
 
-					if (result == 0.0) return result;
+					if (result.ToDouble() == 0.0) return result;
 
 					pos += 3;
 				}
@@ -1818,7 +1826,7 @@ namespace Construction {
 					auto partialArgs = Partial(args, {pos, pos+1});
 					result *= GammaTensor(indices, 0,3).Evaluate(partialArgs);// GammaTensor::Evaluate(partialArgs, GammaTensor(indices, 0,3));
 
-					if (result == 0.0) return result;
+					if (result.ToDouble() == 0.0) return result;
 
 					pos += 2;
 				}
@@ -2623,8 +2631,11 @@ namespace Construction {
 			}
 
 			Tensor RedefineVariables(const std::string& name, int offset=0) const {
+                // Factorize overal scale first
+                auto factorized = FactorizeOveralScale().SeparateScalefactor();
+
 				// Separate the summands, if available
-				auto summands = GetSummands();
+				auto summands = factorized.second.GetSummands();
 
 				Tensor result = Tensor::Zero();
 				unsigned variableCount = 1 + offset;
@@ -2632,7 +2643,13 @@ namespace Construction {
 				for (auto& tensor : summands) {
 					// If the tensor is scaled, redefine the free variable in front (if present)
 					if (tensor.IsScaled() && tensor.As<ScaledTensor>()->GetScale().HasVariables()) {
-						result += scalar_type(name, variableCount++) * Tensor(tensor.As<ScaledTensor>()->GetTensor()->Clone());
+                        auto scale = tensor.As<ScaledTensor>()->GetScale().FactorizeOveralScale();
+
+                        if (scale.IsMultiplied()) {
+                            result += scalar_type(scale.As<MultipliedScalar>()->GetFirst()->Clone()) * scalar_type(name, variableCount++) * Tensor(tensor.As<ScaledTensor>()->GetTensor()->Clone());
+                        } else {
+                            result += scalar_type(name, variableCount++) * Tensor(tensor.As<ScaledTensor>()->GetTensor()->Clone());
+                        }
 					} else if (tensor.IsMultiplied()) {
 						MultipliedTensor* _tensor = static_cast<MultipliedTensor*>(tensor.pointer.get());
 						auto first = Tensor(_tensor->GetFirst()->Clone()).SeparateScalefactor();
@@ -2645,7 +2662,7 @@ namespace Construction {
 					}
 				}
 
-				return result;
+				return factorized.first * result;
 			}
 
 			std::vector<std::pair<scalar_type, Tensor>> ExtractVariables(Tensor* inhomogeneousPart = nullptr) const {
@@ -2769,8 +2786,8 @@ namespace Construction {
         public:
             Tensor FactorizeOveralScale() const {
                 scalar_type overalScale = 1;
-                std::vector<Tensor> tensors;
 
+                std::vector<Tensor> tensors;
                 auto summands = GetSummands();
                 bool first=true;
 

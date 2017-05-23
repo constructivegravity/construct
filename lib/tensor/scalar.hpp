@@ -525,6 +525,43 @@ namespace Construction {
                 return result;
             }
 
+            Scalar FactorizeOveralScale() const {
+                Scalar overal = Scalar::Fraction(1,1);
+
+                auto summands = GetSummands();
+                bool first=true;
+                Scalar result = Scalar::Fraction(0,1);
+
+                for (auto& summand : summands) {
+                    auto sep = summand.SeparateVariablesFromRest();
+
+                    for (auto& pair : sep.first) {
+                        if (first) {
+                            first = false;
+                            overal = pair.second;
+                        }
+
+                        if (pair.second != overal) return *this;
+                        result += pair.first;
+                    }
+
+                    // If the rest does not fit, return the original
+                    if (sep.second != Scalar::Fraction(0,1)) {
+                        if (first) {
+                            first = false;
+                            overal = sep.second;
+                        }
+
+                        if (sep.second != overal) return *this;
+
+                        // Add the one from the rest
+                        result += Fraction(1,1);
+                    }
+                }
+
+                return overal * result;
+            }
+
             std::pair<std::vector<std::pair<Scalar, Scalar>>, Scalar> SeparateVariablesFromRest() const {
                 Scalar rest = 0;
 
@@ -602,6 +639,8 @@ namespace Construction {
                 result += pair.second;
                 return std::move(result);
             }
+        public:
+            bool IsProportionalTo(const Scalar& other, Scalar* factor = nullptr);
         public:
             bool IsProportionalTo(const Scalar& other, Scalar* factor = nullptr);
         public:
