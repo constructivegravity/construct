@@ -642,8 +642,6 @@ namespace Construction {
         public:
             bool IsProportionalTo(const Scalar& other, Scalar* factor = nullptr);
         public:
-            bool IsProportionalTo(const Scalar& other, Scalar* factor = nullptr);
-        public:
             void Serialize(std::ostream& os) const override;
             static std::unique_ptr<AbstractExpression> Deserialize(std::istream& is);
         private:

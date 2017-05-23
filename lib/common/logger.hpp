@@ -4,7 +4,6 @@
 #include <unordered_map>
 #include <mutex>
 #include <thread>
-
 #include <iostream>
 #include <fstream>
 
@@ -68,7 +67,6 @@ namespace Construction {
         class AbstractLogger {
         public:
             AbstractLogger(bool isColored, bool includeTimeStamp, bool includeThreadId, DebugLevel level) : coloredOutput(isColored), includeTimeStamp(includeTimeStamp), includeThreadId(includeThreadId), level(level) { }
-
             virtual ~AbstractLogger() = default;
         public:
             bool IsColored() const { return coloredOutput; }

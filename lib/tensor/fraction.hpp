@@ -29,6 +29,7 @@ namespace Construction {
                 T tmp;
                 num1 = (num1 > 0) ? num1 : -num1;
                 num2 = (num2 > 0) ? num2 : -num2;
+              
                 while (num1 > 0) {
                     tmp = num1;
                     num1 = num2 % num1;
@@ -41,6 +42,7 @@ namespace Construction {
                 if (numerator == 0) return;
 
                 T g = gcd(numerator, denominator);
+
                 numerator /= g;
                 denominator /= g;
 
@@ -226,7 +228,6 @@ namespace Construction {
 
                 while (rest != 0 && rest > 1e-6) {
                     double x = 1.0/rest;
-
                     integer = static_cast<T>(x);
                     double diff = 1-(x - static_cast<T>(x));
                     if (diff < 1e-6) ++integer;

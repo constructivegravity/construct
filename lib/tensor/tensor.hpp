@@ -2786,8 +2786,8 @@ namespace Construction {
         public:
             Tensor FactorizeOveralScale() const {
                 scalar_type overalScale = 1;
-
                 std::vector<Tensor> tensors;
+
                 auto summands = GetSummands();
                 bool first=true;
 
