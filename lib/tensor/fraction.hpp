@@ -228,7 +228,6 @@ namespace Construction {
 
                 while (rest != 0 && rest > 1e-6) {
                     double x = 1.0/rest;
-
                     integer = static_cast<T>(x);
                     double diff = 1-(x - static_cast<T>(x));
                     if (diff < 1e-6) ++integer;
