@@ -29,7 +29,7 @@ namespace Construction {
                 T tmp;
                 num1 = (num1 > 0) ? num1 : -num1;
                 num2 = (num2 > 0) ? num2 : -num2;
-
+              
                 while (num1 > 0) {
                     tmp = num1;
                     num1 = num2 % num1;
@@ -84,7 +84,6 @@ namespace Construction {
             FractionBase& operator+=(const FractionBase& other) {
                 T d = denominator * other.denominator;
                 T n = numerator * other.denominator + other.numerator * denominator;
-
                 denominator = d;
                 numerator = n;
                 Reduce();
@@ -94,7 +93,6 @@ namespace Construction {
             FractionBase& operator-=(const FractionBase& other) {
                 T d = denominator * other.denominator;
                 T n = numerator * other.denominator - other.numerator * denominator;
-
                 denominator = d;
                 numerator = n;
                 return *this;
@@ -124,7 +122,6 @@ namespace Construction {
                 T d = denominator * other.denominator;
                 T n = numerator * other.denominator + other.numerator * denominator;
                 FractionBase result (n,d);
-
                 result.Reduce();
                 return result;
             }
@@ -135,7 +132,6 @@ namespace Construction {
                 T d = denominator * other.denominator;
                 T n = numerator * other.denominator - other.numerator * denominator;
                 FractionBase result (n,d);
-
                 result.Reduce();
                 return result;
             }
@@ -232,7 +228,6 @@ namespace Construction {
 
                 while (rest != 0 && rest > 1e-6) {
                     double x = 1.0/rest;
-
                     integer = static_cast<T>(x);
                     double diff = 1-(x - static_cast<T>(x));
                     if (diff < 1e-6) ++integer;

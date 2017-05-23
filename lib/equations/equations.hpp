@@ -10,6 +10,7 @@
 using Construction::Language::CLI;
 
 namespace Construction {
+  
     namespace Equations {
 
         /**
