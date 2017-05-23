@@ -28,11 +28,8 @@ namespace Construction {
                 values.push_back(static_cast<unsigned>(i));
             }
 
-            /*BigNumber(long i) {
-                unsigned times = sizeof(long) / sizeof(int);
-                for (int i=0; i<times; ++i) {
-                    values.push_back(static_cast<unsigned>((i >> times*sizeof(i)) & 4294967295));
-                }
+            BigNumber(long i) {
+                values.push_back(static_cast<unsigned>(i));
             }
 
             BigNumber(long long i) {
@@ -40,7 +37,7 @@ namespace Construction {
                 for (int i=0; i<times; ++i) {
                     values.push_back(static_cast<unsigned>((i >> times*sizeof(i)) & 4294967295));
                 }
-            }*/
+            }
 
             BigNumber(const std::string& string) {
                 *this = std::move(FromString(string));
@@ -73,7 +70,7 @@ namespace Construction {
                 return *this;
             }
 
-            /*BigNumber& operator=(long long i) {
+            BigNumber& operator=(long long i) {
                 values.clear();
 
                 unsigned times = sizeof(long long) / sizeof(int);
@@ -82,7 +79,7 @@ namespace Construction {
                 }
 
                 return *this;
-            }*/
+            }
 
             BigNumber& operator=(const std::string& string) {
                 values = FromString(string).values;
@@ -94,23 +91,6 @@ namespace Construction {
                 if (string.size() > 0 && string[0] == '-') return FromString(string.substr(1)).Negated();
 
                 BigNumber result;
-
-                // Handle exponents
-                {
-                    auto pose = string.find("e");
-                    auto posE = string.find("E");
-
-                    auto pos = (pose != std::string::npos) ? pose : posE;
-
-                    if (pos != std::string::npos) {
-                        auto base = FromString(string.substr(0, pos));
-                        auto exp = FromString(string.substr(pos+1));
-
-                        if (exp.IsNegative()) return BigNumber(0);
-
-                        return base * BigNumber::Pow(BigNumber(10), exp);
-                    }
-                }
 
                 char pos = 0;
                 unsigned current = 0;
@@ -155,28 +135,15 @@ namespace Construction {
             }
         public:
             bool IsNegative() const {
-                if (values.size() == 0) return false;
                 return (values.back() & (1 << 31)) == (1 << 31);
             }
 
             bool IsPositive() const {
-                if (values.size() == 0) return true;
                 return (values.back() & (1 << 31)) != (1 << 31);
             }
 
             inline size_t Size() const {
                 return values.size();
-            }
-
-            size_t GetEffectiveSize() const {
-                size_t result = values.size();
-                unsigned n = (IsPositive()) ? 0 : 4294967295;
-
-                while (result > 0 && (values[result-1] == n)) {
-                    --result;
-                }
-
-                return result;
             }
         protected:
             void Extend(unsigned length=1) {
@@ -201,15 +168,11 @@ namespace Construction {
             }
         public:
             void Negate() {
-                // Do not waste time on zeros
-                if (values.size() == 0) return;
-
                 for (int i=values.size()-1; i>=0; --i) {
                     values[i] = ~values[i];
                 }
 
-                // Increase the bottom element
-                ++(*this);
+                if (values.size() > 0) ++values[0];
             }
 
             BigNumber Negated() const {
@@ -360,10 +323,24 @@ namespace Construction {
                 std::string pows = "1";
                 std::string result = "0";
 
-                if (IsNegative()) return "-" + Negated().ToDecimalString();
+                bool isNegative = IsNegative();
 
                 for (int i=0; i<values.size() * 32; ++i) {
                     bool value = GetBitAt(i);
+
+                    // If negative, invert value
+                    if (isNegative) value = !value;
+
+                    // Handle the first and second bit extra due to the 2's complement
+                    if (i == 0 && isNegative) {
+                        value = !value;
+                    }
+
+                    if (i == 1 && isNegative) {
+                        if (GetBitAt(0) == 0) {
+                            value = true;
+                        }
+                    }
 
                     // If this byte is set, add the current power of 2 to the result
                     if (value) {
@@ -375,7 +352,7 @@ namespace Construction {
                 }
 
                 // Return the result
-                return result;
+                return (isNegative) ? ("-" + result) : result;
             }
 
             std::string ToHexString(bool padding=false) const {
@@ -453,9 +430,17 @@ namespace Construction {
                     values[i] = result;
                 }
 
+                if (carry != 0) {
+                    if (isNegative) {
+                        values.push_back(4294967294);
+                    } else {
+                        values.push_back(carry);
+                    }
+                }
+
                 // If this was not negative before, but now is, add a zero
-                if ((!isNegative && !other.IsNegative()) && IsNegative()) values.push_back(0);
-                else if ((isNegative && other.IsNegative()) && !IsNegative()) values.push_back(4294967295);
+                if (!isNegative && IsNegative()) values.push_back(0);
+                else if (isNegative && !IsNegative()) values.push_back(4294967295);
 
                 return *this;
             }
@@ -467,13 +452,12 @@ namespace Construction {
             }
 
             inline BigNumber operator++() {
-                *this += BigNumber(1);
-                return *this;
+                return *this + BigNumber(1);
             }
 
             inline BigNumber operator++(int) {
                 BigNumber copy = *this;
-                *this += BigNumber(1);
+                *this = *this + BigNumber(1);
                 return copy;
             }
 
@@ -483,7 +467,6 @@ namespace Construction {
 
             inline BigNumber& operator-=(const BigNumber& other) {
                 *this += (-other);
-                return *this;
             }
 
             inline BigNumber operator-(const BigNumber& other) const {
@@ -533,7 +516,7 @@ namespace Construction {
             }
 
             static inline BigNumber Divide(const BigNumber& a, const BigNumber& b, BigNumber* rest = nullptr) {
-                if (b == BigNumber(0)) throw std::overflow_error("Division by zero");
+                if (b == 0) throw std::overflow_error("Division by zero");
 
                 if (b.IsNegative()) {
                     BigNumber restCopy;
@@ -547,20 +530,20 @@ namespace Construction {
                     BigNumber restCopy;
                     auto q = Divide(-a, b, &restCopy);
 
-                    if (restCopy == BigNumber(0)) {
-                        if (rest) *rest = BigNumber(0);
+                    if (restCopy == 0) {
+                        if (rest) *rest = 0;
                         return -q;
                     }
 
                     if (rest) *rest = b - restCopy;
-                    return -(q+BigNumber(1));
+                    return -(q+1);
                 }
 
-                BigNumber q (0);
+                BigNumber q;
                 BigNumber r = a;
 
                 while (r >= b) {
-                    q = q + BigNumber(1);
+                    q = q + 1;
                     r = r - b;
                 }
 
@@ -585,9 +568,17 @@ namespace Construction {
             }
         public:
             bool operator==(const BigNumber& other) const {
-                // Determine the effective size
-                auto effectiveSizeA = GetEffectiveSize();
-                auto effectiveSizeB = other.GetEffectiveSize();
+                // Determine the effective size of this
+                size_t effectiveSizeA = other.values.size();
+                while (values[effectiveSizeA-1] != 0 && values[effectiveSizeA-1] != 4294967295) {
+                    --effectiveSizeA;
+                }
+
+                // Determine the effective size of the other
+                size_t effectiveSizeB = other.values.size();
+                while (other.values[effectiveSizeB-1] != 0 && other.values[effectiveSizeB-1] != 4294967295) {
+                    --effectiveSizeB;
+                }
 
                 // If they are of different effective size, return false
                 if (effectiveSizeA != effectiveSizeB) return false;
@@ -600,9 +591,17 @@ namespace Construction {
             }
 
             bool operator!=(const BigNumber& other) const {
-                // Determine the effective size
-                auto effectiveSizeA = GetEffectiveSize();
-                auto effectiveSizeB = other.GetEffectiveSize();
+                // Determine the effective size of this
+                size_t effectiveSizeA = other.values.size();
+                while (values[effectiveSizeA-1] != 0 && values[effectiveSizeA-1] != 4294967295) {
+                    --effectiveSizeA;
+                }
+
+                // Determine the effective size of the other
+                size_t effectiveSizeB = other.values.size();
+                while (other.values[effectiveSizeB-1] != 0 && other.values[effectiveSizeB-1] != 4294967295) {
+                    --effectiveSizeB;
+                }
 
                 // If they are of different effective size, return false
                 if (effectiveSizeA != effectiveSizeB) return true;
@@ -619,15 +618,12 @@ namespace Construction {
                 if (IsNegative() && !other.IsNegative()) return true;
                 else if (!IsNegative() && other.IsNegative()) return false;
 
-                // Determine the effective size
-                auto effectiveSizeA = GetEffectiveSize();
-                auto effectiveSizeB = other.GetEffectiveSize();
-
-                if (effectiveSizeA < effectiveSizeB) return !IsNegative();
-                else if (effectiveSizeA > effectiveSizeB) return IsNegative();
+                // Compare by size of bytes
+                if (other.values.size() > values.size()) return !IsNegative();
+                else if (other.values.size() < values.size()) return IsNegative();
 
                 // Compare all bytes
-                for (int i=effectiveSizeA-1; i>=0; --i) {
+                for (int i=values.size()-1; i>=0; --i) {
                     if (values[i] < other.values[i]) return !IsNegative();
                     else if (values[i] > other.values[i]) return IsNegative();
                 }
@@ -640,15 +636,12 @@ namespace Construction {
                 if (IsNegative() && !other.IsNegative()) return true;
                 else if (!IsNegative() && other.IsNegative()) return false;
 
-                // Determine the effective size
-                auto effectiveSizeA = GetEffectiveSize();
-                auto effectiveSizeB = other.GetEffectiveSize();
-
-                if (effectiveSizeA < effectiveSizeB) return !IsNegative();
-                else if (effectiveSizeA > effectiveSizeB) return IsNegative();
+                // Compare by size of bytes
+                if (other.values.size() > values.size()) return !IsNegative();
+                else if (other.values.size() < values.size()) return IsNegative();
 
                 // Compare all bytes
-                for (int i=effectiveSizeA-1; i>=0; --i) {
+                for (int i=values.size()-1; i>=0; --i) {
                     if (values[i] < other.values[i]) return !IsNegative();
                     else if (values[i] > other.values[i]) return IsNegative();
                 }
@@ -741,16 +734,6 @@ namespace Construction {
             friend std::ostream& operator<<(std::ostream& os, const BigNumber& number) {
                 os << number.ToString();
                 return os;
-            }
-
-            /*operator int() const {
-                assert(values.size() == 1);
-                return values[0];
-            }*/
-
-            operator double() const {
-                assert(values.size() == 1);
-                return static_cast<double>(values[0]);
             }
         private:
             std::vector<unsigned> values;

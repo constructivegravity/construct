@@ -2459,7 +2459,7 @@ namespace Construction {
 
                         // Set all entries in the row to zero
                         for (int j = 0; j < M.GetNumberOfColumns(); ++j) {
-                            M(i, j) = Common::BigNumber(0);
+                            M(i, j) = 0;
                         }
                     }
                 }
@@ -2670,7 +2670,7 @@ namespace Construction {
 				auto expanded = Expand();
 
 				if (expanded.IsZeroTensor()) {
-					Construction::Logger::Warning("Expanding ", ToString(), " yields zero");
+					Construction::Logger::Debug("Expanding ", ToString(), " yields zero");
 				} else {
 					Construction::Logger::Debug("Expanded the equation into ", expanded);
 				}
@@ -2785,9 +2785,9 @@ namespace Construction {
 			}
         public:
             Tensor FactorizeOveralScale() const {
-                scalar_type overalScale = Scalar::Fraction(1,1);
-                std::vector<Tensor> tensors;
+                scalar_type overalScale = 1;
 
+                std::vector<Tensor> tensors;
                 auto summands = GetSummands();
                 bool first=true;
 

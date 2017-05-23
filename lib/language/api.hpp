@@ -327,7 +327,7 @@ namespace Construction {
 
                         // Set all entries in the row to zero
                         for (int j = 0; j < system.first.GetNumberOfColumns(); ++j) {
-                            system.first(i, j) = Tensor::Fraction(0,1);
+                            system.first(i, j) = 0;
                         }
                     }
                 }
@@ -360,12 +360,12 @@ namespace Construction {
                     for (int j=0; j<vec.GetDimension(); j++) {
                         //Construction::Logger::Debug("j = ", j, ", vec[j] = ", vec[j], ", isZero = ", (isZero) ? "yes" : "no");
 
-                        if (vec[j] == Construction::Tensor::Fraction(0,1) && isZero) continue;
-                        if (vec[j] == Construction::Tensor::Fraction(1,1) && isZero) {
+                        if (vec[j] == Construction::Tensor::Fraction(0) && isZero) continue;
+                        if (vec[j] == Construction::Tensor::Fraction(1) && isZero) {
                             lhs = system.second[j];
                             isZero = false;
-                        } else if (vec[j] != Construction::Tensor::Fraction(0,1)) {
-                            rhs += (-system.second[j] * Tensor::Scalar::Fraction(vec[j].GetNumerator(), vec[j].GetDenominator()));
+                        } else if (vec[j] != Construction::Tensor::Fraction(0)) {
+                            rhs += (-system.second[j] * Tensor::Scalar::Fraction(vec[j]));
                         }
                     }
 

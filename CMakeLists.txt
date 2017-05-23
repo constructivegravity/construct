@@ -24,8 +24,10 @@ set(CMAKE_MODULE_PATH "${CONSTRUCTION_MAIN_DIRECTORY}/cmake")
 find_package(Boost COMPONENTS system filesystem serialization iostreams REQUIRED)
 find_package(Threads REQUIRED)
 find_package(Readline REQUIRED)
+find_package(Cobalt REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 include_directories(${Readline_INCLUDE_DIR})
+include_directories(${COBALT_INCLUDE_DIRS})
 
 # Documentation
 #find_package(Doxygen)

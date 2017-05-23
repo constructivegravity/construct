@@ -4,7 +4,6 @@
 #include <string>
 #include <iostream>
 #include <cassert>
-#include <stdexcept>
 
 #include <common/bignumber.hpp>
 #include <tensor/scalar.hpp>
@@ -18,7 +17,7 @@ namespace Construction {
             FractionBase() : numerator(T(0)), denominator(T(1)), AbstractScalar(AbstractScalar::FRACTION) { }
             FractionBase(const T& number) :  AbstractScalar(AbstractScalar::FRACTION), numerator(number), denominator(T(1)) { }
             FractionBase(const T& numerator, const T& denominator) :  AbstractScalar(AbstractScalar::FRACTION), numerator(numerator), denominator(denominator) {
-                if (this->denominator < T(0)) {
+                if (this->denominator < 0) {
                     this->numerator = -this->numerator;
                     this->denominator = -this->denominator;
                 }
@@ -28,35 +27,24 @@ namespace Construction {
         public:
             T gcd(T num1, T num2) {
                 T tmp;
-
-                num1 = (num1 > T(0)) ? num1 : -num1;
-                num2 = (num2 > T(0)) ? num2 : -num2;
-
-                while (num1 > T(0)) {
+                num1 = (num1 > 0) ? num1 : -num1;
+                num2 = (num2 > 0) ? num2 : -num2;
+                while (num1 > 0) {
                     tmp = num1;
                     num1 = num2 % num1;
                     num2 = tmp;
                 }
-
                 return num2;
             }
 
             void Reduce() {
-                // Beautify a zero
-                if (numerator == T(0)) {
-                    denominator = 1;
-                    return;
-                }
+                if (numerator == 0) return;
 
                 T g = gcd(numerator, denominator);
                 numerator /= g;
                 denominator /= g;
 
-                if (denominator == T(0)) {
-                    std::cout << "What if I told you, dividing by zero IS the problem?" << std::endl;
-                }
-
-                assert(denominator != T(0) && "Bro, don't divide by zero");
+                assert(denominator != 0 && "Bro, don't divide by zero");
             }
         public:
             bool operator==(const FractionBase& other) const {
@@ -105,14 +93,12 @@ namespace Construction {
                 T n = numerator * other.denominator - other.numerator * denominator;
                 denominator = d;
                 numerator = n;
-                Reduce();
                 return *this;
             }
 
             FractionBase& operator*=(const FractionBase& other) {
                 numerator   *= other.numerator;
                 denominator *= other.denominator;
-                Reduce();
                 return *this;
             }
 
@@ -123,14 +109,11 @@ namespace Construction {
 
                 numerator   = newNumerator;
                 denominator = newDenominator;
-                Reduce();
                 return *this;
             }
 
             FractionBase operator-() const {
-                auto result = FractionBase(-numerator, denominator);
-                result.Reduce();
-                return result;
+                return FractionBase(-numerator, denominator);
             }
 
             FractionBase operator+(const FractionBase& other) const {
@@ -141,9 +124,7 @@ namespace Construction {
                 return result;
             }
 
-            inline FractionBase operator+(int i) const {
-                return *this + FractionBase(i,T(1));
-            }
+            inline FractionBase operator+(int i) const { return *this + FractionBase(i); }
 
             FractionBase operator-(const FractionBase& other) const {
                 T d = denominator * other.denominator;
@@ -153,7 +134,7 @@ namespace Construction {
                 return result;
             }
 
-            inline FractionBase operator-(int i) const { return *this - FractionBase(i,T(1)); }
+            inline FractionBase operator-(int i) const { return *this - FractionBase(i); }
 
             FractionBase operator*(const FractionBase& other) const {
                 FractionBase result (numerator * other.numerator, denominator * other.denominator);
@@ -161,18 +142,12 @@ namespace Construction {
                 return result;
             }
 
-            inline FractionBase operator*(int i) const {
-                auto res = FractionBase(numerator * i, denominator);
-                res.Reduce();
-                return res;
-            }
+            inline FractionBase operator*(int i) const { return FractionBase(numerator * i, denominator); }
 
             FractionBase operator/(const FractionBase& other) const {
-                if (other.numerator == T(0)) throw std::overflow_error("Division by zero");
-
-                T factor = ((numerator < T(0) && other.numerator > T(0)) || (numerator > T(0) && other.numerator < T(0))) ? T(-1) : T(1);
-                T newNumerator = factor * (numerator > T(0) ? numerator : -numerator) * other.denominator;
-                T newDenominator = denominator * (other.numerator > T(0) ? other.numerator : -other.numerator);
+                T factor = ((numerator < 0 && other.numerator > 0) || (numerator > 0 && other.numerator < 0)) ? -1 : 1;
+                T newNumerator = factor * std::abs(numerator) * other.denominator;
+                T newDenominator = denominator * std::abs(other.numerator);
 
                 FractionBase result (newNumerator, newDenominator);
                 result.Reduce();
@@ -180,9 +155,7 @@ namespace Construction {
             }
 
             inline FractionBase operator/(int i) const {
-                if (i == 0) throw std::overflow_error("Division by zero");
-
-                T factor = (i < 0) ? T(-1) : T(1);
+                T factor = (i < 0) ? -1 : 1;
                 T newNumerator = factor * numerator;
                 T newDenominator = denominator * i;
 
@@ -195,28 +168,20 @@ namespace Construction {
                 return static_cast<double>(numerator) / static_cast<double>(denominator);
             }
 
-            T GetNumerator() const {
-                return numerator;
-            }
-
-            T GetDenominator() const {
-                return denominator;
-            }
-
             virtual double ToDouble() const override {
                 return static_cast<double>(numerator) / static_cast<double>(denominator);
             }
 
             virtual std::string ToString() const override {
                 // Do not write 0 to complicated
-                if (numerator == T(0)) return "0";
+                if (numerator == 0) return "0";
 
                 // Reduce
                 FractionBase c = *this;
                 c.Reduce();
 
                 std::stringstream ss;
-                if (c.denominator == T(1)) ss << c.numerator;
+                if (c.denominator == 1) ss << c.numerator;
                 else ss << c.numerator << "/" << c.denominator;
                 return ss.str();
             }
@@ -242,8 +207,8 @@ namespace Construction {
                 // Call parent
                 AbstractScalar::Deserialize(is);
 
-                T numerator = ReadBinary<T>(is);
-                T denominator = ReadBinary<T>(is);
+                long numerator = ReadBinary<T>(is);
+                long denominator = ReadBinary<T>(is);
 
                 return std::move(std::unique_ptr<AbstractScalar>(new FractionBase(numerator, denominator)));
             }
@@ -251,10 +216,10 @@ namespace Construction {
             static FractionBase FromDouble(double f) {
                 if (f < 0) return -FromDouble(-f);
 
-                std::vector<int> values;
+                std::vector<T> values;
 
-                int integer = static_cast<int>(f);
-                double rest = f - static_cast<int>(integer);
+                T integer = static_cast<T>(f);
+                double rest = f - integer;
 
                 values.push_back(integer);
                 int counter = 0;
@@ -262,24 +227,24 @@ namespace Construction {
                 while (rest != 0 && rest > 1e-6) {
                     double x = 1.0/rest;
 
-                    integer = static_cast<int>(x);
-                    double diff = 1-(x - static_cast<double>(integer));
+                    integer = static_cast<T>(x);
+                    double diff = 1-(x - static_cast<T>(x));
                     if (diff < 1e-6) ++integer;
 
-                    rest = x - static_cast<double>(integer);
+                    rest = x - integer;
 
                     values.push_back(integer);
                 }
 
                 // Put together
-                FractionBase result (T(values[values.size()-1]),T(1));
+                FractionBase result (values[values.size()-1],1);
 
                 for (int i=values.size()-2; i>=0; --i) {
                     // Invert the value
-                    result = FractionBase(T(1), T(1)) / result;
+                    result = FractionBase(1,1) / result;
 
                     // Add the current value
-                    result += FractionBase(T(values[i]), T(1));
+                    result += FractionBase(values[i],1);
                 }
 
                 return result;
@@ -289,7 +254,7 @@ namespace Construction {
             T denominator;
         };
 
-        typedef FractionBase<Construction::Common::BigNumber> Fraction;
+        typedef FractionBase<long long> Fraction;
 
     }
 }

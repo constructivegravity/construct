@@ -3,6 +3,8 @@
 #include <memory>
 #include <unordered_map>
 #include <mutex>
+#include <thread>
+
 #include <iostream>
 #include <fstream>
 
@@ -65,11 +67,13 @@ namespace Construction {
 
         class AbstractLogger {
         public:
-            AbstractLogger(bool isColored, bool includeTimeStamp, DebugLevel level) : coloredOutput(isColored), includeTimeStamp(includeTimeStamp), level(level) { }
+            AbstractLogger(bool isColored, bool includeTimeStamp, bool includeThreadId, DebugLevel level) : coloredOutput(isColored), includeTimeStamp(includeTimeStamp), includeThreadId(includeThreadId), level(level) { }
+
             virtual ~AbstractLogger() = default;
         public:
             bool IsColored() const { return coloredOutput; }
             bool IncludesTimeStamp() const { return includeTimeStamp; }
+            bool IncludesThreadId() const { return includeThreadId; }
 
             DebugLevel GetDebugLevel() const { return level; }
             void SetDebugLevel(DebugLevel level) { this->level = level; }
@@ -87,6 +91,19 @@ namespace Construction {
                     Print(now.ToString("%F %H:%M:%S  "));
                 }
             }
+
+            void PrintThreadId() const {
+                if (!includeThreadId) return;
+
+                {
+                    ColorRAII color (this, ColorRAII::LIGHTGRAY);
+
+                    std::stringstream ss;
+                    ss << std::this_thread::get_id() << "   ";
+
+                    Print(ss.str());
+                }
+            }
         protected:
             inline bool DebugLevelCheck(const DebugLevel& other) const {
                 return static_cast<int>(other) <= static_cast<int>(level);
@@ -100,6 +117,7 @@ namespace Construction {
                 std::unique_lock<std::mutex> lock(mutex);
 
                 PrintTimestamp();
+                PrintThreadId();
 
                 Print(content + "\n");
             }
@@ -112,6 +130,7 @@ namespace Construction {
                 std::unique_lock<std::mutex> lock(mutex);
 
                 PrintTimestamp();
+                PrintThreadId();
 
                 // Make the output red
                 {
@@ -130,6 +149,7 @@ namespace Construction {
                 std::unique_lock<std::mutex> lock(mutex);
 
                 PrintTimestamp();
+                PrintThreadId();
 
                 // Make the output red
                 {
@@ -148,6 +168,7 @@ namespace Construction {
                 std::unique_lock<std::mutex> lock(mutex);
 
                 PrintTimestamp();
+                PrintThreadId();
 
                 // Make the output red
                 {
@@ -166,6 +187,7 @@ namespace Construction {
                 std::unique_lock<std::mutex> lock(mutex);
 
                 PrintTimestamp();
+                PrintThreadId();
 
                 // Make the output red
                 {
@@ -184,6 +206,7 @@ namespace Construction {
                 std::unique_lock<std::mutex> lock(mutex);
 
                 PrintTimestamp();
+                PrintThreadId();
 
                 // Make the output red
                 {
@@ -202,6 +225,7 @@ namespace Construction {
                 std::unique_lock<std::mutex> lock(mutex);
 
                 PrintTimestamp();
+                PrintThreadId();
 
                 // Make the output red
                 {
@@ -214,6 +238,7 @@ namespace Construction {
         protected:
             bool coloredOutput=false;
             bool includeTimeStamp;
+            bool includeThreadId;
 
             mutable std::mutex mutex;
             DebugLevel level;
@@ -221,7 +246,7 @@ namespace Construction {
 
         class ScreenLogger : public AbstractLogger {
         public:
-            ScreenLogger() : AbstractLogger(true, false, DebugLevel::ERROR) { }
+            ScreenLogger() : AbstractLogger(true, false, true, DebugLevel::ERROR) { }
 
             virtual ~ScreenLogger() throw() = default;
         public:
@@ -232,7 +257,7 @@ namespace Construction {
 
         class FileLogger : public AbstractLogger {
         public:
-            FileLogger(const std::string& filename) : AbstractLogger(false, true, DebugLevel::DEBUG), filename(filename) { }
+            FileLogger(const std::string& filename) : AbstractLogger(false, true, true, DebugLevel::DEBUG), filename(filename) { }
 
             virtual ~FileLogger() throw() { }
         public:
@@ -415,7 +440,9 @@ namespace Construction {
         }
 
         inline void DoDebug(const std::string& msg) {
+#ifdef DEBUG_MODE
             Common::LoggerManager::Instance()->Debug(msg);
+#endif
         }
 
         template<typename T>
