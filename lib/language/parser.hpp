@@ -1,9 +1,14 @@
 #pragma once
 
+#include <iostream>
 #include <sstream>
+#include <memory>
 
 namespace Construction {
     namespace Language {
+
+        // Forward declaration
+        class Parser;
 
         /**
             \class Token
@@ -97,6 +102,7 @@ namespace Construction {
                 STRING,
                 NUMERIC,
                 PREVIOUS,
+                NEGATION,
                 BINARY
             };
         public:
@@ -105,6 +111,7 @@ namespace Construction {
             std::string GetName() const { return name; }
         public:
             bool IsLiteral() const { return type == Node::LITERAL; }
+            bool IsNegation() const { return type == Node::NEGATION; }
             bool IsBinary() const { return type == Node::BINARY; }
             bool IsCommand() const { return type == Node::COMMAND; }
             bool IsArguments() const { return type == Node::ARGUMENTS; }
@@ -135,6 +142,7 @@ namespace Construction {
         class StringNode;
         class NumericNode;
         class PreviousNode;
+        class NegationNode;
 
         /**
             \class CommandNode
@@ -213,7 +221,7 @@ namespace Construction {
 
         class BinaryNode : public Node {
         public:
-            BinaryNode(std::shared_ptr<Node> lhs, std::shared_ptr<Node> rhs, char op) : Node("Binary", Node::BINARY), lhs(std::move(lhs)), rhs(std::move(rhs)), op(op) { }
+            BinaryNode(const std::shared_ptr<Node>& lhs, const std::shared_ptr<Node>& rhs, char op) : Node("Binary", Node::BINARY), lhs(lhs), rhs(rhs), op(op) { }
         public:
             std::shared_ptr<Node> GetLeft() { return lhs; }
             std::shared_ptr<Node> GetRight() { return rhs; }
@@ -226,13 +234,22 @@ namespace Construction {
 
             virtual std::string ToString() const {
                 std::stringstream ss;
-                ss << lhs->ToString() << " " << op << " " << rhs->ToString();
+                ss << "(" << op << " " << lhs->ToString() << " " << rhs->ToString() << ")";
                 return ss.str();
             }
         private:
             std::shared_ptr<Node> lhs;
             std::shared_ptr<Node> rhs;
             char op;
+        };
+
+        class NegationNode : public Node {
+        public:
+            NegationNode(const std::shared_ptr<Node>& node) : Node("Negation", Node::NEGATION), node(node) { }
+        public:
+            std::shared_ptr<Node> GetNode() { return node; }
+        private:
+            std::shared_ptr<Node> node;
         };
 
         class StringNode : public Node {
@@ -243,7 +260,7 @@ namespace Construction {
         public:
             virtual std::string ToString() const {
                 std::stringstream ss;
-                ss << "\'" << text << "\'";
+                ss << "\"" << text << "\"";
                 return ss.str();
             }
         private:
@@ -258,7 +275,7 @@ namespace Construction {
         public:
             virtual std::string ToString() const {
                 std::stringstream ss;
-                ss << "\"" << text << "\"";
+                ss << "{" << text << "}";
                 return ss.str();
             }
         private:
@@ -285,13 +302,28 @@ namespace Construction {
             virtual std::string ToString() const { return "%"; }
         };
 
+        class BacktrackingRAII {
+        public:
+            BacktrackingRAII(Parser& parser);
+            virtual ~BacktrackingRAII();
+        public:
+            void CancelBacktracking() {
+                backtrack = false;
+            }
 
+            void DoBacktrack() {
+                backtrack = true;
+            }
+        private:
+            Parser& parser;
+            int position;
+            bool backtrack=true;
+        };
 
         /**
             \class Parser
 
             Parser
-
             The EBNF grammar reads
 
                 EXPRESSION
@@ -322,6 +354,7 @@ namespace Construction {
                     = Command
                     | Literal
                     | PREVIOUS
+
                     | STRING
                     | INDICES
                     | NUMERIC
@@ -404,9 +437,10 @@ namespace Construction {
 
                     if (c == "." && inNumeric) {
                         current.append(c);
+                        continue;
                     }
 
-                    if (IsNumeric(c)) {
+                    if (IsNumeric(c) || (c == "-" && IsNumeric(std::string(1, code[i+1])))) {
                         inNumeric = true;
                         current.append(c);
                         continue;
@@ -500,7 +534,19 @@ namespace Construction {
                 if (current.length() > 0)
                     tokens.push_back(Token(Token::LITERAL, code.length()-current.length(),current));
             }
-        private:
+        public:
+            int GetPosition() const { return currentPos; }
+            void GoToPosition(int pos) {
+                if (pos > tokens.size()-1) return;
+
+                // Set the tokens
+                current = tokens[pos];
+                if (pos < tokens.size()-1) lookAhead = tokens[pos+1];
+                else lookAhead = Token(Token::EOL, 0, "");
+
+                currentPos = pos;
+            }
+
             void GetNext() {
                 if (currentPos < tokens.size()-1) {
                     current = tokens[++currentPos];
@@ -509,151 +555,403 @@ namespace Construction {
                     else lookAhead = Token(Token::EOL, 0, "");
                 }
             }
-
-            std::shared_ptr<Node> ParseArgument() {
-                if (current.IsLiteral()) {
-                    if (!lookAhead.IsLeftBracket()) {
-                        auto res = std::make_shared<LiteralNode>(current.GetContent());
-                        GetNext();
-                        return res;
-                    }
-
-                    return ParseCommand();
-                }
+        public:
+            std::shared_ptr<Node> ParseIndices() {
+                BacktrackingRAII backtracking(*this);
 
                 if (current.IsIndices()) {
+                    backtracking.CancelBacktracking();
+
                     auto result = std::make_shared<IndicesNode>(current.GetContent());
+
+                    // Move cursor
                     GetNext();
-                    return result;
+
+                    return std::move(result);
                 }
+
+                return nullptr;
+            }
+
+            std::shared_ptr<Node> ParseString() {
+                BacktrackingRAII backtracking(*this);
 
                 if (current.IsString()) {
+                    backtracking.CancelBacktracking();
+
                     auto result = std::make_shared<StringNode>(current.GetContent());
+
+                    // Move cursor
                     GetNext();
-                    return result;
+
+                    return std::move(result);
                 }
 
+                return nullptr;
+            }
+
+            std::shared_ptr<Node> ParseNumeric() {
+                BacktrackingRAII backtracking(*this);
+
                 if (current.IsNumeric()) {
+                    backtracking.CancelBacktracking();
+
                     auto result = std::make_shared<NumericNode>(current.GetContent());
+
+                    // Move cursor
                     GetNext();
-                    return result;
+
+                    return std::move(result);
+                }
+
+                // Move cursor
+
+                return nullptr;
+            }
+
+            std::shared_ptr<LiteralNode> ParseLiteral() {
+                BacktrackingRAII backtracking (*this);
+
+                // If not a literal, return
+                if (!current.IsLiteral()) return nullptr;
+
+                // Go to the next position
+                backtracking.CancelBacktracking();
+
+                // Make result
+                auto result = std::make_shared<LiteralNode>(current.GetContent());
+
+                // Move cursor
+                GetNext();
+
+                return std::move(result);
+            }
+
+            /**
+                \brief Parses a primary expression
+
+                Parses a primary expression
+
+                    primary ::=
+                            | literal
+                            | string
+                            | indices
+                            | previous
+                            | numeric
+                            ;
+             */
+            std::shared_ptr<Node> ParsePrimary() {
+                BacktrackingRAII backtracking(*this);
+
+                auto literal = ParseLiteral();
+                if (literal) {
+                    backtracking.CancelBacktracking();
+                    return std::move(literal);
+                }
+
+                auto primary = ParseIndices();
+                if (primary) {
+                    backtracking.CancelBacktracking();
+                    return std::move(primary);
+                }
+
+                primary = ParseString();
+                if (primary) {
+                    backtracking.CancelBacktracking();
+                    return std::move(primary);
+                }
+
+                primary = ParseNumeric();
+                if (primary) {
+                    backtracking.CancelBacktracking();
+                    return std::move(primary);
                 }
 
                 if (current.IsPrevious()) {
+                    backtracking.CancelBacktracking();
+
+                    auto result = std::make_shared<PreviousNode>();
                     GetNext();
-                    return std::make_shared<PreviousNode>();
+
+                    return std::move(result);
                 }
 
                 return nullptr;
             }
 
             /**
-                \brief Parse arguments
+                \brief Parses a list of arguments
 
-                Arguments are defined by
-                    Arguments :== Arguments , Argument
-                              |   Argument
-                              ;
+                Parses a list of arguments.
+
+                    arguments ::=
+                            | rhs_expression ',' arguments
+                            | rhs_expression
+                            ;
              */
             std::shared_ptr<ArgumentsNode> ParseArguments() {
-                auto arg = ParseArgument();
-                if (arg == nullptr) return nullptr;
+                BacktrackingRAII backtracking(*this);
+
+                // Parse for the first argument
+                auto arg = ParseRHSExpression();
 
                 if (current.IsComma()) {
+                    // Go to next token
                     GetNext();
+
+                    // Parse for the arguments
                     auto args = ParseArguments();
+                    if (!args) return nullptr;
+
+                    // Insert the argument at the beginning
                     args->Insert(std::move(arg));
+
+                    backtracking.CancelBacktracking();
+
                     return std::move(args);
                 }
 
                 auto args = std::make_shared<ArgumentsNode>();
                 args->Insert(std::move(arg));
 
-                return args;
+                backtracking.CancelBacktracking();
+
+                return std::move(args);
             }
 
-            std::shared_ptr<CommandNode> ParseCommand() {
-                if (!current.IsLiteral()) return nullptr;
-                auto identifier = std::make_shared<LiteralNode>(current.GetContent());
-                GetNext();
+            /**
+                \brief Parses a function call expression
 
-                if (!current.IsLeftBracket()) return nullptr;
+                Parses a call expression. This can either be a function call
+                or a reference to a variable
 
-                GetNext();
+                    call_expression ::=
+                            | literal '(' arguments ')'
+                            | primary
+                            ;
+             */
+            std::shared_ptr<Node> ParseCallExpression() {
+                BacktrackingRAII backtracking(*this);
 
-                // Parse the arguments
-                auto arguments = ParseArguments();
-                if (arguments == nullptr) return nullptr;
-
-                if (!current.IsRightBracket()) return nullptr;
-
-                GetNext();
-
-                return std::make_shared<CommandNode>(std::move(identifier), std::move(arguments));
-            }
-
-            std::shared_ptr<Node> ParseRHSExpression() {
-                if (current.IsPrevious()) {
-                    return std::make_shared<PreviousNode>();
-                }
-
+                // If the current token is a literal parse for a function call
                 if (current.IsLiteral()) {
-                    Token c = current;
+                    auto identifier = ParseLiteral();
 
-                    if (lookAhead.IsLeftBracket()) {
-                        return ParseCommand();
+                    if (!identifier) return nullptr;
+
+                    if (!current.IsLeftBracket()) {
+                        // Finally cancel backtracking
+                        backtracking.CancelBacktracking();
+
+                        return std::move(identifier);
                     }
 
-                    // No command and no assignment => print variable
-                    return std::make_shared<LiteralNode>(c.GetContent());
+                    // Move parser to next token
+                    GetNext();
+
+                    auto arguments = ParseArguments();
+
+                    if (!arguments || !current.IsRightBracket()) return nullptr;
+
+                    // Finally cancel backtracking
+                    backtracking.CancelBacktracking();
+
+                    // Go to the next token
+                    GetNext();
+
+                    return std::make_shared<CommandNode>(std::move(identifier), std::move(arguments));
                 }
 
-                return nullptr;
+                // Parse for a primary expression
+                auto primary = ParsePrimary();
+                if (!primary) return nullptr;
+
+                // Cancel backtracking
+                backtracking.CancelBacktracking();
+
+                return std::move(primary);
             }
 
-            std::shared_ptr<AssignmentNode> ParseAssignment() {
-                std::shared_ptr<LiteralNode> identifier;
-                std::shared_ptr<Node> expression;
+            /**
+                \brief Parses an expression in brackets
 
-                if (!current.IsLiteral()) return nullptr;
-                identifier = std::make_shared<LiteralNode>(current.GetContent());
-                GetNext();
+                Parses an expression in brackets
+
+                    bracket_expression ::=
+                            | '(' rhs_expression ')'
+                            | '-' bracket_expression
+                            | call_expression
+                            ;
+             */
+            std::shared_ptr<Node> ParseBracketExpression() {
+                BacktrackingRAII backtracking(*this);
+
+                // If left bracket
+                if (current.IsLeftBracket()) {
+                    GetNext();
+
+                    // Parse for an expression
+                    auto expression = ParseRHSExpression();
+                    if (!expression) return nullptr;
+
+                    if (!current.IsRightBracket()) return nullptr;
+
+                    // Stop backtracking
+                    backtracking.CancelBacktracking();
+
+                    return std::move(expression);
+                } else if (current.IsMinus()) {
+                    GetNext();
+
+                    // Parse the bracket expression
+                    auto expression = ParseBracketExpression();
+
+                    // Stop backtracking
+                    backtracking.CancelBacktracking();
+
+                    return std::make_shared<NegationNode>(std::move(expression));
+                } else {
+                    auto expression = ParseCallExpression();
+
+                    if (!expression) return nullptr;
+
+                    // Stop backtracking
+                    backtracking.CancelBacktracking();
+
+                    return std::move(expression);
+                }
+            }
+
+            /**
+                \brief Parses a multiplicative expression
+
+                Parses a multiplicative expression.
+
+                    multiplicative_expression ::=
+                                | bracket_expression '*' multiplicative_expression
+                                | bracket_expression
+                                ;
+             */
+            std::shared_ptr<Node> ParseMultiplicativeExpression() {
+                BacktrackingRAII backtracking(*this);
+
+                auto bracket = ParseBracketExpression();
+                if (!bracket) return nullptr;
+
+                backtracking.CancelBacktracking();
+
+                if (current.IsAsterisk()) {
+                    // Move to next token
+                    GetNext();
+
+                    // Parse the next term
+                    auto rhs = ParseMultiplicativeExpression();
+                    if (!rhs) {
+                        backtracking.DoBacktrack();
+                        return nullptr;
+                    }
+
+                    return std::make_shared<BinaryNode>(std::move(bracket), std::move(rhs), '*');
+                } else {
+                    return std::move(bracket);
+                }
+            }
+
+            /**
+                \brief Parses a rhs expression
+
+                Parses a right hand side expression. This is either a sum of
+                objects or a multiplicative expression.
+
+                    rhs_expression ::=
+                                | multiplicative_expression ('+' | '-') rhs_expression
+                                | multiplicative_expression
+                                ;
+             */
+            std::shared_ptr<Node> ParseRHSExpression() {
+                BacktrackingRAII backtracking(*this);
+
+                auto multiplicative = ParseMultiplicativeExpression();
+                if (multiplicative == nullptr) return nullptr;
+
+                // Cancel backtracking
+                backtracking.CancelBacktracking();
+
+                // If it is a position
+                if (current.IsMinus() || current.IsPlus()) {
+                    // Get the operation
+                    char op = (current.IsPlus()) ? '+' : '-';
+
+                    // Move to next token
+                    GetNext();
+
+                    // Parse the second part
+                    auto other = ParseRHSExpression();
+
+                    // If this was not a rhs expression, move back
+                    if (other == nullptr) {
+                        backtracking.DoBacktrack();
+                        return nullptr;
+                    }
+
+                    // Build the binary operation node
+                    return std::make_shared<BinaryNode>(std::move(multiplicative), std::move(other), op);
+                } else {
+                    return std::move(multiplicative);
+                }
+            }
+
+            /**
+                Parses an assignment
+
+                    assignment ::= literal '=' rhs_expression
+             */
+            std::shared_ptr<AssignmentNode> ParseAssignment() {
+                BacktrackingRAII backtracking(*this);
+
+                auto identifier = ParseLiteral();
+                if (identifier == nullptr) return nullptr;
 
                 if (!current.IsAssignment()) return nullptr;
                 GetNext();
 
-                expression = ParseRHSExpression();
-                if (expression == nullptr) {
-                    return nullptr;
-                }
+                auto expression = ParseRHSExpression();
+                if (expression == nullptr) return nullptr;
 
-                return std::make_shared<AssignmentNode>(identifier, expression);
+                // Cancel backtracking
+                backtracking.CancelBacktracking();
+
+                return std::make_shared<AssignmentNode>(std::move(identifier), std::move(expression));
             }
 
             /**
                 \brief Parse an expression
 
-                An expression is either an assignment, a command call
-                or the previous token %.
+                An expression is either an assignment or a rhs expression
+
+                expression ::=
+                        | assignment
+                        | rhs_expression
+                        ;
              */
             std::shared_ptr<Node> ParseExpression() {
-                if (current.IsPrevious()) {
-                    return std::make_shared<PreviousNode>();
+                BacktrackingRAII backtrack(*this);
+
+                // Parse an assignment first
+                auto node = ParseAssignment();
+                if (node != nullptr) {
+                    backtrack.CancelBacktracking();
+                    return std::move(node);
                 }
 
-                if (current.IsLiteral()) {
-                    Token c = current;
-
-                    if (lookAhead.IsLeftBracket()) {
-                        return ParseCommand();
-                    } else if (lookAhead.IsAssignment()) {
-                        return ParseAssignment();
-                    }
-
-                    // No command and no assignment => print variable
-                    return std::move(std::make_shared<LiteralNode>(c.GetContent()));
+                // Parse a rhs node otherwise
+                auto rhs = ParseRHSExpression();
+                if (rhs != nullptr) {
+                    backtrack.CancelBacktracking();
+                    return std::move(rhs);
                 }
 
+                // No expression found, return nullptr
                 return nullptr;
             }
         public:
@@ -693,6 +991,16 @@ namespace Construction {
         /***************************************************************************************************************
             IMPLEMENTATION
          **************************************************************************************************************/
+
+        BacktrackingRAII::BacktrackingRAII(Parser& parser) : parser(parser) {
+                position = parser.GetPosition();
+        }
+
+        BacktrackingRAII::~BacktrackingRAII() {
+            if (backtrack) {
+                parser.GoToPosition(position);
+            }
+        }
 
         std::string CommandNode::ToString() const {
             std::stringstream ss;

@@ -36,7 +36,7 @@ namespace Construction {
         REGISTER_ARGUMENT(Arbitrary, 0, ArgumentType::INDEX);
 
         /**
-            \class EpsilonCommand
+            \class Epsi nCommand
 
             Command that generates one tensor for given indices out of
             epsilons. It uses the API function.
@@ -44,6 +44,10 @@ namespace Construction {
         CLI_COMMAND(Epsilon)
             std::string Help() const {
                 return "Epsilon(<Indices>)";
+            }
+
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                return "\\epsilon_" + args[0];
             }
 
             Expression Execute() const {
@@ -65,6 +69,10 @@ namespace Construction {
                 return "InverseEpsilon(<Indices>)";
             }
 
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                return "\\epsilon^" + args[0];
+            }
+
             Expression Execute() const {
                 return API::InverseEpsilon(GetIndices(0));
             }
@@ -82,6 +90,10 @@ namespace Construction {
         CLI_COMMAND(Gamma)
             std::string Help() const {
                 return "Gamma(<Indices>)";
+            }
+
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                return "\\gamma_" + args[0];
             }
 
             Expression Execute() const {
@@ -103,6 +115,10 @@ namespace Construction {
                 return "InverseGamma(<Indices>)";
             }
 
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                return "\\gamma^" + args[0];
+            }
+
             Expression Execute() const {
                 return API::InverseGamma(GetIndices(0));
             }
@@ -120,6 +136,10 @@ namespace Construction {
         CLI_COMMAND(EpsilonGamma)
             std::string Help() const {
                 return "EpsilonGamma(<Indices>)";
+            }
+
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                return "\\epsilon_" + args[0];
             }
 
             Expression Execute() const {
@@ -141,6 +161,10 @@ namespace Construction {
                 return "Delta(<Indices>)";
             }
 
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                return "\\delta_" + args[0];
+            }
+
             Expression Execute() const {
                 return API::Delta(GetIndices(0));
             }
@@ -159,8 +183,12 @@ namespace Construction {
                     return "Coefficient(<Numeric>, <Numeric>, <Numeric>, <Numeric>)";
                 }
 
+                std::string ToLaTeX(const std::vector<std::string>& args) const {
+                    return Execute().ToString();
+                }
+
                 Expression Execute() const {
-                    return API::Coefficient(GetNumeric(0), GetNumeric(1), GetNumeric(2), GetNumeric(3));
+                    return API::Coefficient(GetNumeric(0).ToDouble(), GetNumeric(1).ToDouble(), GetNumeric(2).ToDouble(), GetNumeric(3).ToDouble());
                 }
         };
 
@@ -184,14 +212,26 @@ namespace Construction {
                 return false;
             }
 
-            Expression Execute() const {
-                auto t = GetTensors(0);
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                std::string output = args[0];
 
+                for (auto i=1; i<args.size(); ++i) {
+                    std::string p = args[i];
+                    if (p[0] == '-') {
+                        output = output + " - " + p.substr(1);
+                    } else {
+                        output = output + " + " + args[i];
+                    }
+                }
+
+                return output;
+            }
+
+            Expression Execute() const {
                 auto result = Tensor::Tensor::Zero();
 
                 for (auto i=0; i<Size(); i++) {
-                    auto s = GetTensors(i);
-                    result = API::Add(result, s);
+                    result += GetTensors(i);
                 }
 
                 return result;
@@ -205,11 +245,91 @@ namespace Construction {
         /**
             \class AddCommand
 
+            Command to add two tensors
+         */
+        CLI_COMMAND(Subtract)
+            std::string Help() const {
+                return "Subtract(<Tensor>, <Tensor>...)";
+            }
+
+            static bool Cachable() {
+                return false;
+            }
+
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                std::string output = args[0];
+
+                for (auto i=1; i<args.size(); ++i) {
+                    output = output + " - ";
+                    if (args[i].find("+") != std::string::npos || args[i].find("-") != std::string::npos) {
+                        output = output + "(" + args[i] + ")";
+                    } else output = output + args[i];
+                }
+
+                return output;
+            }
+
+            Expression Execute() const {
+                auto result = GetTensors(0);
+
+                for (auto i=1; i<Size(); i++) {
+                    result -= GetTensors(i);
+                }
+
+                return result;
+            }
+        };
+
+        REGISTER_COMMAND(Subtract);
+        REGISTER_ARGUMENT(Subtract, 0, ArgumentType::TENSOR);
+        REGISTER_REPEATED_ARGUMENT(Subtract, 1, ArgumentType::TENSOR);
+
+        /**
+            \class NegateCommand
+
+            Command to add two tensors
+         */
+        CLI_COMMAND(Negate)
+            std::string Help() const {
+                return "Negate(<Tensor>)";
+            }
+
+            static bool Cachable() {
+                return false;
+            }
+
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                std::string output = "-";
+                if (args[0].find("+") != std::string::npos || args[0].find("-") != std::string::npos) {
+                    output = output + "(" +args[0] + ")";
+                } else output = output + args[0];
+
+                return output;
+            }
+
+            Expression Execute() const {
+                return -GetTensors(0);
+            }
+        };
+
+        REGISTER_COMMAND(Negate);
+        REGISTER_ARGUMENT(Negate, 0, ArgumentType::TENSOR);
+
+        /**
+            \class AddCommand
+
             Scale a tensor
          */
         CLI_COMMAND(Scale)
             std::string Help() const {
                 return "Scale(<Tensor>, <Numeric>)";
+            }
+
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                if (args[0].find("+") != std::string::npos || args[0].find("-") != std::string::npos) {
+                    return args[1] + " * (" + args[0] + ")";
+                }
+                return args[1] + " * " + args[0];
             }
 
             static bool Cachable() {
@@ -224,6 +344,82 @@ namespace Construction {
         REGISTER_COMMAND(Scale);
         REGISTER_ARGUMENT(Scale, 0, ArgumentType::TENSOR);
         REGISTER_ARGUMENT(Scale, 1, ArgumentType::NUMERIC);
+
+        CLI_COMMAND(Multiply)
+            std::string Help() const {
+                return "Multiply(<Tensor>, <Tensor>...)";
+            }
+
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                std::string output = args[0];
+
+                for (auto i=1; i<args.size(); ++i) {
+                    if (args[i].find("+") != std::string::npos || args[i].find("-") != std::string::npos) {
+                        output = output + " * (" + args[i] + ")";
+                    } else {
+                        output = output + " * " + args[i];
+                    }
+                }
+
+                return output;
+            }
+
+            static bool Cachable() {
+                return false;
+            }
+
+            Expression Execute() const {
+                auto result = GetTensors(0);
+
+                for (auto i=1; i<Size(); i++) {
+                    result *= GetTensors(i);
+                }
+
+                return result;
+            }
+        };
+
+        REGISTER_COMMAND(Multiply);
+        REGISTER_ARGUMENT(Multiply, 0, ArgumentType::TENSOR);
+        REGISTER_REPEATED_ARGUMENT(Multiply, 1, ArgumentType::TENSOR);
+
+        CLI_COMMAND(Contract)
+            std::string Help() const {
+                return "Contract(<Tensor>, <Tensor>...)";
+            }
+
+            static bool Cachable() {
+                return false;
+            }
+
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                std::string output = args[0];
+
+                for (auto i=1; i<args.size(); ++i) {
+                    if (args[i].find("+") != std::string::npos || args[i].find("-") != std::string::npos) {
+                        output = output + " * (" + args[i] + ")";
+                    } else {
+                        output = output + " * " + args[i];
+                    }
+                }
+
+                return output;
+            }
+
+            Expression Execute() const {
+                auto result = GetTensors(0);
+
+                for (auto i=1; i<Size(); i++) {
+                    result *= GetTensors(i);
+                }
+
+                return result;
+            }
+        };
+
+        REGISTER_COMMAND(Contract);
+        REGISTER_ARGUMENT(Contract, 0, ArgumentType::TENSOR);
+        REGISTER_REPEATED_ARGUMENT(Contract, 1, ArgumentType::TENSOR);
 
         /**
             \class AppendCommand
@@ -263,7 +459,6 @@ namespace Construction {
 
             Expression Execute() const {
                 // TODO:
-                //std::cout << "  \033[32m" << API::DegreesOfFreedom(GetTensors(0)) << "\033[0m" << std::endl;
                 return Tensor::Scalar(static_cast<int>(API::DegreesOfFreedom(GetTensors(0))));
             }
 
@@ -305,7 +500,7 @@ namespace Construction {
                     std::vector<unsigned> indices;
 
                     for (auto i=1; i<Size(); i++) {
-                        unsigned j = static_cast<unsigned>(GetNumeric(i));
+                        unsigned j = static_cast<unsigned>(GetNumeric(i).ToDouble());
                         indices.push_back(j);
                     }
 
@@ -364,6 +559,10 @@ namespace Construction {
                 return "HomogeneousSystem(<Tensor>)";
             }
 
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                return args[0];
+            }
+
             Expression Execute() const {
                 return API::HomogeneousSystem(GetTensors(0));
             }
@@ -396,14 +595,12 @@ namespace Construction {
                 return "RenameIndices(<Tensor>, <Indices>, <Indices>)";
             }
 
+            std::string ToLaTeX(const std::vector<std::string>& args) const {
+                return args[0];
+            }
+
             Expression Execute() const {
-                auto tensor = GetTensors(0);
-
-                // If the tensor is zero, return
-                if (tensor.IsZeroTensor()) return tensor;
-
-                tensor.SetIndices(Tensor::Permutation::From(GetIndices(1), tensor.GetIndices())(GetIndices(2)));
-                return tensor.Canonicalize();
+                return Language::API::RenameIndices(GetTensors(0), GetIndices(1), GetIndices(2));
             }
         };
 
@@ -411,6 +608,39 @@ namespace Construction {
         REGISTER_ARGUMENT(RenameIndices, 0, ArgumentType::TENSOR);
         REGISTER_ARGUMENT(RenameIndices, 1, ArgumentType::INDEX);
         REGISTER_ARGUMENT(RenameIndices, 2, ArgumentType::INDEX);
+
+        CLI_COMMAND(Expand)
+            std::string Help() const {
+                return "Expand(<Tensor>)";
+            }
+
+            std::string ToLaTeX() const {
+                return Execute().ToString();
+            }
+
+            Expression Execute() const {
+                return GetTensors(0).Expand();
+            }
+        };
+
+        REGISTER_COMMAND(Expand);
+        REGISTER_ARGUMENT(Expand, 0, ArgumentType::TENSOR);
+
+        CLI_COMMAND(GetAllCombinations)
+            std::string Help() const {
+                return "GetAllCombinations(<Tensor>, <Indices>)";
+            }
+
+            Expression Execute() const {
+
+
+                return Expression::Void();
+            }
+        };
+
+        REGISTER_COMMAND(GetAllCombinations);
+        REGISTER_ARGUMENT(GetAllCombinations, 0, ArgumentType::TENSOR);
+        REGISTER_ARGUMENT(GetAllCombinations, 1, ArgumentType::INDEX);
 
     }
 }

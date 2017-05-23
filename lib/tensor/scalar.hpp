@@ -223,12 +223,20 @@ namespace Construction {
 
                 // If one is minus one, just return the negated expression
                 if (A->IsNumeric() && A->ToDouble() == -1) {
-                    ss << "-" << B->ToString();
+                    if (B->IsAdded()) {
+                        ss << "-(" << B->ToString() << ")";
+                    } else {
+                        ss << "-" << B->ToString();
+                    }
                     return ss.str();
                 }
 
                 if (B->IsNumeric() && B->ToDouble() == -1) {
-                    ss << "-" << A->ToString();
+                    if (A->IsAdded()) {
+                        ss << "-(" << A->ToString() << ")";
+                    } else {
+                        ss << "-" << A->ToString();
+                    }
                     return ss.str();
                 }
 
@@ -294,16 +302,17 @@ namespace Construction {
             Scalar(const std::string& name, const std::string& printed_text);
             Scalar(const std::string& name, unsigned id);
 
-            Scalar(const Scalar& other) : AbstractExpression(SCALAR), pointer(std::move(other.pointer->Clone())) { }
-            Scalar(Scalar&& other) : AbstractExpression(SCALAR), pointer(std::move(other.pointer)) { }
+            Scalar(const Scalar& other) : pointer(std::move(other.pointer->Clone())) { }
+            Scalar(Scalar&& other) : pointer(std::move(other.pointer)) { }
 
-            Scalar(std::unique_ptr<AbstractScalar> pointer) : AbstractExpression(SCALAR), pointer(std::move(pointer)) { }
+            Scalar(std::unique_ptr<AbstractScalar> pointer) : pointer(std::move(pointer)) { }
 
             virtual ~Scalar() = default;
         public:
             // Syntactic sugar
             inline static Scalar Integer(int v) { return Scalar(v); }
             inline static Scalar Fraction(int numerator, unsigned denominator) { return Scalar(numerator, denominator); }
+            static Scalar Fraction(double f);
             inline static Scalar FloatingPoint(double v) { return Scalar(v); }
 
             inline static Scalar Variable(const std::string& name) { return Scalar(name); }
@@ -323,6 +332,8 @@ namespace Construction {
             Scalar& operator=(double d);
         public:
             virtual ExpressionPointer Clone() const override { return std::move(ExpressionPointer(new Scalar(*this))); }
+
+            virtual bool IsScalarExpression() const override { return true; }
         public:
             inline AbstractScalar::Type GetType() const { return pointer->GetType(); }
             inline std::string TypeToString() const { return pointer->TypeToString(); }
@@ -439,6 +450,43 @@ namespace Construction {
             }
 
             /**
+                \brief Expand scalar expressions
+             */
+            Scalar Expand() const {
+                if (pointer->IsAdded()) {
+                    auto summands = GetSummands();
+                    Scalar result;
+
+                    for (auto& scalar : summands) {
+                        auto expanded = scalar.Expand().GetSummands();
+
+                        for (auto& s : expanded) {
+                            result += s;
+                        }
+                    }
+
+                    return result;
+                }
+
+                if (pointer->IsMultiplied()) {
+                    auto expandedLeft = Scalar(static_cast<MultipliedScalar*>(pointer.get())->GetFirst()->Clone()).Expand().GetSummands();
+                    auto expandedRight = Scalar(static_cast<MultipliedScalar*>(pointer.get())->GetSecond()->Clone()).Expand().GetSummands();
+
+                    Scalar result;
+
+                    for (auto& s : expandedLeft) {
+                        for (auto& t : expandedRight) {
+                            result += s*t;
+                        }
+                    }
+
+                    return result;
+                }
+
+                return *this;
+            }
+
+            /**
                 \brief Substitute variables in a scalar expression
 
                 Substitutes a variable with an arbitrary scalar expression. Since
@@ -467,7 +515,7 @@ namespace Construction {
                     if (s.IsVariable()) result += (s == variable) ? other : s;
                     if (s.IsNumeric()) result += s;
 
-                    // If it is a multiplication, substite in each factor recursively
+                    // If it is a multiplication, substitute in each factor recursively
                     if (s.IsMultiplied()) {
                         result += Scalar(static_cast<MultipliedScalar*>(s.pointer.get())->GetFirst()->Clone()).Substitute(variable, other) *
                                   Scalar(static_cast<MultipliedScalar*>(s.pointer.get())->GetSecond()->Clone()).Substitute(variable, other);
@@ -481,7 +529,7 @@ namespace Construction {
                 Scalar rest = 0;
 
                 // Get the summands
-                auto summands = GetSummands();
+                auto summands = Expand().GetSummands();
 
                 std::vector<Scalar> keys;
                 std::vector<Scalar> values;
@@ -542,6 +590,20 @@ namespace Construction {
 
                 return { result, rest };
             }
+
+            Scalar Simplify() const {
+                auto pair = SeparateVariablesFromRest();
+
+                Scalar result;
+                for (auto& vars : pair.first) {
+                    result += vars.first * vars.second;
+                }
+
+                result += pair.second;
+                return std::move(result);
+            }
+        public:
+            bool IsProportionalTo(const Scalar& other, Scalar* factor = nullptr);
         public:
             void Serialize(std::ostream& os) const override;
             static std::unique_ptr<AbstractExpression> Deserialize(std::istream& is);
@@ -550,4 +612,18 @@ namespace Construction {
         };
 
     }
+}
+
+namespace std {
+
+    /**
+        Hash function for scalars to use std::unordered_map
+     */
+    template<>
+    struct hash<Construction::Tensor::Scalar> {
+        std::size_t operator()(const Construction::Tensor::Scalar& scalar) const {
+            return std::hash<std::string>()(scalar.ToString());
+        }
+    };
+
 }

@@ -4,6 +4,7 @@
 #include <sstream>
 #include <map>
 #include <fstream>
+#include <mutex>
 
 #include <common/singleton.hpp>
 #include <common/error.hpp>
@@ -33,10 +34,18 @@ namespace Construction {
 
         class Session : public Singleton<Session> {
         public:
-            Session() { }
+            Session() : current(Expression::Void()) { }
         public:
             Expression GetCurrent() const {
-                return current;
+                Expression result;
+
+                // Scope based locking
+                {
+                    std::unique_lock<std::mutex> lock(mutex);
+                    result = current;
+                }
+
+                return result;
             }
 
             std::string GetLastCommandString() const {
@@ -46,12 +55,49 @@ namespace Construction {
             Notebook& GetNotebook() { return notebook; }
 
             void SetCurrent(const std::string& cmd, const Expression& tensors) {
+                std::unique_lock<std::mutex> lock(mutex);
+
                 lastCmd = cmd;
                 current = tensors;
             }
 
-            Expression& Get(const std::string& name) {
+            /*Expression& Get(const std::string& name) {
                 return memory[name];
+            }*/
+
+            Expression Get(const std::string& name) const {
+                std::unique_lock<std::mutex> lock(mutex);
+
+                auto it = memory.find(name);
+
+                if (it == memory.end()) {
+                    return Expression::Void();
+                } else {
+                    return it->second;
+                }
+            }
+
+            void Set(const std::string& name, const Expression& expression) {
+                std::unique_lock<std::mutex> lock(mutex);
+
+                memory[name] = expression;
+            }
+
+            void Set(const std::string& name, Expression&& expression) {
+                std::unique_lock<std::mutex> lock(mutex);
+
+                memory[name] = std::move(expression);
+            }
+
+            void TurnCurrentIntoAVariable(const std::string& name) {
+                std::unique_lock<std::mutex> lock(mutex);
+
+                auto it = memory.find(name);
+                if (it == memory.end()) {
+                    memory.insert({ name, current });
+                } else {
+                    it->second = current;
+                }
             }
 
             Expression& operator[](const std::string& name) {
@@ -61,6 +107,8 @@ namespace Construction {
             size_t Size() const { return memory.size(); }
         public:
             void SaveToFile(const std::string& filename) const {
+                std::unique_lock<std::mutex> lock(mutex);
+
                 std::stringstream os;
 
                 // Store the notebook
@@ -141,6 +189,8 @@ namespace Construction {
                 \throws CannotOpenSessionException
              */
             void LoadFromFile(const std::string& filename) {
+                std::unique_lock<std::mutex> lock(mutex);
+
                 std::ifstream file (filename);
                 std::stringstream is;
 
@@ -266,6 +316,7 @@ namespace Construction {
         private:
             Notebook notebook;
 
+            mutable std::mutex mutex;
             std::string lastCmd;
             Expression current;
             std::map<std::string, Expression> memory;

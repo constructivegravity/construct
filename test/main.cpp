@@ -2,6 +2,8 @@
 #include <catch.hpp>
 
 //#include "common.cpp"
-#include "tensor.cpp"
+//#include "tensor.cpp"
 //#include "api.cpp"
 //#include "vector.cpp"
+
+#include "equations/metric.cpp"

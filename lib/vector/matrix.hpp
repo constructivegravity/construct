@@ -1,5 +1,6 @@
 #pragma once
 
+#include <common/logger.hpp>
 #include <common/error.hpp>
 #include <vector/vector.hpp>
 
@@ -74,6 +75,7 @@ namespace Construction {
             unsigned column;
         };
 
+        template<typename T>
         class Matrix {
         public:
             /**
@@ -89,7 +91,7 @@ namespace Construction {
              */
             ~Matrix() { }
 
-            Matrix(std::initializer_list<Vector> list) {
+            Matrix(std::initializer_list<Vector<T>> list) {
                 m = list.size();
                 n = (*list.begin()).GetDimension();
 
@@ -105,7 +107,7 @@ namespace Construction {
                 }
             }
 
-            Matrix(const std::vector<Vector>& list) {
+            Matrix(const std::vector<Vector<T>>& list) {
                 m = list.size();
                 if (m == 0) return;
 
@@ -147,36 +149,36 @@ namespace Construction {
                 return m;
             }
         public:
-            inline float& At(int i, int j) {
+            inline T& At(int i, int j) {
                 if (i >= n || j >= m || i < 0 || j < 0) throw OutOfBoundariesException();
                 return values[MatrixIndex(i,j)];
             }
 
-            inline float At(int i, int j) const {
+            inline T At(int i, int j) const {
                 if (i >= n || j >= m || i < 0 || j < 0) throw OutOfBoundariesException();
                 auto it = values.find(MatrixIndex(i,j));
-                if (it == values.end()) return 0;
+                if (it == values.end()) return T(0);
                 return it->second;
             }
 
-            inline float& operator()(int i, int j) {
+            inline T& operator()(int i, int j) {
                 if (i >= n || j >= m || i < 0 || j < 0) throw OutOfBoundariesException();
                 return values[MatrixIndex(i,j)];
             }
 
-            inline float operator()(int i, int j) const {
+            inline T operator()(int i, int j) const {
                 if (i >= n || j >= m || i < 0 || j < 0) throw OutOfBoundariesException();
                 auto it = values.find(MatrixIndex(i,j));
-                if (it == values.end()) return 0;
+                if (it == values.end()) return T(0);
                 return it->second;
             }
 
-            inline void Set(int i, int j, float value) {
+            inline void Set(int i, int j, T value) {
                 if (i >= n || j >= m || i < 0 || j < 0) throw OutOfBoundariesException();
                 auto it = values.find(MatrixIndex(i,j));
 
                 // If the new value is zero, delete the entry if necessary
-                if (value == 0) {
+                if (value == T(0)) {
                     if (it == values.end()) return;
                     values.erase(it);
                 } else {
@@ -185,20 +187,20 @@ namespace Construction {
                 }
             }
         public:
-            Vector GetRowVector(int i) const {
+            Vector<T> GetRowVector(int i) const {
                 if (i >= n) throw OutOfBoundariesException();
 
-                Vector result(m);
+                Vector<T> result(m);
                 for (int j=0; j<m; j++) {
                     result[j] = At(i,j);
                 }
                 return result;
             }
 
-            Vector GetColumnVector(int i) const {
+            Vector<T> GetColumnVector(int i) const {
                 if (i >= m) throw OutOfBoundariesException();
 
-                Vector result(n);
+                Vector<T> result(n);
                 for (int j=0; j<n; j++) {
                     result[j] = At(j,i);
                 }
@@ -241,7 +243,7 @@ namespace Construction {
                 if (other.n != n || other.m != m) throw DimensionsDoNotMatchException();
                 for (int i=0; i<n; i++) {
                     for (int j=0; j<m; j++) {
-                        float z = other(i,j);
+                        double z = other(i,j);
                         if (z != 0) At(i,j) += z;
                     }
                 }
@@ -254,9 +256,9 @@ namespace Construction {
 
                 for (int i=0; i<n; i++) {
                     for (int j=0; j<m; j++) {
-                        float x = At(i,j);
-                        float y = other(i,j);
-                        if (x != 0 || y != 0) result(n,m) = x + y;
+                        double x = At(i,j);
+                        double y = other(i,j);
+                        if (x != T(0) || y != T(0)) result(n,m) = x + y;
                     }
                 }
                 return result;
@@ -266,8 +268,8 @@ namespace Construction {
                 if (other.n != n || other.m != m) throw DimensionsDoNotMatchException();
                 for (int i=0; i<n; i++) {
                     for (int j=0; j<m; j++) {
-                        float z = other(i,j);
-                        if (z != 0) At(i,j) -= z;
+                        double z = other(i,j);
+                        if (z != T(0)) At(i,j) -= z;
                     }
                 }
                 return *this;
@@ -279,28 +281,28 @@ namespace Construction {
 
                 for (int i=0; i<n; i++) {
                     for (int j=0; j<m; j++) {
-                        float x = At(i,j);
-                        float y = other(i,j);
-                        if (x != 0 || y != 0) result(n,m) = x - y;
+                        double x = At(i,j);
+                        double y = other(i,j);
+                        if (x != T(0) || y != T(0)) result(n,m) = x - y;
                     }
                 }
                 return result;
             }
 
-            Matrix& operator*=(float c) {
+            Matrix& operator*=(double c) {
                 for (int i=0; i<n; i++) {
                     for (int j=0; j<m; j++) {
-                        if (At(i,j) != 0) At(i,j) *= c;
+                        if (At(i,j) != T(0)) At(i,j) *= c;
                     }
                 }
                 return *this;
             }
 
-            Matrix operator*(float c) const {
+            Matrix operator*(double c) const {
                 Matrix result (n,m);
                 for (int i=0; i<n; i++) {
                     for (int j=0; j<m; j++) {
-                        if (At(i,j) != 0) result(i,j) = c * At(i,j);
+                        if (At(i,j) != T(0)) result(i,j) = c * At(i,j);
                     }
                 }
                 return result;
@@ -313,8 +315,8 @@ namespace Construction {
                 for (int i=0; i<n; i++) {
                     for (int j=0; j<other.m; j++) {
                         for (int k=0; k<m; k++) {
-                            float z = At(i,k)*other(k,j);
-                            if (z != 0) result(i,j) = z;
+                            double z = At(i,k)*other(k,j);
+                            if (z != T(0)) result(i,j) = z;
                         }
                     }
                 }
@@ -322,9 +324,9 @@ namespace Construction {
                 return result;
             }
 
-            Vector operator*(const Vector& v) const {
+            Vector<T> operator*(const Vector<T>& v) const {
                 if (m != v.GetDimension()) throw OutOfBoundariesException();
-                Vector result(n);
+                Vector<T> result(n);
                 for (int i=0; i<n; i++) {
                     for (int j=0; j<m; j++) {
                         result[i] = At(i,j) * v[j];
@@ -333,22 +335,20 @@ namespace Construction {
                 return result;
             }
 
-            Matrix& operator/=(float c) {
-                c = 1.0/c;
+            Matrix& operator/=(T c) {
                 for (int i=0; i<n; i++) {
                     for (int j=0; j<m; j++) {
-                        if (At(i,j) != 0) At(i,j) *= c;
+                        if (At(i,j) != T(0)) At(i,j) /= c;
                     }
                 }
                 return *this;
             }
 
-            Matrix operator/(float c) const {
-                c = 1.0/c;
+            Matrix operator/(T c) const {
                 Matrix result (n,m);
                 for (int i=0; i<n; i++) {
                     for (int j=0; j<m; j++) {
-                        if (At(i,j) != 0) result(i,j) = c * At(i,j);
+                        if (At(i,j) != T(0)) result(i,j) = At(i,j) / c;
                     }
                 }
                 return result;
@@ -359,22 +359,22 @@ namespace Construction {
 
                 for (unsigned i=0; i<std::min(n, this->n); i++) {
                     for (unsigned j=0; j<std::min(m, this->m); j++) {
-                        if (At(i,j) != 0) result(i,j) = At(i,j);
+                        if (At(i,j) != T(0)) result(i,j) = At(i,j);
                     }
                 }
 
                 return result;
             }
 
-            float GetDensity() const {
+            double GetDensity() const {
                 size_t value = 0;
                 for (int r=0; r<GetNumberOfRows(); r++) {
                     for (int c=0; c<GetNumberOfColumns(); c++) {
-                        if (At(r,c) != 0) value++;
+                        if (At(r,c) != T(0)) value++;
                     }
                 }
 
-                return (static_cast<float>(value) / GetNumberOfRows()) / GetNumberOfColumns();
+                return (static_cast<double>(value) / GetNumberOfRows()) / GetNumberOfColumns();
             }
         public:
             /**
@@ -387,7 +387,7 @@ namespace Construction {
                 for (unsigned r=0; r<result.GetNumberOfColumns(); r++) {
                     bool isZero = true;
                     for (unsigned c=0; c<result.GetNumberOfColumns(); c++) {
-                        if (result(r,c) != 0) {
+                        if (result(r,c) != T(0)) {
                             isZero = false;
                             break;
                         }
@@ -403,7 +403,7 @@ namespace Construction {
                     if (zeroRow[r]) continue;
 
                     unsigned i = r;
-                    while (result(i, lead) == 0) {
+                    while (result(i, lead) == T(0)) {
                         i++;
                         if (result.GetNumberOfRows() <= i && !zeroRow[i]) {
                             i = r;
@@ -414,16 +414,16 @@ namespace Construction {
                     result.SwapRows(i,r);
 
                     // Divide row r through M[r,lead]
-                    if (result(r, lead) != 0) {
-                        float x = result(r, lead);
+                    if (result(r, lead) != T(0)) {
+                        T x = result(r, lead);
                         for (int k=0; k<result.GetNumberOfColumns(); k++) result(r, k) /= x;
                     }
 
                     for (unsigned i=0; i<result.GetNumberOfRows(); i++) {
                         if (i != r) {
-                            float x = result(i, lead);
+                            T x = result(i, lead);
                             for (unsigned k=0; k<result.GetNumberOfColumns(); k++) {
-                                float y = result(r,k);
+                                T y = result(r,k);
                                 result(i,k) -= x*result(r,k);
                             }
                         }
@@ -442,10 +442,10 @@ namespace Construction {
                 unsigned numRows = GetNumberOfRows();
 
                 // Find rows that are completely zero
-                for (unsigned r=0; r<numRows; r++) {
+                for (unsigned r=0; r<numRows; ++r) {
                     bool isZero = true;
                     for (unsigned c=0; c<GetNumberOfColumns(); c++) {
-                        if (At(r,c) != 0) {
+                        if (At(r,c) != T(0)) {
                             isZero = false;
                             break;
                         }
@@ -466,37 +466,39 @@ namespace Construction {
 
                 // Do magic
                 unsigned lead=0;
-                for (unsigned r=0; r<numRows; r++) {
+                for (unsigned r=0; r<numRows; ++r) {
                     if (lead >= GetNumberOfColumns()) return;
 
+                    // Search for first line that has a non-zero entry as pivot element
                     unsigned i = r;
-                    while (At(i, lead) == 0) {
-                        i++;
+                    while (At(i, lead) == T(0)) {
+                        ++i;
                         if (numRows <= i) {
                             i = r;
-                            lead++;
+                            ++lead;
                             if (lead >= GetNumberOfColumns()) return;
                         }
                     }
                     SwapRows(i,r);
 
                     // Divide row r through M[r,lead]
-                    if (At(r, lead) != 0) {
-                        float x = At(r, lead);
+                    if (At(r, lead) != T(0)) {
+                        T x = At(r, lead);
+
                         for (int k=0; k<GetNumberOfColumns(); k++) {
-                            float z = At(r,k);
+                            T z = At(r,k) / x;
 
                             // Update the value, remove zeros from the memory
                             // automatically
-                            Set(r,k, z / x);
+                            Set(r,k, z);
                         }
                     }
 
                     for (unsigned i=0; i<numRows; i++) {
                         if (i != r) {
-                            float x = At(i, lead);
+                            T x = At(i, lead);
                             for (unsigned k=0; k<GetNumberOfColumns(); k++) {
-                                float y = x*At(r,k);
+                                T y = x*At(r,k);
 
                                 // Update the value, remove zeros from the memory
                                 // automatically
@@ -505,6 +507,8 @@ namespace Construction {
                         }
                     }
                     lead++;
+
+                    Construction::Logger::Debug("Gauss step: ", ToString(false));
                 }
             }
         public:
@@ -514,15 +518,15 @@ namespace Construction {
 
                 for (int k=0; k<m; k++) {
                     auto it1 = values.find(MatrixIndex(i,k));
-                    float value1 = (it1 != values.end()) ? it1->second : 0;
+                    T value1 = (it1 != values.end()) ? it1->second : T(0);
                     if (it1 != values.end()) values.erase(it1);
 
                     auto it2 = values.find(MatrixIndex(j,k));
-                    float value2 = (it2 != values.end()) ? it2->second : 0;
+                    T value2 = (it2 != values.end()) ? it2->second : T(0);
                     if (it2 != values.end()) values.erase(it2);
 
-                    if (value1 != 0) values.insert({ MatrixIndex(j,k), value1 });
-                    if (value2 != 0) values.insert({ MatrixIndex(i,k), value2 });
+                    if (value1 != T(0)) values.insert({ MatrixIndex(j,k), value1 });
+                    if (value2 != T(0)) values.insert({ MatrixIndex(i,k), value2 });
                 }
             }
 
@@ -532,38 +536,56 @@ namespace Construction {
 
                 for (int k=0; k<n; k++) {
                     auto it1 = values.find(MatrixIndex(k,i));
-                    float value1 = (it1 != values.end()) ? it1->second : 0;
+                    double value1 = (it1 != values.end()) ? it1->second : T(0);
                     if (it1 != values.end()) values.erase(it1);
 
                     auto it2 = values.find(MatrixIndex(k,j));
-                    float value2 = (it2 != values.end()) ? it2->second : 0;
+                    double value2 = (it2 != values.end()) ? it2->second : T(0);
                     if (it2 != values.end()) values.erase(it2);
 
-                    if (value1 != 0) values.insert({ MatrixIndex(k,j), value1 });
-                    if (value2 != 0) values.insert({ MatrixIndex(k,i), value2 });
+                    if (value1 != T(0)) values.insert({ MatrixIndex(k,j), value1 });
+                    if (value2 != T(0)) values.insert({ MatrixIndex(k,i), value2 });
                 }
             }
         public:
-            friend std::ostream& operator<<(std::ostream& os, const Matrix& v) {
+            std::string ToString(bool includeEmptyRows=true) const {
+                std::stringstream os;
+
                 os << "[";
-                for (int i=0; i<v.n; i++) {
-                    if (i > 0) os << " ";
-                    os << "[";
-                    for (int j=0; j<v.m; j++) {
-                        os << std::setw(3) << std::setprecision(1) << v(i,j);
-                        if (j != v.m-1) os << ", ";
+                for (int i=0; i<n; i++) {
+                    std::stringstream is;
+                    bool isEmpty=true;
+
+                    if (i > 0) is << " ";
+                    is << "[";
+                    for (int j=0; j<m; j++) {
+                        auto v = At(i,j);
+                        if (v != T(0)) isEmpty = false;
+
+                        is << std::setw(3) << std::setprecision(2) << At(i,j);
+                        if (j != m-1) is << ", ";
                     }
-                    os << "]"; //<< std::endl;
-                    if (i != v.n-1) os << ", " << std::endl;
+                    is << "]"; //<< std::endl;
+                    if (i != n-1) is << ", " << std::endl;
+
+                    if (includeEmptyRows || !isEmpty) {
+                        os << is.str();
+                    }
                 }
                 os << "]";
+
+                return os.str();
+            }
+
+            friend std::ostream& operator<<(std::ostream& os, const Matrix& v) {
+                os << v.ToString();
                 return os;
             }
         private:
             unsigned n;
             unsigned m;
 
-            std::map<MatrixIndex, float> values;
+            std::map<MatrixIndex, T> values;
         };
 
     }

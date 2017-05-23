@@ -22,15 +22,6 @@ SCENARIO("General tensors", "[tensor]") {
 
         }
 
-        WHEN(" looking at the size of the tensors in memory") {
-            THEN(" EpsilonGammas are of size ") {
-                auto tensor = Construction::Tensor::Tensor::EpsilonGamma(0,6, Construction::Tensor::Indices::GetRomanSeries(12, {1,3}));
-
-                REQUIRE(tensor.ToString() == "\\gamma_{ab}\\gamma_{cd}\\gamma_{ef}\\gamma_{gh}\\gamma_{ij}\\gamma_{kl}");
-                REQUIRE(tensor.Size() == 144);
-            }
-        }
-
         WHEN(" symmetrizing a tensor") {
             auto tensor = Construction::Tensor::Tensor::EpsilonGamma(0,2, Construction::Tensor::Indices::GetRomanSeries(4, {1,3}));
 
@@ -341,7 +332,7 @@ SCENARIO("Addition", "[tensor-addition]") {
         WHEN(" printing the TeX code") {
 
             THEN(" get twice the metric \\gamma") {
-                REQUIRE(a.ToString() == "\\gamma_{ab} + \n\\gamma_{ab}");
+                REQUIRE(a.ToString() == "\\gamma_{ab} + \\gamma_{ab}");
             }
         }
 
@@ -371,7 +362,7 @@ SCENARIO("Addition", "[tensor-addition]") {
             }
 
             THEN(" the expanded term looks correct") {
-                REQUIRE(expanded.ToString() == "1/2 * \\gamma_{ab} + \n1/2 * \\gamma_{ba}");
+                REQUIRE(expanded.ToString() == "1/2 * \\gamma_{ab} + 1/2 * \\gamma_{ba}");
             }
 
             THEN(" we get the metric again after simplification") {

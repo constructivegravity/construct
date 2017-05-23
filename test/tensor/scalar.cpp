@@ -32,6 +32,11 @@ SCENARIO("Scalars", "[scalar]") {
 			REQUIRE(s.ToDouble() == 0);
 		}
 
+        WHEN(" creating from a double") {
+            REQUIRE(Scalar::Fraction(0.5).ToString() == "1/2");
+            REQUIRE(Scalar::Fraction(0.25).ToString() == "1/4");
+        }
+
 		WHEN(" comparing two scalars") {
 			REQUIRE(zero == 0);
 			REQUIRE(Scalar(1) == 1);
@@ -86,7 +91,7 @@ SCENARIO("Scalars", "[scalar]") {
 			}
 		}
 
-		WHEN(" serializing this") {
+		/*WHEN(" serializing this") {
 			THEN(" we get something") {
 				std::string content;
 				{
@@ -104,7 +109,7 @@ SCENARIO("Scalars", "[scalar]") {
 					REQUIRE(deserialized.ToString() == s.ToString());
 				}
 			}
-		}
+		}*/
 
 		WHEN(" checking if it contains a variable") {
 			THEN(" we get yes") {

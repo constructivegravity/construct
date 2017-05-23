@@ -33,31 +33,28 @@ namespace Construction {
             we cannot employ template based optimizations and need to
             implement a dynamical version.
          */
+        template<typename T>
         class Vector {
         public:
             Vector(size_t dimension) {
                 this->dimension = dimension;
-                data = new float[dimension];
-
-                for (int i=0; i<dimension; i++) {
-                    data[i] = 0.0;
-                }
+                data = (T*) std::calloc(dimension, sizeof(T));
             }
 
             ~Vector() {
                 if (data != nullptr) {
-                    delete[] data;
+                    std::free(data);
                 }
             }
 
-            Vector(std::initializer_list<float> list) {
+            Vector(std::initializer_list<T> list) {
                 dimension = list.size();
-                data = new float[dimension];
+                data = (T*) std::calloc(dimension, sizeof(T));
 
                 int i=0;
                 for (auto& e : list) {
                     data[i] = e;
-                    i++;
+                    ++i;
                 }
             }
 
@@ -67,7 +64,7 @@ namespace Construction {
             Vector(const Vector& other) {
                 dimension = other.GetDimension();
 
-                data = new float[dimension];
+                data = (T*) std::calloc(dimension, sizeof(T));
                 for (int i=0; i<dimension; i++) {
                     data[i] = other.data[i];
                 }
@@ -82,10 +79,10 @@ namespace Construction {
             }
         public:
             Vector& operator=(const Vector& other) {
-                delete[] data;
+                std::free(data);
 
                 size_t dim = other.GetDimension();
-                data = new float[dim];
+                data = (T*) std::calloc(dimension, sizeof(T));
                 for (int i=0; i<dim; i++) {
                     data[i] = other.data[i];
                 }
@@ -94,7 +91,7 @@ namespace Construction {
             }
 
             Vector& operator=(Vector&& other) {
-                delete[] data;
+                std::free(data);
                 data = other.data;
                 other.data = nullptr;
                 return *this;
@@ -104,22 +101,22 @@ namespace Construction {
                 return dimension;
             }
         public:
-            float At(unsigned i) const {
+            T At(unsigned i) const {
                 if (i >= GetDimension()) throw OutOfBoundariesException();
                 return data[i];
             }
 
-            float& At(unsigned i) {
+            T& At(unsigned i) {
                 if (i >= GetDimension()) throw OutOfBoundariesException();
                 return data[i];
             }
 
-            float& operator[](unsigned i) {
+            T& operator[](unsigned i) {
                 if (i >= GetDimension()) throw OutOfBoundariesException();
                 return data[i];
             }
 
-            float operator[](unsigned i) const {
+            T operator[](unsigned i) const {
                 if (i >= GetDimension()) throw OutOfBoundariesException();
                 return data[i];
             }
@@ -214,27 +211,27 @@ namespace Construction {
                 return result;
             }
 
-            float operator*(const Vector& other) const {
+            T operator*(const Vector& other) const {
                 size_t dim =  GetDimension();
                 if (other.GetDimension() != dim) {
                     throw IncompatibleDimensionsException();
                 }
 
-                float result = 0.0;
+                T result;
                 for (int i=0; i<dim; i++) {
                     result += data[i]*other.data[i];
                 }
                 return result;
             }
 
-            Vector& operator*=(float c) {
+            Vector& operator*=(T c) {
                 for (int i=0; i<GetDimension(); i++) {
                     data[i] *= c;
                 }
                 return *this;
             }
 
-            Vector operator*(float c) const {
+            Vector operator*(T c) const {
                 Vector result = *this;
                 for (int i=0; i<GetDimension(); i++) {
                     result.data[i] *= c;
@@ -242,30 +239,28 @@ namespace Construction {
                 return result;
             }
 
-            inline friend Vector operator*(float c, const Vector& v) {
+            inline friend Vector operator*(T c, const Vector& v) {
                 return v*c;
             }
 
-            Vector& operator/=(float c) {
-                c = 1.0/c;
+            Vector& operator/=(T c) {
                 for (int i=0; i<GetDimension(); i++) {
-                    data[i] *= c;
+                    data[i] /= c;
                 }
                 return *this;
             }
 
-            Vector operator/(float c) const {
+            Vector operator/(T c) const {
                 Vector result = *this;
-                c = 1.0/c;
                 for (int i=0; i<GetDimension(); i++) {
-                    result.data[i] *= c;
+                    result.data[i] /= c;
                 }
                 return result;
             }
         public:
             bool IsZero() const {
                 for (int i=0; i<GetDimension(); i++) {
-                    if (data[i] != 0.0f) return false;
+                    if (data[i] != T(0)) return false; // Assuming that T(0) is the default value
                 }
                 return true;
             }
@@ -284,15 +279,15 @@ namespace Construction {
                 return false;
             }
         public:
-            float LengthSquared() const {
-                float result = 0.0;
+            T LengthSquared() const {
+                T result = T(0);
                 for (int i=0; i<GetDimension(); i++) {
                     result += data[i]*data[i];
                 }
                 return result;
             }
 
-            inline float Length() const {
+            inline T Length() const {
                 return sqrt(LengthSquared());
             }
 
@@ -301,13 +296,13 @@ namespace Construction {
             }
 
             void Normalize() {
-                double c = 1.0/Length();
+                T c = Length();
                 for (int i=0; i<GetDimension(); i++) {
-                    data[i] *= c;
+                    data[i] /= c;
                 }
             }
 
-            inline friend float Dot(const Vector& v, const Vector& w) {
+            inline friend T Dot(const Vector& v, const Vector& w) {
                 return v*w;
             }
 
@@ -331,8 +326,11 @@ namespace Construction {
             }
         private:
             size_t dimension;
-            float* data;
+            T* data;
         };
+
+        typedef Vector<float>       Vecf;
+        typedef Vector<double>      Vecd;
 
     }
 }
