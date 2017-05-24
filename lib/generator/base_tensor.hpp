@@ -138,6 +138,9 @@ namespace Construction {
                     }
                 }
 
+                // We cannot build anything with one index!
+                if (indices.Size() == 1) return Tensor::Tensor::Zero();
+
                 Tensor::Tensor result = Tensor::Tensor::Zero();
                 unsigned variableCounter = 0;
 

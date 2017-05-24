@@ -2640,6 +2640,9 @@ namespace Construction {
 				Tensor result = Tensor::Zero();
 				unsigned variableCount = 1 + offset;
 
+                // If the overal factor is a variable, rename it
+                if (factorized.first.HasVariables()) factorized.first = scalar_type(name, variableCount++);
+
 				for (auto& tensor : summands) {
 					// If the tensor is scaled, redefine the free variable in front (if present)
 					if (tensor.IsScaled() && tensor.As<ScaledTensor>()->GetScale().HasVariables()) {
