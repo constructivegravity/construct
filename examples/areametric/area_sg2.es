@@ -14,7 +14,7 @@ Add(Scale(#<lambda_BBdd.BBB_:2:2:2:0:{c d a b e f}:no>,2), Scale(#<lambda_BBd.BB
 //24 
 Add(Scale(Symmetrize(#<xi_BB.Bd_:2:0:2:1:{a b e f c}:no>,{b c}),4), Scale(Symmetrize(Multiply(InverseGamma({m n}),Epsilon({m a e}),#<lambda_BBBdd_:0:0:2:2:{f n b c}>),{e f}),-1))
 //25 
-Add(Scale(#<xi_B.BBd_:2:0:2:1:{a b e f c}:no>,4), Symmetrize(Multiply(InverseGamma({m n}),Epsilon({m a e}),#<lambda_BBBdd_:0:0:2:2:{f n b c}>),{e f}))
+Add(Scale(Symmetrize(#<xi_B.BBd_:2:0:2:1:{a b e f c}:no>,4),{a b}), Symmetrize(Multiply(InverseGamma({m n}),Epsilon({m a e}),#<lambda_BBBdd_:0:0:2:2:{f n b c}>),{e f}))
 //33 
 Add(Symmetrize(Multiply(InverseGamma({m n}),Epsilon({a m c}),#<theta_B.BBB_:2:0:2:0:{e f d n}:no>),{c d}), Symmetrize(Multiply(InverseGamma({m n}),Epsilon({a m e}),#<theta_B.BBB_:2:0:2:0:{c d f n}:no>),{e f}))
 //34 
