@@ -31,7 +31,6 @@ namespace Construction {
             void RegisterFlags() {
                 AddLocalFlag<int>(parallelEqns, "parallel", "p", 1, "Number of equations that are solved in parallel");
                 AddLocalFlag<bool>(abc, "abc", "a", false, "Do not print the full tensors but only the scalars in front of base tensors");
-                AddLocalFlag<bool>(debugMode, "debug", "d", false, "Print everything that is happening");
                 AddLocalFlag<bool>(colored, "colored", "c", false, "Prettify the output");
             }
 
@@ -50,7 +49,7 @@ namespace Construction {
                 // Add options for debugging
                 Construction::Equations::SubstitutionManager::Instance()->SetMaxTickets(parallelEqns);
 
-                if (debugMode) {
+                if (Lookup<bool>("debug")) {
                     logger.SetDebugLevel("screen", Construction::Common::DebugLevel::DEBUG);
                 }
 
@@ -161,7 +160,7 @@ namespace Construction {
                         offset += summands.size();
                     }
 
-                    std::cout << (colored ? "  \033[36m#<" : "  ") << it->first.id << ":" << it->first.l << ":" << it->first.ld << ":" << it->first.r << ":" << it->first.rd << ">" << (colored ? "\033[0m = " : " = ") << std::endl;
+                    std::cout << (colored ? "  \033[36m#<" : "  #<") << it->first.id << ":" << it->first.l << ":" << it->first.ld << ":" << it->first.r << ":" << it->first.rd << ">" << (colored ? "\033[0m = " : " = ") << std::endl;
 
                     for (int i=0; i<summands.size(); ++i) {
                         auto t = summands[i];
@@ -211,7 +210,7 @@ namespace Construction {
             offset += summands.size();
         }
 
-        std::cout << "  \033[36m#<" << it->first.id << ":" << it->first.l << ":" << it->first.ld << ":" << it->first.r << ":" << it->first.rd << ">" << "\033[0m : " << std::endl;
+        std::cout << "  " << (colored ? "\033[36m" : "") << "#<" << it->first.id << ":" << it->first.l << ":" << it->first.ld << ":" << it->first.r << ":" << it->first.rd << ">" << (colored ? "\033[0m" : "") << " : " << std::endl;
 
         for (int i=0; i<summands.size(); ++i) {
             auto t = summands[i];
@@ -220,18 +219,18 @@ namespace Construction {
                 auto s = t.SeparateScalefactor();
                 auto abc = Construction::Tensor::Scalar(s.second.GetSummands().size(), 1) * s.first;
 
-                std::cout << "     \033[32m";
+                std::cout << "     " << (colored ? "\033[32m" : "");
 
                 char c = 'a' + static_cast<char>(i);
 
                 std::cout << c << coeffPos << " = " << abc.ToString();
             } else if (t.IsScalar()) {
-                std::cout << "     \033[32m" << t.ToString();
+                std::cout << "     " << (colored ? "\033[32m" : "") << t.ToString();
             } else {
-                std::cout << "     \033[33m" << t.ToString();
+                std::cout << "     " << (colored ? "\033[33m" : "") << t.ToString();
             }
 
-            std::cout << "\033[0m";
+            if (colored) std::cout << "\033[0m";
 
             std::cout << std::endl;
         }
@@ -272,7 +271,6 @@ namespace Construction {
         private:
             int parallelEqns;
             bool abc;
-            bool debugMode;
             bool colored;
         };
 
