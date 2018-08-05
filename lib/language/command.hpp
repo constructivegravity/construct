@@ -90,6 +90,8 @@ namespace Construction {
             Command() = default;
             Command(const std::string& name) : name(name) { }
         public:
+            virtual ~Command() { }
+        public:
             std::string GetName() const { return name; }
             void SetName(const std::string& name) { this->name = name; }
         public:

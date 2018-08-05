@@ -10,7 +10,7 @@
 using Construction::Language::CLI;
 
 namespace Construction {
-  
+
     namespace Equations {
 
         /**
@@ -310,6 +310,17 @@ namespace Construction {
 
                     if (c == '>') {
                         inCoeff = false;
+
+                        bool applyMagicSauce = true;
+                        if (mode == 1) {
+                            applyMagicSauce = false;
+                            auto indices = Indices::FromString(temp);
+                            r = indices.Size();
+                            l = 0;
+                            ld = 0;
+                            rd = 0;
+                        }
+
                         mode = 0;
 
                         if (foundOptional) {
@@ -344,7 +355,7 @@ namespace Construction {
                         }
 
                         // Get the coefficient reference
-                        auto ref = Coefficients::Instance()->Get(l, ld, r, rd, id, exchangeSymmetry);
+                        CoefficientReference ref = (applyMagicSauce) ? Coefficients::Instance()->Get(l, ld, r, rd, id, exchangeSymmetry) : Coefficients::Instance()->Get(r, id);
 
                         tmp2 = "";
                         exchangeSymmetry = true;

@@ -21,6 +21,19 @@ namespace Construction {
 			Substitution(const Scalar& variable, const Scalar& other) {
 				substitutions.push_back({variable,other});
 			}
+
+            Substitution(const Substitution& other) : substitutions(other.substitutions) {}
+            Substitution(Substitution&& other) : substitutions(std::move(other.substitutions)) {}
+        public:
+            Substitution& operator=(const Substitution& other) {
+                substitutions = other.substitutions;
+                return *this;
+            }
+
+            Substitution& operator=(Substitution&& other) {
+                substitutions = std::move(other.substitutions);
+                return *this;
+            }
 		public:
 			void Insert(const Scalar& variable, const Scalar& expression) {
 				substitutions.push_back({variable, expression});
@@ -207,6 +220,16 @@ namespace Construction {
 		private:
 			std::vector< std::pair<Scalar, Scalar> > substitutions;
 		};
+
+        // Register the substitution for GetExpressionType
+        namespace detail {
+
+            template<>
+            struct GetExpressionType<Substitution> {
+                static constexpr ExpressionType value = ExpressionType::SUBSTITUTION;
+            };
+
+        }
 
 	}
 }

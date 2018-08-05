@@ -648,6 +648,16 @@ namespace Construction {
             ScalarPointer pointer;
         };
 
+        // Register the scalar for GetExpressionType
+        namespace detail {
+
+            template<>
+            struct GetExpressionType<Scalar> {
+                static constexpr ExpressionType value = ExpressionType::SCALAR;
+            };
+
+        }
+
     }
 }
 

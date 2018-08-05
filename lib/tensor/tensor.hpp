@@ -1691,7 +1691,8 @@ namespace Construction {
 		class EpsilonGammaTensor : public AbstractTensor {
 		public:
 			EpsilonGammaTensor(unsigned numEpsilon, unsigned numGamma, const Indices& indices) : /*Tensor("EpsilonGamma", "\\epsilon\\gamma", indices)*/ AbstractTensor("", "", indices), numEpsilon(numEpsilon), numGamma(numGamma) {
-				assert(numEpsilon * 3 + numGamma*2 == indices.Size());
+				assert(indices.Size() > 0);
+				assert(numEpsilon * (indices[0].GetRange().GetTo()-indices[0].GetRange().GetFrom()+1) + numGamma*2 == indices.Size());
 
 				type = TensorType::EPSILONGAMMA;
 			}
@@ -1738,9 +1739,9 @@ namespace Construction {
                 // Canonicalize the epsilon contribution
                 if (numEpsilon == 1) {
                     // Sort and append the indices to the new list
-                    newIndices.Append(indices.Partial({0, 2}));
+                    newIndices.Append(indices.Partial({0, indices[0].GetRange().GetTo()-indices[0].GetRange().GetFrom() }));
 
-                    pos += 3;
+                    pos += indices[0].GetRange().GetTo()-indices[0].GetRange().GetFrom() + 1;
                 }
 
                 // Vector for the sorted indices of the gammas
@@ -1775,13 +1776,19 @@ namespace Construction {
 				std::stringstream ss;
 				unsigned pos = 0;
 
+				int epsIndices = indices[0].GetRange().GetTo() - indices[0].GetRange().GetFrom();
+
 				for (unsigned i=0; i<numEpsilon; i++) {
-					ss << "\\epsilon" << indices.Partial({pos,pos+2});
-					pos += 3;
+					ss << "\\epsilon" << indices.Partial({pos,pos+epsIndices});
+					pos += epsIndices + 1;
 				}
 
 				for (unsigned i=0; i<numGamma; i++) {
-					ss << "\\gamma" << indices.Partial({pos, pos+1});
+					if (indices.Size() > 0 && (indices[0].GetRange().GetFrom() == 0 && indices[0].GetRange().GetTo() == 3)) {
+						ss << "\\eta" << indices.Partial({pos,pos+1});
+					} else {
+						ss << "\\gamma" << indices.Partial({pos, pos+1});
+					}
 					pos += 2;
 				}
 
@@ -1808,16 +1815,18 @@ namespace Construction {
 				Scalar result = Scalar::Fraction(1,1);
 				unsigned pos = 0;
 
+				unsigned dim = indices[0].GetRange().GetTo() - indices[0].GetRange().GetFrom() + 1;
+
 				// Calculate the epsilon contribution
 				for (unsigned i=0; i<numEpsilon; i++) {
-					auto indices = this->indices.Partial({pos,pos+2});
-					auto partialArgs = Partial(args, {pos,pos+2});
+					auto indices = this->indices.Partial({pos,pos+dim-1});
+					auto partialArgs = Partial(args, {pos,pos+dim-1});
 
 					result *= EpsilonTensor::GetEpsilonComponents(partialArgs);
 
 					if (result.ToDouble() == 0.0) return result;
 
-					pos += 3;
+					pos += dim;
 				}
 
 				// Calculate the gamma contribution
@@ -1843,10 +1852,11 @@ namespace Construction {
 				int sign = 1;
 
 				Indices newIndices;
+				unsigned dim = indices[0].GetRange().GetTo() - indices[0].GetRange().GetFrom() + 1;
 
 				// Canonicalize the epsilon contribution
 				if (numEpsilon == 1) {
-					auto epsilonIndices = indices.Partial({0, 2});
+					auto epsilonIndices = indices.Partial({0, dim-1});
 
 					// Sort and append the indices to the new list
 					auto sortedIndices = epsilonIndices.Ordered();
@@ -1855,7 +1865,7 @@ namespace Construction {
 					// Find the sign
 					sign = Permutation::From(epsilonIndices, sortedIndices).Sign();
 
-					pos += 3;
+					pos += dim;
 				}
 
 				// Vector for the sorted indices of the gammas
@@ -3713,6 +3723,16 @@ namespace Construction {
 		private:
 			TensorPointer pointer;
 		};
+
+		// Register the tensor for GetExpressionType
+		namespace detail {
+
+			template<>
+			struct GetExpressionType<Tensor> {
+				static constexpr ExpressionType value = ExpressionType::TENSOR;
+			};
+
+		}
 
 	}
 }

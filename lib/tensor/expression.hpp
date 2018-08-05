@@ -4,6 +4,7 @@
 #include <string>
 #include <sstream>
 #include <iostream>
+#include <cassert>
 
 #include <common/serializable.hpp>
 #include <common/printable.hpp>
@@ -127,6 +128,36 @@ namespace Construction {
 			std::string value;
 		};
 
+		// Meta-Programming extraction of the expression type
+		namespace detail {
+
+			template<class T>
+			struct GetExpressionType {
+				static constexpr ExpressionType value = ExpressionType::UNKNOWN;
+			};
+
+			template<>
+			struct GetExpressionType<VoidExpression> {
+				static constexpr ExpressionType value = ExpressionType::VOID_TYPE;
+			};
+
+			template<>
+			struct GetExpressionType<BoolExpression> {
+				static constexpr ExpressionType value = ExpressionType::BOOLEAN;
+			};
+
+			template<>
+			struct GetExpressionType<StringExpression> {
+				static constexpr ExpressionType value = ExpressionType::STRING;
+			};
+
+		}
+
+		template<class T>
+		ExpressionType GetExpressionType() {
+			return detail::GetExpressionType<T>::value;
+		}
+
 		class Expression : public Common::Printable, public Serializable<Expression> {
 		public:
 			Expression() : pointer(ExpressionPointer(new VoidExpression())) { }
@@ -194,10 +225,16 @@ namespace Construction {
             static std::unique_ptr<Expression> Deserialize(std::istream& is);
 		public:
 			template<class T>
-			T As() { return *static_cast<T*>(pointer.get()); }
+			T As() {
+				assert(GetExpressionType<T>() == GetType());
+				return *static_cast<T*>(pointer.get());
+			}
 
 			template<class T>
-			const T* As() const { return static_cast<const T*>(pointer.get()); }
+			const T* As() const {
+				assert(GetExpressionType<T>() == GetType());
+				return static_cast<const T*>(pointer.get());
+			}
 		private:
 			ExpressionPointer pointer;
 		};

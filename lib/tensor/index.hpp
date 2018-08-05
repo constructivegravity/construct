@@ -168,6 +168,10 @@ namespace Construction {
 				return range;
 			}
 
+			inline void SetRange(const Range& value) {
+				range = value;
+			}
+
 			inline bool IsContravariant() const {
 				return up;
 			}
@@ -1168,6 +1172,16 @@ namespace Construction {
 			}
 
 			return result;
+		}
+
+		// Register the indices for GetExpressionType
+		namespace detail {
+
+			template<>
+			struct GetExpressionType<Indices> {
+				static constexpr ExpressionType value = ExpressionType::INDICES;
+			};
+
 		}
 
 	}
