@@ -82,10 +82,22 @@ namespace Construction {
                     }
                 }
 
+                // Print all the coefficients
+                std::cerr << (colored  ? "\033[32m" : "") << "Coefficients:" << (colored? "\033[0m" : "") << std::endl;
+                for (auto it = Construction::Equations::Coefficients::Instance()->begin(); it != Construction::Equations::Coefficients::Instance()->end(); ++it) {
+                    if (it->first.applyMagicSauce) {
+                        std::cout << (colored ? "  \033[36m#<" : "  #<") << it->first.id << ":" << it->first.l << ":" << it->first.ld << ":" << it->first.r << ":" << it->first.rd << ">" << (colored ? "\033[0m" : "") << std::endl;
+                    } else {
+                        std::cout << (colored ? "  \033[36m#<" : "  #<") << it->first.id << ">" << (colored ? "\033[0m" : "") << std::endl;
+                    }
+                }
+                std::cerr << std::endl;
+
                 // Print the code
                 for (auto& eq : equations) {
                     std::cerr<< (colored ? " \033[36m" : " ") << "> " << eq->ToLaTeX() << "\033[0m" << std::endl;
                 }
+                std::cerr << std::endl;
 
                 // Calculate number of coefficients and equations
                 int numberOfSteps = equations.size() + 8 * Construction::Equations::Coefficients::Instance()->Size();
@@ -160,7 +172,11 @@ namespace Construction {
                         offset += summands.size();
                     }
 
-                    std::cout << (colored ? "  \033[36m#<" : "  #<") << it->first.id << ":" << it->first.l << ":" << it->first.ld << ":" << it->first.r << ":" << it->first.rd << ">" << (colored ? "\033[0m = " : " = ") << std::endl;
+                    if (it->first.applyMagicSauce) {
+                        std::cout << (colored ? "  \033[36m#<" : "  #<") << it->first.id << ":" << it->first.l << ":" << it->first.ld << ":" << it->first.r << ":" << it->first.rd << ">" << (colored ? "\033[0m = " : " = ") << std::endl;
+                    } else {
+                        std::cout << (colored ? "  \033[36m#<" : "  #<") << it->first.id << ">" << (colored ? "\033[0m = " : " = ") << std::endl;
+                    }
 
                     for (int i=0; i<summands.size(); ++i) {
                         auto t = summands[i];
@@ -210,7 +226,11 @@ namespace Construction {
             offset += summands.size();
         }
 
-        std::cout << "  " << (colored ? "\033[36m" : "") << "#<" << it->first.id << ":" << it->first.l << ":" << it->first.ld << ":" << it->first.r << ":" << it->first.rd << ">" << (colored ? "\033[0m" : "") << " : " << std::endl;
+        if (it->first.applyMagicSauce) {
+            std::cout << "  " << (colored ? "\033[36m" : "") << "#<" << it->first.id << ":" << it->first.l << ":" << it->first.ld << ":" << it->first.r << ":" << it->first.rd << ">" << (colored ? "\033[0m" : "") << " : " << std::endl;
+        } else {
+            std::cout << "  " << (colored ? "\033[36m" : "") << "#<" << it->first.id << ">" << (colored ? "\033[0m" : "") << " : " << std::endl;
+        }
 
         for (int i=0; i<summands.size(); ++i) {
             auto t = summands[i];

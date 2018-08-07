@@ -401,6 +401,11 @@ namespace Construction {
                     temp += c;
                 }
 
+
+                if (inCoeff) {
+                    throw std::runtime_error("Syntax error");
+                }
+
                 // Check if the equation is trivial
                 {
                     isEmpty = true;
@@ -464,7 +469,7 @@ namespace Construction {
                 CLI cli;
 
                 // Set the coefficient of the session
-                //try {
+                try {
                     cli(eq);
 
                     // III. Convert the output into a substitution
@@ -479,7 +484,7 @@ namespace Construction {
                     //  IV. Give the substitution to the ticket
                     // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
                     ticket->Fulfill(subst);
-                /*} catch (const Exception& e) {
+                } catch (const Exception& e) {
                     state = ABORTED;
 
                     // TODO: THROW EXCEPTION
@@ -491,7 +496,7 @@ namespace Construction {
                     Notify();
 
                     return;
-                }*/
+                }
 
                 // Set the state to solved
                 state = SOLVED;
