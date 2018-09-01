@@ -352,6 +352,8 @@ namespace Construction {
 
                 eq = substName + " = HomogeneousSystem(" + current + "):";
                 test = testName + " = " + current + ":";
+
+                std::cout << eq << std::endl;
             }
         public:
             /**

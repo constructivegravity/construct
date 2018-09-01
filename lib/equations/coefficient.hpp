@@ -579,10 +579,10 @@ namespace Construction {
                 // Add symmetrization of the blocks
                 for (auto block : defn.blocks) {
                     // Symmetrization of block
-                    if (block.indices > 0 && block.symmetry != CoefficientDefinition::SymmetryType::NONE) ++result;
+                    if (block.indices > 1 && block.symmetry != CoefficientDefinition::SymmetryType::NONE) ++result;
 
                     // Symmetrization of derivative blocks
-                    if (block.derivatives > 0) ++result;
+                    if (block.derivatives > 1) ++result;
                 }
 
                 // Exchange symmetries
@@ -681,6 +681,7 @@ namespace Construction {
 
                         // Generate current string
                         std::string currentCmd = "Arbitrary(" + indices.ToCommand() + ")";
+                        std::cout << currentCmd << std::endl;
 
                         // Generate the tensors
                         if (!db->Contains(currentCmd)) {
@@ -704,7 +705,7 @@ namespace Construction {
 
                         for (auto& block : blocks) {
                             // If there are no indices in the block, do nothing
-                            if (block.first.Size() == 0) continue;
+                            if (block.first.Size() == 0 || block.first.Size() == 1) continue;
 
                             switch (block.second) {
                                 case CoefficientDefinition::SymmetryType::NONE:
@@ -715,6 +716,7 @@ namespace Construction {
                                     // Make symmetric
                                     if (block.first.Size() > 1) {
                                         currentCmd = "Symmetrize(" + currentCmd + ", " + block.first.ToCommand() + ")";
+                                        std::cout << currentCmd << std::endl;
 
                                         if (!db->Contains(currentCmd)) {
                                             tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Symmetrize(block.first));
@@ -747,6 +749,7 @@ namespace Construction {
 
                         for (auto& exchanged : exchangedIndices) {
                             currentCmd = "ExchangeSymmetrize(" + currentCmd + ", " + indices.ToCommand() + ", " + exchanged.ToCommand() +")";
+                            std::cout << currentCmd << std::endl;
 
                             if (!db->Contains(currentCmd)) {
                                 tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->ExchangeSymmetrize(indices, exchanged));
@@ -755,10 +758,13 @@ namespace Construction {
                             } else {
                                 tensor = std::make_shared<Construction::Tensor::Tensor>(db->Get(currentCmd).As<Construction::Tensor::Tensor>());
                             }
+
+                            Notify();
                         }
 
                         // ---------- Simplify -----------
                         currentCmd = "LinearIndependent(" + currentCmd + ")";
+                        std::cout << currentCmd << std::endl;
                         if (!db->Contains(currentCmd)) {
                             tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Simplify().RedefineVariables(GetRandomString()));
 
