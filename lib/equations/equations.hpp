@@ -280,22 +280,21 @@ namespace Construction {
                     // Try to parse a coefficient
                     coefficientParser.Parse(c, l);
 
-                    if (!coefficientParser.IsInCoefficient()) {
+                    if (!coefficientParser.IsInCoefficient() && !coefficientParser.IsFinished()) {
                         current += c;
-                        continue;
                     }
 
                     if (coefficientParser.IsFinished()) {
                         auto defn = coefficientParser.GetDefinition();
+                        coefficientParser.Reset();
+
+                        id = defn.name;
 
                         // Canonicalize
                         defn.Canonicalize();
 
                         // Get the coefficient reference
-                        // TODO: need to work on the coefficient references
-                        CoefficientReference ref = (applyMagicSauce) ? Coefficients::Instance()->Get(l, ld, r, rd, id,
-                                                                                                     exchangeSymmetry)
-                                                                     : Coefficients::Instance()->Get(r, id);
+                        CoefficientReference ref = Coefficients::Instance()->Get(defn, id);
 
                         // Replace the coefficient with a dummy name
                         {

@@ -389,7 +389,7 @@ namespace Construction {
 
                             default:
                                 // TODO: proper exception
-                                throw UnknownCommandException();
+                                throw std::runtime_error(std::string("Unexpected expression of type `") + expr.TypeToString() + std::string("`."));
                         }
                     }
 

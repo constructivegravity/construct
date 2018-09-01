@@ -82,9 +82,11 @@ namespace Construction {
             }
 
             void Canonicalize() {
-                using sort_t = std::tuple<Block, Indices, int>;
+                /*using sort_t = std::tuple<Block, Indices, int>;
                 std::vector<sort_t> data;
                 Indices old = indices;
+
+                /*std::cout << ToString() << std::endl;
 
                 for (int i=0; i<blocks.size(); ++i) {
                     auto ind = old.Partial({ 0, blocks[i].indices + blocks[i].derivatives-1 });
@@ -95,7 +97,7 @@ namespace Construction {
 
                 // Sort
                 std::sort(data.begin(), data.end(), [&](const sort_t& a, const sort_t& b) {
-                    if (!this->exchangeSymmetries[std::get<2>(a)]) return true;
+                    //if (!this->exchangeSymmetries[std::get<2>(a)]) return true;
                     return std::get<0>(a) < std::get<0>(b);
                 });
 
@@ -107,13 +109,107 @@ namespace Construction {
                     blocks.push_back(std::get<0>(e));
                     indices.Append(std::get<1>(e));
                 }
+
+                std::cout << ToString() << std::endl << std::endl;*/
+            }
+
+            std::string ToString() const {
+                std::string result = "#<";
+
+                result += name;
+                for (auto& block : blocks) {
+                    result += ":" + std::to_string(block.indices);
+
+                    switch (block.symmetry) {
+                        case CoefficientDefinition::SymmetryType ::SYMMETRIC:
+                            break;
+                        case CoefficientDefinition::SymmetryType ::ANTISYMMETRIC:
+                            result += ",antisymmetric";
+                            break;
+                        case CoefficientDefinition::SymmetryType ::NONE:
+                            result += ",none";
+                            break;
+                    }
+
+                    result += ":" + std::to_string(block.derivatives);
+                }
+
+                if (exchangeSymmetries.size() > 0) result += ":";
+
+                for (int i=0; i<exchangeSymmetries.size(); ++i) {
+                    result += exchangeSymmetries[i] ? "yes" : "no";
+                    if (i < exchangeSymmetries.size()-1) result += ",";
+                }
+
+                result += ">";
+
+                return result;
+            }
+
+            bool operator<(const CoefficientDefinition& other) const {
+                if (blocks.size() < other.blocks.size()) return true;
+                else if (blocks.size() > other.blocks.size()) return false;
+
+                for (int i=0; i<blocks.size(); ++i) {
+                    if (blocks[i] < other.blocks[i]) return true;
+                    else if (blocks[i] > other.blocks[i]) return false;
+                }
+
+                for (int i=0; i<exchangeSymmetries.size(); ++i) {
+                    if (exchangeSymmetries[i] && !other.exchangeSymmetries[i]) return true;
+                    if (!exchangeSymmetries[i] && other.exchangeSymmetries[i]) return false;
+                }
+
+                return name < other.name;
+            }
+
+            bool operator<=(const CoefficientDefinition& other) const {
+                if (blocks.size() < other.blocks.size()) return true;
+                else if (blocks.size() > other.blocks.size()) return false;
+
+                for (int i=0; i<blocks.size(); ++i) {
+                    if (blocks[i] < other.blocks[i]) return true;
+                    else if (blocks[i] > other.blocks[i]) return false;
+                }
+
+                for (int i=0; i<exchangeSymmetries.size(); ++i) {
+                    if (exchangeSymmetries[i] && !other.exchangeSymmetries[i]) return true;
+                    if (!exchangeSymmetries[i] && other.exchangeSymmetries[i]) return false;
+                }
+
+                return name <= other.name;
+            }
+
+            bool operator==(const CoefficientDefinition& other) const {
+                if (blocks.size() != other.blocks.size()) return false;
+
+                for (int i=0; i<blocks.size(); ++i) {
+                    if (blocks[i] != other.blocks[i]) return false;
+                }
+
+                for (int i=0; i<exchangeSymmetries.size(); ++i) {
+                    if (exchangeSymmetries[i] != other.exchangeSymmetries[i]) return false;
+                }
+
+                return name == other.name;
+            }
+
+            inline bool operator>(const CoefficientDefinition& other) const {
+               return other < *this;
+            }
+
+            inline bool operator>=(const CoefficientDefinition& other) const {
+                return other <= *this;
+            }
+
+            inline bool operator!=(const CoefficientDefinition& other) const {
+                return !(*this == other);
             }
 
             std::string name;
             std::vector<Block> blocks;
             std::vector<bool> exchangeSymmetries;
             Indices indices;
-            bool appyMagicSauce=true;
         };
 
         /**
@@ -128,6 +224,14 @@ namespace Construction {
         public:
             CoefficientParser() = default;
         public:
+            void Reset() {
+                inCoeff = false;
+                isFinished = false;
+                ignoreNextToken = false;
+                buffer = "";
+                this->current.clear();
+            }
+
             void Parse(char current, char lookAhead = 0) {
                 // If we are not inside of a coefficient
                 if (!inCoeff) {
@@ -198,21 +302,21 @@ namespace Construction {
                 }
 
                 // If there are no indices
-                if (!IsIndex() && coeff.blocks.size() > 0) throw std::runtime_error("Invalid coefficient definition. Need indices");
+                if (!IsIndex()) throw std::runtime_error("Invalid coefficient definition. Need indices");
 
                 // If we have an index
-                if (IsIndex()) {
-                    coeff.indices = Indices::FromString(PopFront());
+                coeff.indices = Indices::FromString(PopFront());
 
-                    unsigned total = 0;
-                    for (auto& block : coeff.blocks) {
-                        total += block.indices + block.derivatives;
-                    }
+                unsigned total = 0;
+                for (auto& block : coeff.blocks) {
+                    total += block.indices + block.derivatives;
+                }
 
-                    if (coeff.indices.Size() != total) throw std::runtime_error("Invalid coefficient definition. The number of indices does not match.");
+                if (coeff.indices.Size() != total) {
+                    if (total != 0) throw std::runtime_error("Invalid coefficient definition. The number of indices does not match.");
 
-                    // Apply magic sauce?
-                    if (coeff.blocks.size() == 0) coeff.appyMagicSauce = false;
+                    // Don't apply magic sauce
+                    coeff.blocks.push_back(CoefficientDefinition::Block{ static_cast<unsigned>(coeff.indices.Size()), 0, CoefficientDefinition::SymmetryType::NONE });
                 }
 
                 // If we have an exchange symmetry entry
@@ -348,17 +452,7 @@ namespace Construction {
                 ABORTED = 4
             };
         public:
-            Coefficient(unsigned indices, const std::string& id)
-                : applyMagicSauce(false), l(indices), ld(0), r(0), rd(0), id(id), exchangeSymmetry(false), state(DEFERRED)
-            {
-                name = id + GetRandomString(4);
-            }
-
-            // Constructor
-            Coefficient(unsigned l, unsigned ld, unsigned r, unsigned rd, const std::string& id, bool exchangeSymmetry=true)
-                : applyMagicSauce(true), l(l), ld(ld), r(r), rd(rd), id(id), exchangeSymmetry(exchangeSymmetry), state(DEFERRED)
-            {
-                // Generate random name
+            Coefficient(CoefficientDefinition defn, const std::string& id) : defn(defn), id(id), state(DEFERRED) {
                 name = id + GetRandomString(4);
             }
 
@@ -433,10 +527,7 @@ namespace Construction {
         public:
             std::string GetName() const { return name; }
 
-            unsigned GetNumberOfLeftIndices() const { return l; }
-            unsigned GetNumberOfLeftDerivativeIndices() const { return ld; }
-            unsigned GetNumberOfRightIndices() const { return r; }
-            unsigned GetNumberOfRightDerivativeIndices() const { return rd; }
+            CoefficientDefinition GetDefinition() const { return defn; }
         public:
             /**
                 Returns the tensor if it was calculated, otherwise it blocks
@@ -475,6 +566,32 @@ namespace Construction {
                 if (isUnlocked) readMutex.unlock();
                 return !isUnlocked;
             }
+        public:
+            /**
+                \brief Calculate the number of steps needed to calculate the coefficient
+
+                Calculates the actual number of steps that need to be calculated during
+                generation of the coefficient.
+             */
+            unsigned int GetNumberOfSteps() const {
+                unsigned int result = 2; // Arbitrary + Simplify
+
+                // Add symmetrization of the blocks
+                for (auto block : defn.blocks) {
+                    // Symmetrization of block
+                    if (block.indices > 0 && block.symmetry != CoefficientDefinition::SymmetryType::NONE) ++result;
+
+                    // Symmetrization of derivative blocks
+                    if (block.derivatives > 0) ++result;
+                }
+
+                // Exchange symmetries
+                for (auto exchangeSymmetry : defn.exchangeSymmetries) {
+                    if (exchangeSymmetry) ++result;
+                }
+
+                return result;
+            }
         private:
             /**
                 \brief Calculates the actual tensor with the correct symmetries
@@ -496,160 +613,71 @@ namespace Construction {
                     // Set the state to calculating
                     state = CALCULATING;
 
-                    // If no indices, return a variable
-                    if (applyMagicSauce) {
-                        if (l == 0 && ld == 0 && r == 0 && rd == 0) {
-                            tensor = std::make_shared<Construction::Tensor::Tensor>(
+                    // Dealing with a constant
+                    if (defn.indices.Size() == 0) {
+                        tensor = std::make_shared<Construction::Tensor::Tensor>(
                                 Construction::Tensor::Scalar(GetRandomString() + "_1") * Construction::Tensor::Tensor::One()
-                            );
+                        );
 
-                            Notify(); // Arbitrary
-                            Notify(); // Symmetrize 1
-                            Notify(); // Symmetrize 2
-                            Notify(); // Symmetrize 3
-                            Notify(); // Symmetrize 4
-                            Notify(); // Exchange Symmetrize
-                            Notify(); // Simplify
-                        } else {
-                            auto db = Construction::Tensor::ExpressionDatabase::Instance();
-
-                            // Get index blocks
-                            auto block1 = Construction::Tensor::Indices::GetRomanSeries(l, {1,3});
-                            auto block2 = Construction::Tensor::Indices::GetRomanSeries(ld, {1,3}, l);
-                            auto block3 = Construction::Tensor::Indices::GetRomanSeries(r, {1,3}, l+ld);
-                            auto block4 = Construction::Tensor::Indices::GetRomanSeries(rd, {1,3}, l+ld+r);
-
-                            // Generate all the indices
-                            auto indices = block1;
-                            indices.Append(block2);
-                            indices.Append(block3);
-                            indices.Append(block4);
-
-                            // Generate current string
-                            std::string currentCmd = "Arbitrary(" + indices.ToCommand() + ")";
-
-                            // Generate the tensors
-                            if (!db->Contains(currentCmd)) {
-                                tensor = std::make_shared<Construction::Tensor::Tensor>(Construction::Language::API::Arbitrary(indices));
-
-                                // Insert into the database
-                                db->Insert(currentCmd, *tensor);
-                            } else {
-                                Construction::Logger::Debug("Found coefficient in database");
-
-                                auto expr = db->Get(currentCmd).As<Construction::Tensor::Tensor>();
-                                Construction::Logger::Debug("Found ", expr);
-
-                                // Copy from database
-                                tensor = std::make_shared<Construction::Tensor::Tensor>(expr);
-                            }
-
-                            Notify();
-
-                            // Update the session of the coefficient
-                            //session.SetCurrent(currentCmd, *tensor);
-
-                            // Symmetrize first block if necessary
-                            if (block1.Size() > 1) {
-                                currentCmd = "Symmetrize(" + currentCmd + ", " + block1.ToCommand() + ")";
-
-                                if (!db->Contains(currentCmd)) {
-                                    tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Symmetrize(block1));
-                                    db->Insert(currentCmd, *tensor);
-                                } else {
-                                    tensor = std::make_shared<Construction::Tensor::Tensor>(db->Get(currentCmd).As<Construction::Tensor::Tensor>());
-                                }
-
-                                //session.SetCurrent(currentCmd, *tensor);
-                            }
-
-                            Notify();
-
-                            // Symmetrize second block if necessary
-                            if (block2.Size() > 1) {
-                                currentCmd = "Symmetrize(" + currentCmd + ", " + block2.ToCommand() + ")";
-
-                                if (!db->Contains(currentCmd)) {
-                                    tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Symmetrize(block2));
-                                    db->Insert(currentCmd, *tensor);
-                                } else {
-                                    tensor = std::make_shared<Construction::Tensor::Tensor>(db->Get(currentCmd).As<Construction::Tensor::Tensor>());
-                                }
-                            }
-
-                            Notify();
-
-                            // Symmetrize first block if necessary
-                            if (block3.Size() > 1) {
-                                currentCmd = "Symmetrize(" + currentCmd + ", " + block3.ToCommand() + ")";
-
-                                if (!db->Contains(currentCmd)) {
-                                    tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Symmetrize(block3));
-                                    db->Insert(currentCmd, *tensor);
-                                } else {
-                                    tensor = std::make_shared<Construction::Tensor::Tensor>(db->Get(currentCmd).As<Construction::Tensor::Tensor>());
-                                }
-                                //session.SetCurrent(currentCmd, *tensor);
-                            }
-
-                            Notify();
-
-                            // Symmetrize first block if necessary
-                            if (block4.Size() > 1) {
-                                currentCmd = "Symmetrize(" + currentCmd + ", " + block4.ToCommand() + ")";
-
-                                if (!db->Contains(currentCmd)) {
-                                    tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Symmetrize(block4));
-                                    db->Insert(currentCmd, *tensor);
-                                } else {
-                                    tensor = std::make_shared<Construction::Tensor::Tensor>(db->Get(currentCmd).As<Construction::Tensor::Tensor>());
-                                }
-
-                                //session.SetCurrent(currentCmd, *tensor);
-                            }
-
-                            Notify();
-
-                            // Do the block exchange if necessary
-                            if (l == r && ld == rd && exchangeSymmetry) {
-                                auto exchanged = block3;
-                                exchanged.Append(block4);
-                                exchanged.Append(block1);
-                                exchanged.Append(block2);
-
-                                currentCmd = "ExchangeSymmetrize(" + currentCmd + ", " + indices.ToCommand() + ", " + exchanged.ToCommand() +")";
-
-                                if (!db->Contains(currentCmd)) {
-                                    tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->ExchangeSymmetrize(indices, exchanged));
-
-                                    db->Insert(currentCmd, *tensor);
-                                } else {
-                                    tensor = std::make_shared<Construction::Tensor::Tensor>(db->Get(currentCmd).As<Construction::Tensor::Tensor>());
-                                }
-                            }
-
-                            Notify();
-                            //session.SetCurrent(currentCmd, *tensor);
-
-                            // Simplify and redefine variables
-                            currentCmd = "LinearIndependent(" + currentCmd + ")";
-                            if (!db->Contains(currentCmd)) {
-                                tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Simplify().RedefineVariables(GetRandomString()));
-
-                                db->Insert(currentCmd, *tensor);
-                            } else {
-                                tensor = std::make_shared<Construction::Tensor::Tensor>(db->Get(currentCmd).As<Construction::Tensor::Tensor>());
-                            }
-
-                            Notify();
-                        }
-
-                        Session::Instance()->Set(name, std::move(*tensor));
+                        Notify(); // Arbitrary
+                        Notify(); // Simplify
                     } else {
+                        // ------ Arbitrary(...) --------
+
                         auto db = Construction::Tensor::ExpressionDatabase::Instance();
 
                         // Get index blocks
-                        auto indices = Construction::Tensor::Indices::GetRomanSeries(l, {1,3});
+                        std::vector<std::pair<Indices, CoefficientDefinition::SymmetryType>> blocks;
+                        std::vector<Indices> exchangedIndices;
+                        Indices indices;
+
+                        // Prepare all the index blocks and required symmetrization
+                        {
+                            unsigned offset = 0;
+                            for (auto& block : defn.blocks) {
+                                // DOF block
+                                auto block_indices = Construction::Tensor::Indices::GetRomanSeries(block.indices,
+                                                                                                   {1, 3}, offset);
+                                blocks.push_back(std::make_pair(block_indices, block.symmetry));
+                                offset += block.indices;
+                                indices.Append(block_indices);
+
+                                // derivative block
+                                auto derivative_indices = Construction::Tensor::Indices::GetRomanSeries(
+                                        block.derivatives, {1, 3}, offset);
+                                blocks.push_back(std::make_pair(derivative_indices,
+                                                                CoefficientDefinition::SymmetryType::SYMMETRIC));
+                                offset += block.derivatives;
+                                indices.Append(derivative_indices);
+                            }
+                        }
+
+                        // Generate the list of all the exchanged indices
+                        {
+                            for (int i=0; i<defn.exchangeSymmetries.size(); ++i) {
+                                if (!defn.exchangeSymmetries[i]) continue;
+
+                                // Check if necessary
+                                if (defn.blocks[i] != defn.blocks[i+1]) continue;
+
+                                Indices inds;
+                                for (int j=0; j<blocks.size()/2; ++j) {
+                                    if (j != i) {
+                                        inds.Append(blocks[2*j].first);
+                                        inds.Append(blocks[2*j+1].first);
+                                    } else {
+                                        inds.Append(blocks[2*j+2].first);
+                                        inds.Append(blocks[2*j+3].first);
+                                        inds.Append(blocks[2*j].first);
+                                        inds.Append(blocks[2*j+1].first);
+                                        ++j;
+                                    }
+                                }
+                                exchangedIndices.push_back(inds);
+                            }
+                        }
+
+                        // ---------- Arbitrary -----------
 
                         // Generate current string
                         std::string currentCmd = "Arbitrary(" + indices.ToCommand() + ")";
@@ -670,14 +698,66 @@ namespace Construction {
                             tensor = std::make_shared<Construction::Tensor::Tensor>(expr);
                         }
 
-                        Notify(); // Arbitrary
-                        Notify(); // Symmetrize 1
-                        Notify(); // Symmetrize 2
-                        Notify(); // Symmetrize 3
-                        Notify(); // Symmetrize 4
-                        Notify(); // Exchange Symmetrize
+                        Notify();
 
-                        // Simplify and redefine variables
+                        // ---------- Symmetrizations -----------
+
+                        for (auto& block : blocks) {
+                            // If there are no indices in the block, do nothing
+                            if (block.first.Size() == 0) continue;
+
+                            switch (block.second) {
+                                case CoefficientDefinition::SymmetryType::NONE:
+                                    // Do nothing
+                                    break;
+
+                                case CoefficientDefinition::SymmetryType::SYMMETRIC:
+                                    // Make symmetric
+                                    if (block.first.Size() > 1) {
+                                        currentCmd = "Symmetrize(" + currentCmd + ", " + block.first.ToCommand() + ")";
+
+                                        if (!db->Contains(currentCmd)) {
+                                            tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Symmetrize(block.first));
+                                            db->Insert(currentCmd, *tensor);
+                                        } else {
+                                            tensor = std::make_shared<Construction::Tensor::Tensor>(db->Get(currentCmd).As<Construction::Tensor::Tensor>());
+                                        }
+                                    }
+                                    Notify();
+                                    break;
+
+                                case CoefficientDefinition::SymmetryType::ANTISYMMETRIC:
+                                    // Make antisymmetric
+                                    if (block.first.Size() > 1) {
+                                        currentCmd = "AntiSymmetrize(" + currentCmd + ", " + block.first.ToCommand() + ")";
+
+                                        if (!db->Contains(currentCmd)) {
+                                            tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->AntiSymmetrize(block.first));
+                                            db->Insert(currentCmd, *tensor);
+                                        } else {
+                                            tensor = std::make_shared<Construction::Tensor::Tensor>(db->Get(currentCmd).As<Construction::Tensor::Tensor>());
+                                        }
+                                    }
+                                    Notify();
+                                    break;
+                            }
+                        }
+
+                        // ---------- Exchange Symmetrizations -----------
+
+                        for (auto& exchanged : exchangedIndices) {
+                            currentCmd = "ExchangeSymmetrize(" + currentCmd + ", " + indices.ToCommand() + ", " + exchanged.ToCommand() +")";
+
+                            if (!db->Contains(currentCmd)) {
+                                tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->ExchangeSymmetrize(indices, exchanged));
+
+                                db->Insert(currentCmd, *tensor);
+                            } else {
+                                tensor = std::make_shared<Construction::Tensor::Tensor>(db->Get(currentCmd).As<Construction::Tensor::Tensor>());
+                            }
+                        }
+
+                        // ---------- Simplify -----------
                         currentCmd = "LinearIndependent(" + currentCmd + ")";
                         if (!db->Contains(currentCmd)) {
                             tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Simplify().RedefineVariables(GetRandomString()));
@@ -687,13 +767,12 @@ namespace Construction {
                             tensor = std::make_shared<Construction::Tensor::Tensor>(db->Get(currentCmd).As<Construction::Tensor::Tensor>());
                         }
 
-                        Notify(); // Simplify
+                        Notify();
 
+                        // Assign the tensor to the session
                         Session::Instance()->Set(name, std::move(*tensor));
                     }
-
-                    //session.SetCurrent(currentCmd, *tensor);
-                } catch(...) {
+                } catch (...) {
                     // In case of exception, just set the calculation to aborted
                     state = ABORTED;
 
@@ -741,9 +820,8 @@ namespace Construction {
         public:
             std::string ToString(bool includeResult=true) const {
                 std::stringstream ss;
-                ss << "#<" << id << ":" << l << ":" << ld << ":" << r << ":" << rd;
-                if (!exchangeSymmetry) ss << ":no";
-                ss << ">";
+
+                ss << defn.ToString();
 
                 if (state == FINISHED && includeResult) {
                     ss << " = " << tensor->ToString();
@@ -763,11 +841,9 @@ namespace Construction {
 
             std::vector<ObserverFunction> observers;
 
-            bool applyMagicSauce;
-            unsigned l, ld, r, rd;
             std::string id;
             std::string name;
-            bool exchangeSymmetry;
+            CoefficientDefinition defn;
 
             std::shared_ptr<Tensor::Tensor> tensor;
         };
@@ -785,16 +861,12 @@ namespace Construction {
         class Coefficients : public Singleton<Coefficients> {
         public:
             struct Definition {
-                unsigned l;
-                unsigned ld;
-                unsigned r;
-                unsigned rd;
+                CoefficientDefinition defn;
+
                 std::string id;
-                bool exchangeSymmetry;
-                bool applyMagicSauce;
 
                 bool operator==(const Definition& other) const {
-                    return l == other.l && r == other.r && ld == other.ld && rd == other.rd && id == other.id && exchangeSymmetry == other.exchangeSymmetry && applyMagicSauce == other.applyMagicSauce;
+                    return defn == other.defn && id == other.id;
                 }
 
                 bool operator!=(const Definition& other) const {
@@ -802,46 +874,14 @@ namespace Construction {
                 }
 
                 bool operator<(const Definition& other) const {
-                    if (l > other.l) return false;
-                    else if (l < other.l) return true;
-
-                    if (ld > other.ld) return false;
-                    else if (ld < other.ld) return true;
-
-                    if (r > other.r) return false;
-                    else if (r < other.r) return true;
-
-                    if (rd > other.rd) return false;
-                    else if (rd < other.rd) return true;
-
-                    if (!exchangeSymmetry && other.exchangeSymmetry) return false;
-                    else if (exchangeSymmetry && !other.exchangeSymmetry) return true;
-
-                    if (!applyMagicSauce && other.applyMagicSauce) return false;
-                    else if (applyMagicSauce && !other.applyMagicSauce) return true;
-
+                    if (defn > other.defn) return false;
+                    else if (defn < other.defn) return true;
                     return id < other.id;
                 }
 
                 bool operator<=(const Definition& other) const {
-                    if (l > other.l) return false;
-                    else if (l < other.l) return true;
-
-                    if (ld > other.ld) return false;
-                    else if (ld < other.ld) return true;
-
-                    if (r > other.r) return false;
-                    else if (r < other.r) return true;
-
-                    if (rd > other.rd) return false;
-                    else if (rd < other.rd) return true;
-
-                    if (!exchangeSymmetry && other.exchangeSymmetry) return false;
-                    else if (exchangeSymmetry && !other.exchangeSymmetry) return true;
-
-                    if (!applyMagicSauce && other.applyMagicSauce) return false;
-                    else if (applyMagicSauce && !other.applyMagicSauce) return true;
-
+                    if (defn > other.defn) return false;
+                    else if (defn < other.defn) return true;
                     return id <= other.id;
                 }
 
@@ -854,40 +894,40 @@ namespace Construction {
                 }
             };
         public:
-            class DefinitionHasher {
+            /*class DefinitionHasher {
             public:
                 size_t operator()(const Definition& d) const {
-                    return std::hash<unsigned>()(d.l) ^ std::hash<unsigned>()(d.ld) ^ std::hash<unsigned>()(d.r) ^ std::hash<unsigned>()(d.rd) ^ std::hash<std::string>()(d.id) ^ std::hash<bool>()(d.exchangeSymmetry);
+                    auto result = std::hash<std::string>(d.id);
+
+                    result = result ^ std::hash<std::string>(d.defn.name);
+
+                    for (auto& block : d.defn.blocks) {
+                        result = result ^ std::hash<unsigned>(block.indices);
+                        result = result ^ std::hash<unsigned>(block.derivatives);
+                        result = result ^ std::hash<int>(static_cast<int>(block.symmetry));
+                    }
+
+                    for (auto& exchange : d.defn.exchangeSymmetries) {
+                        result = result ^ std::hash<bool>(exchange);
+                    }
+
+                    return result;
                 }
-            };
+            };*/
         public:
-            CoefficientReference Get(unsigned indices, const std::string& id) {
+            CoefficientReference Get(CoefficientDefinition defn, const std::string& id) {
                 Definition d;
-                d.l = indices; d.ld = 0; d.r = 0; d.rd = 0; d.id = id; d.exchangeSymmetry = false; d.applyMagicSauce = false;
+                d.defn = defn;
 
                 auto it = map.find(d);
 
                 if (it != map.end()) {
                     return it->second;
                 } else {
-                    CoefficientReference ref = std::make_shared<Coefficient>(indices, id);
+                    CoefficientReference ref = std::make_shared<Coefficient>(defn, id);
                     map.insert({ d, ref });
                     return ref;
-                }
-            }
 
-            CoefficientReference Get(unsigned l, unsigned ld, unsigned r, unsigned rd, const std::string& id, bool exchangeSymmetry=true) {
-                Definition d;
-                d.l = l; d.ld = ld; d.r = r; d.rd = rd; d.id = id; d.exchangeSymmetry = exchangeSymmetry; d.applyMagicSauce = true;
-
-                auto it = map.find(d);
-
-                if (it != map.end()) {
-                    return it->second;
-                } else {
-                    CoefficientReference ref = std::make_shared<Coefficient>(l, ld, r, rd, id, exchangeSymmetry);
-                    map.insert({ d, ref });
-                    return ref;
                 }
             }
 
@@ -905,6 +945,14 @@ namespace Construction {
             }
 
             size_t Size() const { return map.size(); }
+        public:
+            unsigned int GetNumberOfSteps() const {
+                unsigned int steps = 0;
+                for (auto& it : map) {
+                    steps += it.second->GetNumberOfSteps();
+                }
+                return steps;
+            }
         public:
             typedef std::map<Definition, CoefficientReference>      container_type;
             //typedef std::unordered_map<Definition, CoefficientReference, DefinitionHasher>   container_type;

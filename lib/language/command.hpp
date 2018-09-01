@@ -33,6 +33,7 @@ namespace Construction {
     class UnknownCommandException : public Exception {
     public:
         UnknownCommandException() : Exception("The command is unknown") { }
+        UnknownCommandException(const std::string& name) : Exception(std::string("The command ") + name + std::string(" is unknown")) { }
     };
 
     namespace Language {
@@ -232,7 +233,7 @@ namespace Construction {
 
                 if (pointer != nullptr) {
                     return std::shared_ptr<Command>(pointer);
-                } else throw UnknownCommandException();
+                } else throw UnknownCommandException(name);
             }
 
             /**
