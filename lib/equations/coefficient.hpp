@@ -6,6 +6,8 @@
 #include <functional>
 #include <random>
 #include <memory>
+#include <algorithm>
+#include <string>
 
 #include <common/uuid.hpp>
 #include <language/session.hpp>
@@ -21,6 +23,307 @@ using Construction::Tensor::Indices;
 
 namespace Construction {
     namespace Equations {
+
+        struct CoefficientDefinition {
+            enum class SymmetryType {
+                SYMMETRIC = 0,
+                ANTISYMMETRIC = 1,
+                NONE = 2
+            };
+
+            struct Block {
+                unsigned int indices;
+                unsigned int derivatives;
+                SymmetryType symmetry;
+
+                bool operator<(const Block& other) const {
+                    if (indices < other.indices) return true;
+                    else if (indices > other.indices) return false;
+
+                    if (derivatives < other.derivatives) return true;
+                    else if (derivatives > other.derivatives) return false;
+
+                    return symmetry < other.symmetry;
+                }
+
+                bool operator<=(const Block& other) const {
+                    if (indices < other.indices) return true;
+                    else if (indices > other.indices) return false;
+
+                    if (derivatives < other.derivatives) return true;
+                    else if (derivatives > other.derivatives) return false;
+
+                    return symmetry <= other.symmetry;
+                }
+
+                bool operator==(const Block& other) const {
+                    return indices == other.indices && derivatives == other.derivatives && symmetry == other.symmetry;
+                }
+
+                inline bool operator!=(const Block& other) const {
+                    return !(*this == other);
+                }
+
+                inline bool operator>(const Block& other) const {
+                    return other < *this;
+                }
+
+                inline bool operator>=(const Block& other) const {
+                    return other <= *this;
+                }
+            };
+
+            void AddBlock(unsigned int indices, unsigned derivatives, SymmetryType symmetry) {
+                blocks.push_back(Block{indices, derivatives, symmetry});
+            }
+
+            size_t TotalIndices() const {
+                return indices.Size();
+            }
+
+            void Canonicalize() {
+                using sort_t = std::tuple<Block, Indices, int>;
+                std::vector<sort_t> data;
+                Indices old = indices;
+
+                for (int i=0; i<blocks.size(); ++i) {
+                    auto ind = old.Partial({ 0, blocks[i].indices + blocks[i].derivatives-1 });
+                    old = old.Partial({ blocks[i].indices + blocks[i].derivatives, static_cast<unsigned int>(old.Size())-1 });
+
+                    data.push_back(std::make_tuple(blocks[i], ind, i));
+                }
+
+                // Sort
+                std::sort(data.begin(), data.end(), [&](const sort_t& a, const sort_t& b) {
+                    if (!this->exchangeSymmetries[std::get<2>(a)]) return true;
+                    return std::get<0>(a) < std::get<0>(b);
+                });
+
+                // Get the results
+                blocks.clear();
+                indices.Clear();
+
+                for (auto& e : data) {
+                    blocks.push_back(std::get<0>(e));
+                    indices.Append(std::get<1>(e));
+                }
+            }
+
+            std::string name;
+            std::vector<Block> blocks;
+            std::vector<bool> exchangeSymmetries;
+            Indices indices;
+            bool appyMagicSauce=true;
+        };
+
+        /**
+            \class CoefficientParser
+
+            Class to parse coefficients from input text and return the definition.
+            The syntax is
+
+                #<{namespace}:
+         */
+        class CoefficientParser {
+        public:
+            CoefficientParser() = default;
+        public:
+            void Parse(char current, char lookAhead = 0) {
+                // If we are not inside of a coefficient
+                if (!inCoeff) {
+                    // If we do not see the beginning of a new coefficient, do nothing
+                    if (current != '#' || lookAhead != '<') return;
+                    else {
+                        // Setup a new coefficient
+                        inCoeff = true;
+                        isFinished = false;
+                        ignoreNextToken = true; // Need to take care of the fact that the definition of a coefficient starts with two chars
+                        buffer = "";
+                        this->current.clear();
+                        wholeBuffer = "#<";
+                        return;
+                    }
+                }
+
+                // Ignore the token?
+                if (ignoreNextToken) {
+                    ignoreNextToken = false;
+                    return;
+                }
+
+                wholeBuffer += std::string(1, current);
+
+                // Deal with input
+                if (current == '>') {
+                    inCoeff = false;
+                    isFinished = true;
+                    this->current.push_back(buffer);
+
+                    // Setup the definition of the coefficient
+                    BuildCoefficientDefinition();
+                } else if (current != ':') {
+                    buffer += std::string(1, current);
+                } else {
+                    this->current.push_back(buffer);
+                    buffer = "";
+                }
+            }
+
+            void BuildCoefficientDefinition() {
+                // Check if the input is valid
+                if (current.size() == 0) {
+                    throw std::runtime_error("Invalid coefficient definition. Cannot read coefficient `#<>`.");
+                }
+
+                coeff = CoefficientDefinition();
+
+                // Get name
+                coeff.name = PopFront();
+
+                // Try to add blocks
+                while (IsBlock()) {
+                    auto vec = SplitByComma(PopFront());
+                    unsigned int numDerivatives = std::stoi(PopFront());
+                    unsigned int numIndices = std::stoi(vec[0]);
+                    auto symmetry = CoefficientDefinition::SymmetryType::SYMMETRIC;
+
+                    if (vec.size() > 1) {
+                        auto def = vec[1];
+                        if (def == "symmetric") symmetry = CoefficientDefinition::SymmetryType::SYMMETRIC;
+                        else if (def == "antisymmetric") symmetry = CoefficientDefinition::SymmetryType::ANTISYMMETRIC;
+                        else if (def == "none") symmetry = CoefficientDefinition::SymmetryType::NONE;
+                    }
+
+                    coeff.AddBlock(numIndices, numDerivatives, symmetry);
+                }
+
+                // If there are no indices
+                if (!IsIndex() && coeff.blocks.size() > 0) throw std::runtime_error("Invalid coefficient definition. Need indices");
+
+                // If we have an index
+                if (IsIndex()) {
+                    coeff.indices = Indices::FromString(PopFront());
+
+                    unsigned total = 0;
+                    for (auto& block : coeff.blocks) {
+                        total += block.indices + block.derivatives;
+                    }
+
+                    if (coeff.indices.Size() != total) throw std::runtime_error("Invalid coefficient definition. The number of indices does not match.");
+
+                    // Apply magic sauce?
+                    if (coeff.blocks.size() == 0) coeff.appyMagicSauce = false;
+                }
+
+                // If we have an exchange symmetry entry
+                if (IsExchangeSymmetry()) {
+                    auto vec = SplitByComma(PopFront());
+
+                    // If we have only one entry, treat all blocks equally
+                    if (vec.size() == 1) {
+                        while (vec.size() != coeff.blocks.size()-1) vec.push_back(vec[0]);
+                    }
+
+                    // If we do not have enough entries for the exchange symmetries, complain
+                    if (vec.size() != coeff.blocks.size()-1) throw std::runtime_error("Invalid coefficient definition. Missing exchange symmetry information.");
+
+                    for (auto& e : vec) {
+                        coeff.exchangeSymmetries.push_back(e == "yes");
+                    }
+                }
+
+                // If there was no exchange symmetry block treat it as yes
+                if (coeff.exchangeSymmetries.size() == 0) {
+                    while (coeff.exchangeSymmetries.size() != coeff.blocks.size() - 1) {
+                        coeff.exchangeSymmetries.push_back(true);
+                    }
+                }
+
+                // Expect no further input
+                if (current.size() != 0) std::runtime_error("Invalid coefficient definition.");
+            }
+        private:
+            std::string PopFront() {
+                auto result = current[0];
+                current.erase(current.begin());
+                return result;
+            }
+
+            static std::vector<std::string> SplitByComma(const std::string& block) {
+                std::vector<std::string> result;
+                std::string buffer = "";
+
+                for (auto& c : block) {
+                    if (c == ',') {
+                        // Translate the second block to lower case
+                        result.push_back(buffer);
+                        buffer = "";
+                    } else {
+                        buffer += std::string(1, tolower(c));
+                    }
+                }
+                result.push_back(buffer);
+
+                return result;
+            }
+        public:
+            bool IsInCoefficient() const { return inCoeff; }
+            bool IsFinished() const { return isFinished; }
+
+            bool IsValidInput() const {
+                return IsIndex() || IsExchangeSymmetry() || IsBlock();
+            }
+
+            bool IsIndex() const {
+                if (current.size() < 1) return false;
+                return current[0][0] == '{' && current[0][current[0].size()-1] == '}';
+            }
+
+            bool IsExchangeSymmetry() const {
+                if (current.size() < 1) return false;
+
+                auto vec = SplitByComma(current[0]);
+
+                for (auto& e : vec) {
+                    if (e != "yes" && e != "no") return false;
+                }
+
+                return true;
+            }
+
+            bool IsBlock() const {
+                if (current.size() < 2) return false;
+
+                auto vec = SplitByComma(current[0]);
+
+                std::string numIndices = vec[0];
+                std::string numDerivatives = current[1];
+
+                try {
+                    std::stoi(numIndices);
+                    std::stoi(numDerivatives);
+                } catch(...) {
+                    return false;
+                }
+
+                if (vec.size() == 2)
+                    return (vec[1] == "symmetric" || vec[1] == "antisymmetric" || vec[2] == "none");
+                else if (vec.size() == 1) return true;
+                else return false;
+            }
+
+            CoefficientDefinition GetDefinition() const {
+                return coeff;
+            }
+        private:
+            CoefficientDefinition coeff;
+            std::string wholeBuffer;
+            std::string buffer;
+            std::vector<std::string> current;
+            bool inCoeff = false;
+            bool isFinished = false;
+            bool ignoreNextToken = false;
+        };
 
         /**
             \class Coefficient

@@ -265,121 +265,57 @@ namespace Construction {
                 bool exchangeSymmetry = true;
                 std::string id;
                 unsigned mode=0;
+                CoefficientParser coefficientParser;
 
                 // Recognize a coefficient
                 for (int i=0; i<code.size(); ++i) {
                     char c = code[i];
+                    char l = i < code.size()-1 ? code[i+1] : 0;
 
                     // Ignore comments
-                    if (c == '/' && i<code.size()-1 && code[i+1] == '/' ) {
+                    if (c == '/' && l == '/' ) {
                         break;
                     }
 
-                    if (!inCoeff) {
-                        if (c == '#' && i < code.size()-1 & code[i+1] == '<') {
-                            inCoeff = true;
-                            coeffStart = i;
-                            i++;
-                            continue;
-                        }
+                    // Try to parse a coefficient
+                    coefficientParser.Parse(c, l);
 
+                    if (!coefficientParser.IsInCoefficient()) {
                         current += c;
                         continue;
                     }
 
-                    if (c == ':') {
-                        if (mode == 0) {
-                            id = temp;
-                        } else if (mode == 1) {
-                            l = std::stoi(temp);
-                        } else if (mode == 2) {
-                            ld = std::stoi(temp);
-                        } else if (mode == 3) {
-                            r = std::stoi(temp);
-                        } else if (mode == 4) {
-                            rd = std::stoi(temp);
-                        } else if (mode == 5) {
-                            foundOptional = true;
-                            tmp2 = temp;
-                        }
+                    if (coefficientParser.IsFinished()) {
+                        auto defn = coefficientParser.GetDefinition();
 
-                        temp = "";
-                        mode++;
-                        continue;
-                    }
-
-                    if (c == '>') {
-                        inCoeff = false;
-
-                        bool applyMagicSauce = true;
-                        if (mode == 1) {
-                            applyMagicSauce = false;
-                            auto indices = Indices::FromString(temp);
-                            r = indices.Size();
-                            l = 0;
-                            ld = 0;
-                            rd = 0;
-                        }
-
-                        mode = 0;
-
-                        if (foundOptional) {
-                            if (temp == "no") {
-                                exchangeSymmetry = false;
-                            }
-
-                            temp = tmp2;
-                        }
-
-                        // Bring the coefficients into canonical order.
-                        // Since we have the exchange symmetry, this is of course
-                        // always possible.
-                        if (r < l || (r == l && rd < ld)) {
-                            // Swap the blocks
-                            auto tmp = l;
-                            l = r;
-                            r = tmp;
-
-                            tmp = ld;
-                            ld = rd;
-                            rd = tmp;
-
-                            auto indices = Indices::FromString(temp);
-
-                            auto block1 = indices.Partial({0, r+rd-1});
-                            auto block2 = indices.Partial({r+rd, r+rd+l+ld-1});
-
-                            block2.Append(block1);
-
-                            temp = block2.ToCommand();
-                        }
+                        // Canonicalize
+                        defn.Canonicalize();
 
                         // Get the coefficient reference
-                        CoefficientReference ref = (applyMagicSauce) ? Coefficients::Instance()->Get(l, ld, r, rd, id, exchangeSymmetry) : Coefficients::Instance()->Get(r, id);
-
-                        tmp2 = "";
-                        exchangeSymmetry = true;
-                        foundOptional = false;
+                        // TODO: need to work on the coefficient references
+                        CoefficientReference ref = (applyMagicSauce) ? Coefficients::Instance()->Get(l, ld, r, rd, id,
+                                                                                                     exchangeSymmetry)
+                                                                     : Coefficients::Instance()->Get(r, id);
 
                         // Replace the coefficient with a dummy name
                         {
                             std::stringstream ss;
-                            ss << "RenameIndices(" << ref->GetName() << ", " ;
+                            ss << "RenameIndices(" << ref->GetName() << ", ";
 
-                            auto indices = Construction::Tensor::Indices::GetRomanSeries(l+ld+r+rd, {1,3});
+                            auto indices = Construction::Tensor::Indices::GetRomanSeries(defn.indices.Size(), {1, 3});
                             ss << "{";
-                            for (int i=0; i<indices.Size(); ++i) {
+                            for (int i = 0; i < indices.Size(); ++i) {
                                 ss << indices[i];
-                                if (i < indices.Size()-1) ss << " ";
+                                if (i < indices.Size() - 1) ss << " ";
                             }
                             ss << "}, ";
-                            ss << temp << ")";
+                            ss << defn.indices.ToCommand() << ")";
 
                             current += ss.str();
                         }
 
-                        bool found=false;
-                        for (auto& ref_ : coefficients) {
+                        bool found = false;
+                        for (auto &ref_ : coefficients) {
                             if (ref_ == ref) {
                                 found = true;
                                 break;
@@ -388,21 +324,16 @@ namespace Construction {
 
                         if (!found) {
                             // Add the notification method
-                            ref->RegisterObserver(std::bind(&Equation::OnCoefficientCalculated, this, std::placeholders::_1));
+                            ref->RegisterObserver(
+                                    std::bind(&Equation::OnCoefficientCalculated, this, std::placeholders::_1));
 
                             // Put on the list
                             coefficients.push_back(std::move(ref));
                         }
-
-                        temp = "";
-                        continue;
                     }
-
-                    temp += c;
                 }
 
-
-                if (inCoeff) {
+                if (coefficientParser.IsInCoefficient()) {
                     throw std::runtime_error("Syntax error");
                 }
 
@@ -472,9 +403,11 @@ namespace Construction {
                 try {
                     cli(eq);
 
+                    auto session = Session::Instance();
+
                     // III. Convert the output into a substitution
                     // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-                    auto subst = Session::Instance()->Get(substName).As<Tensor::Substitution>();
+                    auto subst = session->Get(substName).As<Tensor::Substitution>();
 
                     // Store the substitution in the
                     this->substitution = subst;
