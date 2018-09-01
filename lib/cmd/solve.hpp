@@ -5,6 +5,7 @@
 #define RECOVER_FROM_EXCEPTIONS 	0
 #define DEBUG_MODE
 
+#include <regex>
 #include <common/logger.hpp>
 
 #include <equations/equations.hpp>
@@ -72,6 +73,9 @@ namespace Construction {
                 while (std::getline(file, line)) {
                     // Ignore empty lines
                     if (line == "") continue;
+
+                    // Delete all "\r"s
+                    line = std::regex_replace(line, std::regex("\\r"), "");
 
                     // Add the equation
                     auto eq = std::make_shared<Construction::Equations::Equation>(line);
