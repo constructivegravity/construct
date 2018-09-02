@@ -681,7 +681,6 @@ namespace Construction {
 
                         // Generate current string
                         std::string currentCmd = "Arbitrary(" + indices.ToCommand() + ")";
-                        std::cout << currentCmd << std::endl;
 
                         // Generate the tensors
                         if (!db->Contains(currentCmd)) {
@@ -716,7 +715,6 @@ namespace Construction {
                                     // Make symmetric
                                     if (block.first.Size() > 1) {
                                         currentCmd = "Symmetrize(" + currentCmd + ", " + block.first.ToCommand() + ")";
-                                        std::cout << currentCmd << std::endl;
 
                                         if (!db->Contains(currentCmd)) {
                                             tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Symmetrize(block.first));
@@ -749,7 +747,6 @@ namespace Construction {
 
                         for (auto& exchanged : exchangedIndices) {
                             currentCmd = "ExchangeSymmetrize(" + currentCmd + ", " + indices.ToCommand() + ", " + exchanged.ToCommand() +")";
-                            std::cout << currentCmd << std::endl;
 
                             if (!db->Contains(currentCmd)) {
                                 tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->ExchangeSymmetrize(indices, exchanged));
@@ -764,7 +761,6 @@ namespace Construction {
 
                         // ---------- Simplify -----------
                         currentCmd = "LinearIndependent(" + currentCmd + ")";
-                        std::cout << currentCmd << std::endl;
                         if (!db->Contains(currentCmd)) {
                             tensor = std::make_shared<Construction::Tensor::Tensor>(tensor->Simplify().RedefineVariables(GetRandomString()));
 
