@@ -15,6 +15,30 @@
 namespace Construction {
     namespace Cmd {
 
+        std::string TrimLeft(const std::string& str, char c = ' ') {
+            std::string output = str;
+
+            while (output.size() > 0 && output[0] == c) {
+                output = output.substr(1);
+            }
+
+            return output;
+        }
+
+        std::string TrimRight(const std::string& str, char c = ' ') {
+            std::string output = str;
+
+            while (output.size() > 0 && output[output.size()-1] == c) {
+                output = output.substr(0, output.size()-1);
+            }
+
+            return output;
+        }
+
+        std::string Trim(const std::string& str, char c = ' ') {
+            return TrimLeft(TrimRight(str, c), c);
+        }
+
         class SolveCommand : public Cobalt::Command<SolveCommand> {
         public:
             static std::string Use() {
@@ -71,11 +95,17 @@ namespace Construction {
                 // Read line per line and add them as equations
                 std::string line;
                 while (std::getline(file, line)) {
-                    // Ignore empty lines
-                    if (line == "") continue;
+                    // Trim lines to deal with Refik's input
+                    line = Trim(line);
 
                     // Delete all "\r"s
                     line = std::regex_replace(line, std::regex("\\r"), "");
+
+                    // Ignore empty lines
+                    if (line == "") continue;
+
+                    // Ignore comments
+                    if (line.size() > 1 && line[0] == '/' && line[1] == '/') continue;
 
                     // Add the equation
                     auto eq = std::make_shared<Construction::Equations::Equation>(line);

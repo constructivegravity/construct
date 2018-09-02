@@ -313,7 +313,7 @@ namespace Construction {
                 }
 
                 if (coeff.indices.Size() != total) {
-                    if (total != 0) throw std::runtime_error("Invalid coefficient definition. The number of indices does not match.");
+                    if (total != 0) throw std::runtime_error("Invalid coefficient definition `" + wholeBuffer + "`. The number of indices does not match (Expected " + std::to_string(total) + ", got " + std::to_string(coeff.indices.Size()) + ").");
 
                     // Don't apply magic sauce
                     coeff.blocks.push_back(CoefficientDefinition::Block{ static_cast<unsigned>(coeff.indices.Size()), 0, CoefficientDefinition::SymmetryType::NONE });

@@ -267,6 +267,8 @@ namespace Construction {
                 unsigned mode=0;
                 CoefficientParser coefficientParser;
 
+                std::cout << "Code: `" << code << '`' << std::endl;
+
                 // Recognize a coefficient
                 for (int i=0; i<code.size(); ++i) {
                     char c = code[i];
@@ -353,7 +355,7 @@ namespace Construction {
                 eq = substName + " = HomogeneousSystem(" + current + "):";
                 test = testName + " = " + current + ":";
 
-                std::cout << eq << std::endl;
+                std::cout << eq << std::endl << std::endl;
             }
         public:
             /**
