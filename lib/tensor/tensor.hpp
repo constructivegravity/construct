@@ -2896,7 +2896,7 @@ namespace Construction {
 						bool firstEntry = true;
 						std::mutex mutex;
 
-                        Common::TaskPool pool(4);
+                        Common::TaskPool pool(1);
 
 						symmetrizedSummands = pool.Map<std::pair<scalar_type,Tensor>, Tensor>(summands, [&](const Tensor& tensor) {
 							auto result = tensor.Symmetrize(indices).SeparateScalefactor();
@@ -3068,7 +3068,7 @@ namespace Construction {
 
 					// Move the tensors on the stack
 					{
-                        Common::TaskPool pool(4);
+                        Common::TaskPool pool(1);
 
 						stack = pool.Map<Tensor,Indices>(permutations, [this](const Indices& indices) {
 							Tensor clone = *this;

@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <string>
 
+#include <common/task_pool.hpp>
 #include <common/uuid.hpp>
 #include <language/session.hpp>
 #include <tensor/index.hpp>
