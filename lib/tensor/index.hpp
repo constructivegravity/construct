@@ -808,6 +808,85 @@ namespace Construction {
 
 				return result;
 			}
+
+			/**
+                \brief Returns all the possible interesting index combinations for the tensor.
+
+                 Returns all the possible index combinations for the tensor.
+                 It uses a recursive inline methods that fixes the indices one by one
+                 until all indices have a value. In this case the combination is added to the
+                 result.
+             */
+			std::vector<std::vector<unsigned>> GetAllInterestingIndexCombinations() const {
+				// Result
+				std::vector<std::vector<unsigned>> result;
+
+				// Heurestics for special cases
+				if (Size() == 0) return result;
+
+				assert(indices[0].GetRange().GetDimension() == 3 && "Cannot apply the index heuristics for spacetime ranges");
+
+				// Helper method to recursively determine the index combinations
+				std::function<void(const std::vector<unsigned>&)> fn = [&](const std::vector<unsigned>& input) -> void {
+					// If all indices are fixed, add the combination to the list
+					if (input.size() == Size()) {
+						result.push_back(input);
+						return;
+					}
+
+					// Get range of next unfixed index
+					auto range = indices[input.size()].GetRange();
+
+					// Iterate over the range
+					for (auto i : range) {
+						// Add the index to the list
+						std::vector<unsigned> newInput = input;
+						newInput.push_back(i);
+
+						// Recursive call to go to next index
+						fn(newInput);
+					}
+				};
+
+				// Helper method to recursively determine the index combinations
+				std::function<void(const std::vector<unsigned>&)> gn = [&](const std::vector<unsigned>& input) -> void {
+					// If all indices are fixed, add the combination to the list
+					if (input.size() == Size()) {
+						result.push_back(input);
+						return;
+					}
+
+					// Get range of next unfixed index
+					auto range = indices[input.size()].GetRange();
+
+					// Add a 1 as index and still use the method
+					{
+						std::vector<unsigned> newInput = input;
+						newInput.push_back(1);
+
+						// Recursion to add a 1
+						gn(newInput);
+					}
+
+					// Add a 2 as index and still use the standard method from now on
+					{
+						std::vector<unsigned> newInput = input;
+						newInput.push_back(2);
+
+						// Recursion to add a 1
+						fn(newInput);
+					}
+				};
+
+				// Set the first index to one
+                if (Size() == 1) {
+					fn({});
+				} else {
+					gn({1});
+				}
+
+				return result;
+			}
 		public:
 			static Indices GetSeries(unsigned N, const std::string& name, const std::string& printed, const Range& range, unsigned offset=0) {
 				Indices result;

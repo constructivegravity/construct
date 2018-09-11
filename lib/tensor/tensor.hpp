@@ -397,11 +397,11 @@ namespace Construction {
 			 	result.
 			 */
 			std::vector<std::vector<unsigned>> GetAllIndexCombinations() const {
-                return indices.GetAllIndexCombinations();
+                return indices.GetAllInterestingIndexCombinations();
 			}
 
 			virtual std::vector<std::vector<unsigned>> GetAllInterestingIndexCombinations() const {
-				return GetAllIndexCombinations();
+				return indices.GetAllInterestingIndexCombinations();
 			}
 
 			/**
