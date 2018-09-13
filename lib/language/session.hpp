@@ -8,6 +8,7 @@
 
 #include <common/singleton.hpp>
 #include <common/error.hpp>
+#include <common/logger.hpp>
 
 #include <tensor/expression.hpp>
 #include <language/notebook.hpp>
@@ -64,6 +65,22 @@ namespace Construction {
             /*Expression& Get(const std::string& name) {
                 return memory[name];
             }*/
+
+            bool Contains(const std::string& name) const {
+                std::unique_lock<std::mutex> lock(mutex);
+                auto it = memory.find(name);
+                return it != memory.end();
+            }
+
+            std::vector<std::string> Variables() const {
+                std::vector<std::string> result;
+
+                for (auto& kv : memory) {
+                    result.push_back(kv.first);
+                }
+
+                return result;
+            }
 
             Expression Get(const std::string& name) const {
                 std::unique_lock<std::mutex> lock(mutex);

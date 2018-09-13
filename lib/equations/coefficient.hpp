@@ -622,6 +622,9 @@ namespace Construction {
 
                         Notify(); // Arbitrary
                         Notify(); // Simplify
+
+                        // Assign the tensor to the session
+                        Session::Instance()->Set(name, std::move(*tensor));
                     } else {
                         // ------ Arbitrary(...) --------
 
@@ -782,6 +785,8 @@ namespace Construction {
                     // Notify all observers
                     Notify();
                     variable.notify_all();
+
+                    throw;
 
                     return;
                 }

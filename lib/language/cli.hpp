@@ -182,6 +182,15 @@ namespace Construction {
                 // Literals
                 else if (document->IsLiteral()) {
                     auto id = std::dynamic_pointer_cast<LiteralNode>(document)->GetText();
+                    if (!Session::Instance()->Contains(id)) {
+                        std::string msg = "Unknown variable `" + id + "`. Existing variables:\n";
+                        for (auto& var : Session::Instance()->Variables()) {
+                            msg += " - " + var + "\n";
+                        }
+
+                        throw std::runtime_error(msg);
+                    }
+
                     lastResult = Session::Instance()->Get(id);
                     Session::Instance()->SetCurrent(definition[id], lastResult);
 ;
